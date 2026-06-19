@@ -1,0 +1,370 @@
+# Hub-and-Spoke Network — AWS Landing Zone Accelerator
+#
+# Traffic flows
+# ─────────────────────────────────────────────────────
+#  Inbound:   Internet ──► NLB (Ingress-VPC) ──► TGW ──► Spoke-VPC
+#  Outbound:  Spoke-VPC ──► TGW ──► Inspection-VPC ──► NAT-GW ──► Internet
+#  East-West: Spoke-VPC ──► TGW ──► Inspection-VPC (ANFW) ──► TGW ──► Spoke-VPC
+#  VPN:       On-prem ──► VGW/CGW ──► TGW ──► Spokes (via Inspection)
+
+defaultVpc:
+  delete: true
+
+# ─── Transit Gateway ──────────────────────────────────────────────────────────
+transitGateways:
+  - name: Main-TGW
+    account: Network
+    region: eu-west-1
+    asn: 65521
+    defaultRouteTableAssociation: disable
+    defaultRouteTablePropagation: disable
+    autoAcceptSharingAttachments: enable
+    shareTargets:
+      organizationalUnits:
+        - Infrastructure
+        - Workloads
+    tags:
+      - key: Environment
+        value: Hub
+
+# ─── Customer Gateways (VPN) ─────────────────────────────────────────────────
+customerGateways:
+  - name: OnPrem-CGW
+    account: Network
+    region: eu-west-1
+    ipAddress: 203.0.113.10          # On-premises public IP
+    asn: 65000
+    vpnConnections:
+      - name: OnPrem-VPN
+        transitGateway: Main-TGW
+        routeTableAssociations:
+          - routeTableName: VPN-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        staticRoutesOnly: false
+        tunnelSpecifications:
+          - tunnelInsideCidr: 169.254.100.0/30
+          - tunnelInsideCidr: 169.254.100.4/30
+
+# ─── VPCs ─────────────────────────────────────────────────────────────────────
+vpcs:
+
+  # ── Ingress VPC ─────────────────────────────────────────────────────────────
+  # Handles inbound traffic from internet via NLB → forwards to spokes via TGW
+  - name: Ingress-VPC
+    account: Network
+    region: eu-west-1
+    cidrs:
+      - 10.0.0.0/23
+    internetGateway: true
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    subnets:
+      - name: Public-Subnet-A
+        availabilityZone: a
+        routeTable: Public-RT
+        ipv4CidrBlock: 10.0.0.0/26
+      - name: Public-Subnet-B
+        availabilityZone: b
+        routeTable: Public-RT
+        ipv4CidrBlock: 10.0.0.64/26
+      - name: NLB-Private-Subnet-A
+        availabilityZone: a
+        routeTable: NLB-RT
+        ipv4CidrBlock: 10.0.0.128/26
+      - name: NLB-Private-Subnet-B
+        availabilityZone: b
+        routeTable: NLB-RT
+        ipv4CidrBlock: 10.0.0.192/26
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.0.1.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.0.1.16/28
+    transitGatewayAttachments:
+      - name: Ingress-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Ingress-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+    tags:
+      - key: Purpose
+        value: Ingress
+
+  # ── Inspection / Egress VPC ─────────────────────────────────────────────────
+  # AWS Network Firewall for east-west + egress inspection, NAT Gateway for egress
+  - name: Inspection-VPC
+    account: Network
+    region: eu-west-1
+    cidrs:
+      - 10.0.4.0/22
+    internetGateway: true
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    subnets:
+      - name: Firewall-Subnet-A
+        availabilityZone: a
+        routeTable: Firewall-RT
+        ipv4CidrBlock: 10.0.4.0/26
+      - name: Firewall-Subnet-B
+        availabilityZone: b
+        routeTable: Firewall-RT
+        ipv4CidrBlock: 10.0.4.64/26
+      - name: NAT-Public-Subnet-A
+        availabilityZone: a
+        routeTable: NAT-RT
+        ipv4CidrBlock: 10.0.4.128/26
+      - name: NAT-Public-Subnet-B
+        availabilityZone: b
+        routeTable: NAT-RT
+        ipv4CidrBlock: 10.0.4.192/26
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.0.5.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.0.5.16/28
+    transitGatewayAttachments:
+      - name: Inspection-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Inspection-RT
+        routeTablePropagations: []    # Inspection VPC does NOT propagate routes
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+    tags:
+      - key: Purpose
+        value: Inspection-Egress
+
+  # ── Shared Services VPC ─────────────────────────────────────────────────────
+  # Centralised: Active Directory, DNS (Route 53 Resolver), patch management
+  - name: SharedServices-VPC
+    account: SharedServices
+    region: eu-west-1
+    cidrs:
+      - 10.1.0.0/22
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    subnets:
+      - name: App-Private-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.1.0.0/24
+      - name: App-Private-Subnet-B
+        availabilityZone: b
+        routeTable: App-RT
+        ipv4CidrBlock: 10.1.1.0/24
+      - name: Endpoint-Subnet-A
+        availabilityZone: a
+        routeTable: Endpoint-RT
+        ipv4CidrBlock: 10.1.2.0/25
+      - name: Endpoint-Subnet-B
+        availabilityZone: b
+        routeTable: Endpoint-RT
+        ipv4CidrBlock: 10.1.2.128/25
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.1.3.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.1.3.16/28
+    transitGatewayAttachments:
+      - name: SharedServices-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Spoke-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+
+  # ── Dev VPC ──────────────────────────────────────────────────────────────────
+  - name: Dev-VPC
+    account: Dev-Application
+    region: eu-west-1
+    cidrs:
+      - 10.10.0.0/22
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    subnets:
+      - name: App-Private-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.10.0.0/24
+      - name: App-Private-Subnet-B
+        availabilityZone: b
+        routeTable: App-RT
+        ipv4CidrBlock: 10.10.1.0/24
+      - name: Data-Private-Subnet-A
+        availabilityZone: a
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.10.2.0/24
+      - name: Data-Private-Subnet-B
+        availabilityZone: b
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.10.3.0/24
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.10.0.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.10.0.16/28
+    transitGatewayAttachments:
+      - name: Dev-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Spoke-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+
+  # ── Test VPC ─────────────────────────────────────────────────────────────────
+  - name: Test-VPC
+    account: Test-Application
+    region: eu-west-1
+    cidrs:
+      - 10.11.0.0/22
+    subnets:
+      - name: App-Private-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.11.0.0/24
+      - name: App-Private-Subnet-B
+        availabilityZone: b
+        routeTable: App-RT
+        ipv4CidrBlock: 10.11.1.0/24
+      - name: Data-Private-Subnet-A
+        availabilityZone: a
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.11.2.0/24
+      - name: Data-Private-Subnet-B
+        availabilityZone: b
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.11.3.0/24
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.11.0.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.11.0.16/28
+    transitGatewayAttachments:
+      - name: Test-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Spoke-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+
+  # ── Prod VPC ─────────────────────────────────────────────────────────────────
+  - name: Prod-VPC
+    account: Prod-Application
+    region: eu-west-1
+    cidrs:
+      - 10.20.0.0/21
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    subnets:
+      - name: App-Private-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.0.0/24
+      - name: App-Private-Subnet-B
+        availabilityZone: b
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.1.0/24
+      - name: App-Private-Subnet-C
+        availabilityZone: c
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.2.0/24
+      - name: Data-Private-Subnet-A
+        availabilityZone: a
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.20.3.0/24
+      - name: Data-Private-Subnet-B
+        availabilityZone: b
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.20.4.0/24
+      - name: Data-Private-Subnet-C
+        availabilityZone: c
+        routeTable: Data-RT
+        ipv4CidrBlock: 10.20.5.0/24
+      - name: TGW-Attach-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.20.6.0/28
+      - name: TGW-Attach-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.20.6.16/28
+      - name: TGW-Attach-Subnet-C
+        availabilityZone: c
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.20.6.32/28
+    transitGatewayAttachments:
+      - name: Prod-TGW-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Spoke-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        subnets:
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+          - TGW-Attach-Subnet-C
+
+# ─── TGW Route Tables ─────────────────────────────────────────────────────────
+# Ingress-RT:    inbound traffic → Inspection VPC (force through firewall)
+# Spoke-RT:      spoke → spoke goes via Inspection VPC (default route to Inspection)
+# Inspection-RT: Inspection VPC attachment
+# VPN-RT:        on-premises VPN → Inspection VPC then onwards
+transitGatewayRouteTables:
+  - name: Ingress-RT
+    transitGateway:
+      name: Main-TGW
+      account: Network
+  - name: Spoke-RT
+    transitGateway:
+      name: Main-TGW
+      account: Network
+  - name: Inspection-RT
+    transitGateway:
+      name: Main-TGW
+      account: Network
+  - name: VPN-RT
+    transitGateway:
+      name: Main-TGW
+      account: Network

@@ -1,0 +1,25 @@
+enable: true
+
+organizationalUnits:
+  - name: Security
+    organizationalUnits: []
+  - name: Infrastructure
+    organizationalUnits:
+      - name: Network
+      - name: SharedServices
+  - name: Workloads
+    organizationalUnits:
+      - name: Dev
+      - name: Test
+      - name: Prod
+  - name: Sandbox
+  - name: Suspended
+
+serviceControlPolicies:
+  - name: DenyRootUser
+    description: Deny root user actions
+    deploymentTargets:
+      organizationalUnits:
+        - Security
+        - Infrastructure
+        - Workloads

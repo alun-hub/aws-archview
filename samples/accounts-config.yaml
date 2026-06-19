@@ -1,0 +1,46 @@
+mandatoryAccounts:
+  - name: Management
+    description: Organization management account
+    email: management@example.com
+    organizationalUnit: Root
+
+  - name: LogArchive
+    description: Centralized logging account
+    email: log-archive@example.com
+    organizationalUnit: Security
+
+  - name: Audit
+    description: Security audit account
+    email: audit@example.com
+    organizationalUnit: Security
+
+workloadAccounts:
+  - name: Network
+    description: Shared network hub account
+    email: network@example.com
+    organizationalUnit: Infrastructure/Network
+
+  - name: SharedServices
+    description: Shared services (AD, DNS, etc.)
+    email: shared-services@example.com
+    organizationalUnit: Infrastructure/SharedServices
+
+  - name: Dev-Application
+    description: Application development environment
+    email: dev-app@example.com
+    organizationalUnit: Workloads/Dev
+
+  - name: Test-Application
+    description: Application test environment
+    email: test-app@example.com
+    organizationalUnit: Workloads/Test
+
+  - name: Prod-Application
+    description: Application production environment
+    email: prod-app@example.com
+    organizationalUnit: Workloads/Prod
+
+  - name: Sandbox
+    description: Developer sandbox account
+    email: sandbox@example.com
+    organizationalUnit: Sandbox
