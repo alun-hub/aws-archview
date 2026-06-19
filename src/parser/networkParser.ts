@@ -176,29 +176,18 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       })
     }
 
-    // ② Subnets — grouped by type
-    const subnetsByKind = new Map<NodeKind, typeof vpc.subnets>()
+    // ② Subnets — output each subnet individually
     for (const subnet of vpc.subnets ?? []) {
       const kind = subnetKind(subnet.name)
-      const existing = subnetsByKind.get(kind) ?? []
-      existing.push(subnet)
-      subnetsByKind.set(kind, existing)
-    }
-    for (const [kind, subnets] of subnetsByKind) {
-      if (!subnets?.length) continue
-      const label =
-        kind === 'subnet-firewall' ? 'Firewall Subnets'
-        : kind === 'subnet-tgw'   ? 'TGW Attach Subnets'
-        : kind === 'subnet-public' ? 'Public Subnets'
-        : 'Private Subnets'
       nodes.push({
-        id:       `subnet:${vpc.name}:${kind}`,
+        id: `subnet:${vpc.name}:${subnet.name}`,
         kind,
-        label,
+        label: subnet.name,
         data: {
           kind,
-          subnets: subnets.map((s) => `${s.name} (${s.ipv4CidrBlock})`),
-          azs:     [...new Set(subnets.map((s) => s.availabilityZone))].join(', '),
+          cidr: subnet.ipv4CidrBlock,
+          az: subnet.availabilityZone,
+          routeTable: subnet.routeTable,
         },
         parentId: vpcId,
       })
