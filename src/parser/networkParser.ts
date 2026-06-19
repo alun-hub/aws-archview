@@ -180,7 +180,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     for (const subnet of vpc.subnets ?? []) {
       const kind = subnetKind(subnet.name)
       nodes.push({
-        id: `subnet:${vpc.name}:${subnet.name}`,
+        id: `subnet:${vpcId}:${subnet.name}`,
         kind,
         label: subnet.name,
         data: {
@@ -188,6 +188,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           cidr: subnet.ipv4CidrBlock,
           az: subnet.availabilityZone,
           routeTable: subnet.routeTable,
+          sublabel: subnet.ipv4CidrBlock,
         },
         parentId: vpcId,
       })
