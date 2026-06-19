@@ -65,25 +65,48 @@ function computeBox(
   const childPos = new Map<string, { x: number; y: number }>()
 
   if (parentKind === 'vpc') {
+    const getSubnetTierPrefix = (name: string): string => {
+      return name.replace(/[-_][A-Za-z]$/, '')
+    }
+
+    const getSubnetKind = (name: string): string => {
+      const n = name.toLowerCase()
+      if (n.includes('firewall') || n.includes('anfw')) return 'subnet-firewall'
+      if (n.includes('tgw') || n.includes('transit')) return 'subnet-tgw'
+      if (n.includes('public') || n.includes('nat-public') || n.includes('ingress')) return 'subnet-public'
+      return 'subnet-private'
+    }
+
     const subnets = children.filter(c => c.type?.startsWith('subnet'))
     const nonSubnets = children.filter(c => !c.type?.startsWith('subnet'))
 
-    // Sort unique AZs and Tiers
+    // Sort unique AZs and Tier prefixes
     const azs = [...new Set(subnets.map(c => ((c.data as { az?: string })?.az ?? 'a').toLowerCase()))].sort()
     const TIER_ORDER = ['subnet-public', 'subnet-firewall', 'subnet-private', 'subnet-tgw']
-    const tiers = [...new Set(subnets.map(c => (c.data as { kind?: string })?.kind ?? 'subnet-private'))]
-      .sort((x, y) => TIER_ORDER.indexOf(x) - TIER_ORDER.indexOf(y))
+    
+    const uniquePrefixes = [...new Set(subnets.map(c => getSubnetTierPrefix((c.data as { label?: string })?.label ?? '')))]
+      .sort((a, b) => {
+        const kindA = getSubnetKind(a)
+        const kindB = getSubnetKind(b)
+        const idxA = TIER_ORDER.indexOf(kindA)
+        const idxB = TIER_ORDER.indexOf(kindB)
+        if (idxA !== idxB) {
+          return idxA - idxB
+        }
+        return a.localeCompare(b)
+      })
 
     // Calculate dynamic column widths and row heights
     const colWidths = new Array(azs.length).fill(0)
-    const rowHeights = new Array(tiers.length).fill(0)
+    const rowHeights = new Array(uniquePrefixes.length).fill(0)
     for (const { id: cId, box } of childBoxes) {
       const c = nodeMap.get(cId)!
       if (!c.type?.startsWith('subnet')) continue
+      const label = (c.data as { label?: string })?.label ?? ''
       const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
-      const kind = (c.data as { kind?: string })?.kind ?? 'subnet-private'
+      const prefix = getSubnetTierPrefix(label)
       const colIdx = azs.indexOf(az)
-      const rowIdx = tiers.indexOf(kind)
+      const rowIdx = uniquePrefixes.indexOf(prefix)
       if (colIdx !== -1) colWidths[colIdx] = Math.max(colWidths[colIdx], box.width)
       if (rowIdx !== -1) rowHeights[rowIdx] = Math.max(rowHeights[rowIdx], box.height)
     }
@@ -107,10 +130,11 @@ function computeBox(
     for (const { id: cId } of childBoxes) {
       const c = nodeMap.get(cId)!
       if (!c.type?.startsWith('subnet')) continue
+      const label = (c.data as { label?: string })?.label ?? ''
       const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
-      const kind = (c.data as { kind?: string })?.kind ?? 'subnet-private'
+      const prefix = getSubnetTierPrefix(label)
       const colIdx = azs.indexOf(az)
-      const rowIdx = tiers.indexOf(kind)
+      const rowIdx = uniquePrefixes.indexOf(prefix)
 
       // Calculate prefix sums for column offsets and row offsets
       let xOffset = PAD_H

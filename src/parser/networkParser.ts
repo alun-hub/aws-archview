@@ -179,8 +179,9 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     // ② Subnets — output each subnet individually
     for (const subnet of vpc.subnets ?? []) {
       const kind = subnetKind(subnet.name)
+      const subnetNodeId = `subnet:${vpcId}:${subnet.name}`
       nodes.push({
-        id: `subnet:${vpcId}:${subnet.name}`,
+        id: subnetNodeId,
         kind,
         label: subnet.name,
         data: {
@@ -192,6 +193,17 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         },
         parentId: vpcId,
       })
+
+      // If subnet name contains 'nat', add a NAT Gateway leaf node inside it
+      if (subnet.name.toLowerCase().includes('nat')) {
+        nodes.push({
+          id: `natgw:${vpcId}:${subnet.name}`,
+          kind: 'nat-gateway',
+          label: 'NAT Gateway',
+          data: { kind: 'nat-gateway' },
+          parentId: subnetNodeId,
+        })
+      }
     }
 
     // ③ TGW attachment edges with route table label

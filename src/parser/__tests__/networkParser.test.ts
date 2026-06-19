@@ -13,7 +13,8 @@ describe('networkParser', () => {
         subnets: [
           { name: 'App-Private-Subnet-A', availabilityZone: 'a', routeTable: 'App-RT', ipv4CidrBlock: '10.0.0.0/24' },
           { name: 'Public-Subnet-B', availabilityZone: 'b', routeTable: 'Public-RT', ipv4CidrBlock: '10.0.1.0/24' },
-          { name: 'Firewall-Subnet-A', availabilityZone: 'a', routeTable: 'Firewall-RT', ipv4CidrBlock: '10.0.2.0/24' }
+          { name: 'Firewall-Subnet-A', availabilityZone: 'a', routeTable: 'Firewall-RT', ipv4CidrBlock: '10.0.2.0/24' },
+          { name: 'NAT-Public-Subnet-A', availabilityZone: 'a', routeTable: 'NAT-RT', ipv4CidrBlock: '10.0.3.0/24' }
         ]
       }]
     }
@@ -21,7 +22,7 @@ describe('networkParser', () => {
     const model = parseNetwork(config)
     
     const subnets = model.nodes.filter(n => n.parentId === 'vpc:Dev-VPC:Dev')
-    expect(subnets.length).toBe(3)
+    expect(subnets.length).toBe(4)
     
     const subA = subnets.find(s => s.label === 'App-Private-Subnet-A')
     expect(subA).toBeDefined()
@@ -44,5 +45,16 @@ describe('networkParser', () => {
     expect(subF?.data.cidr).toBe('10.0.2.0/24')
     expect(subF?.data.sublabel).toBe('10.0.2.0/24')
     expect(subF?.data.az).toBe('a')
+
+    const natSub = subnets.find(s => s.label === 'NAT-Public-Subnet-A')
+    expect(natSub?.id).toBe('subnet:vpc:Dev-VPC:Dev:NAT-Public-Subnet-A')
+    expect(natSub?.kind).toBe('subnet-public')
+    expect(natSub?.data.cidr).toBe('10.0.3.0/24')
+    expect(natSub?.data.az).toBe('a')
+
+    const natGw = model.nodes.find(n => n.parentId === natSub?.id)
+    expect(natGw).toBeDefined()
+    expect(natGw?.kind).toBe('nat-gateway')
+    expect(natGw?.label).toBe('NAT Gateway')
   })
 })

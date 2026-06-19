@@ -52,6 +52,7 @@ const SVG_MAP: Partial<Record<IconKind, string>> = {
   nlb:                  'nlb.svg',
   alb:                  'alb.svg',
   'network-firewall':   'network-firewall.svg',
+  'nat-gateway':        'nat-gateway.svg',
   // Management
   organizations:        'organizations.svg',
   'control-tower':      'control-tower.svg',
