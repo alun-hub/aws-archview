@@ -19,7 +19,8 @@ describe('organizationParser', () => {
       guardduty: { enable: true },
       securityHub: { enable: true },
       macie: { enable: true },
-      awsConfig: { enableConfigurationRecorder: true }
+      awsConfig: { enableConfigurationRecorder: true },
+      cloudtrail: { enable: true }
     }
     const iam: IamConfig = {
       identityCenter: { enable: true }
@@ -32,11 +33,15 @@ describe('organizationParser', () => {
     expect(auditChildren.map(c => c.kind)).toContain('security-hub')
     expect(auditChildren.map(c => c.kind)).toContain('macie')
     expect(auditChildren.map(c => c.kind)).toContain('config')
+    // Verify that injected nodes do not override kind in data
+    expect(auditChildren.find(c => c.kind === 'guardduty')?.data?.kind).toBeUndefined()
 
     const logChildren = model.nodes.filter(n => n.parentId === 'account:LogArchive')
     expect(logChildren.map(c => c.kind)).toContain('cloudtrail')
+    expect(logChildren.find(c => c.kind === 'cloudtrail')?.data?.kind).toBeUndefined()
 
     const mgmtChildren = model.nodes.filter(n => n.parentId === 'account:Management')
     expect(mgmtChildren.map(c => c.kind)).toContain('iam')
+    expect(mgmtChildren.find(c => c.kind === 'iam')?.data?.kind).toBeUndefined()
   })
 })

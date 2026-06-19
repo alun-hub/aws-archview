@@ -72,7 +72,7 @@ export function parseOrganization(
           id: `guardduty:${account.name}`,
           kind: 'guardduty',
           label: 'GuardDuty',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
@@ -81,7 +81,7 @@ export function parseOrganization(
           id: `security-hub:${account.name}`,
           kind: 'security-hub',
           label: 'Security Hub',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
@@ -90,7 +90,7 @@ export function parseOrganization(
           id: `macie:${account.name}`,
           kind: 'macie',
           label: 'Macie',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
@@ -99,19 +99,19 @@ export function parseOrganization(
           id: `config:${account.name}`,
           kind: 'config',
           label: 'AWS Config',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
     }
 
     if (account.name === 'LogArchive' && securityConfig) {
-      if (securityConfig.cloudtrail?.enable !== false) {
+      if (securityConfig.cloudtrail?.enable) {
         nodes.push({
           id: `cloudtrail:${account.name}`,
           kind: 'cloudtrail',
           label: 'CloudTrail',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
@@ -123,7 +123,7 @@ export function parseOrganization(
           id: `iam:${account.name}`,
           kind: 'iam',
           label: 'IAM Identity Center',
-          data: { kind: 'service' },
+          data: {},
           parentId: id,
         })
       }
