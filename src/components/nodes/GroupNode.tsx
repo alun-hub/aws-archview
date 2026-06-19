@@ -1,5 +1,6 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { AwsIcon, kindBackground, kindBorderColor, type IconKind } from '../../icons/AwsIcon'
+import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
+import { kindBackground, kindBorderColor } from '../../icons/awsIconStyles'
 
 export interface GroupNodeData {
   label: string
@@ -22,8 +23,7 @@ export function GroupNode({ data, selected, width, height }: NodeProps) {
     d.dashed ||
     d.kind === 'root' ||
     d.kind === 'on-premises' ||
-    d.kind.startsWith('subnet-') ||
-    d.kind === 'subnet'
+    isSubnet
   const borderStyle = isDashed ? 'dashed' : 'solid'
 
   const getHeaderText = () => {

@@ -151,7 +151,7 @@ export function DetailPanel({ node }: Props) {
           <Row key={k} label={FIELD_LABEL[k] ?? k} value={v} />
         ))}
       {node.parentId && (
-        <Row label="Parent" value={node.parentId.replace(/^(account|vpc|ou):/, '')} />
+        <Row label="Parent" value={node.parentId.substring(node.parentId.indexOf(':') + 1)} />
       )}
     </div>
   )
