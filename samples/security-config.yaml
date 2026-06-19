@@ -1,0 +1,20 @@
+# AWS Landing Zone Accelerator Security Configuration
+#
+securityHub:
+  enable: true
+  excludeRegions: []
+  standards:
+    - aws-foundational-security-best-practices-v1.0.0
+    - cis-aws-foundational-benchmarks-v1.2.0
+guardduty:
+  enable: true
+  s3Protection:
+    enable: true
+macie:
+  enable: true
+  policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+awsConfig:
+  enableConfigurationRecorder: true
+  enableDeliveryChannel: true
+cloudtrail:
+  enable: true
