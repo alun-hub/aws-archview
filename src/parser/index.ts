@@ -1,5 +1,5 @@
 import yaml from 'js-yaml'
-import type { AccountsConfig, NetworkConfig, OrganizationConfig } from './types'
+import type { AccountsConfig, NetworkConfig, OrganizationConfig, SecurityConfig, IamConfig } from './types'
 import { parseNetwork } from './networkParser'
 import { parseOrganization } from './organizationParser'
 
@@ -9,6 +9,8 @@ export interface LzaConfigs {
   organization?: OrganizationConfig
   accounts?: AccountsConfig
   network?: NetworkConfig
+  security?: SecurityConfig
+  iam?: IamConfig
 }
 
 export type ViewKind = 'organization' | 'network'
