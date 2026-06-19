@@ -6,6 +6,10 @@ const KIND_LABEL: Record<string, string> = {
   account:        'AWS Account',
   vpc:            'VPC',
   subnet:         'Subnet',
+  'subnet-public':  'Public Subnet',
+  'subnet-private': 'Private Subnet',
+  'subnet-firewall':'Firewall Subnet',
+  'subnet-tgw':     'TGW Attachment Subnet',
   tgw:            'Transit Gateway',
   'tgw-rt-group': 'Route Table Group',
   'tgw-rt':       'TGW Route Table',
@@ -13,6 +17,12 @@ const KIND_LABEL: Record<string, string> = {
   cgw:            'Customer Gateway',
   igw:            'Internet Gateway',
   'on-premises':  'On-Premises',
+  'security-hub': 'Security Hub',
+  guardduty:      'GuardDuty',
+  macie:          'Macie',
+  config:         'AWS Config',
+  cloudtrail:     'CloudTrail',
+  iam:            'IAM Identity Center',
   service:        'AWS Service',
 }
 
@@ -22,6 +32,10 @@ const KIND_COLOR: Record<string, string> = {
   account:        '#FF9900',
   'management-account': '#FF9900',
   vpc:            '#8C4FFF',
+  'subnet-public':  '#248814',
+  'subnet-private': '#1A6CAE',
+  'subnet-firewall':'#CC3300',
+  'subnet-tgw':     '#6B3FA0',
   tgw:            '#6B3FA0',
   'tgw-rt-group': '#6B3FA0',
   'tgw-rt':       '#6B3FA0',
@@ -29,6 +43,12 @@ const KIND_COLOR: Record<string, string> = {
   cgw:            '#CC7700',
   igw:            '#007DB8',
   'on-premises':  '#5A5A5A',
+  'security-hub': '#CD2264',
+  guardduty:      '#CD2264',
+  macie:          '#CD2264',
+  config:         '#CD2264',
+  cloudtrail:     '#CD2264',
+  iam:            '#CD2264',
 }
 
 // Human-readable labels for known data keys
@@ -48,6 +68,9 @@ const FIELD_LABEL: Record<string, string> = {
   associations:     'Associations',
   propagatesFrom:   'Propagations (from)',
   sublabel:         'Account',
+  cidr:             'CIDR Block',
+  az:               'Availability Zone',
+  routeTable:       'Route Table',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)

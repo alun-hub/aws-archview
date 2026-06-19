@@ -4,74 +4,126 @@ import { AwsIcon, kindBackground, kindBorderColor, type IconKind } from '../../i
 export interface GroupNodeData {
   label: string
   kind: string
+  cidr?: string
+  az?: string
   sublabel?: string
-  dashed?: boolean
+  cidrs?: string[]
+  email?: string
   [key: string]: unknown
 }
-
-// Kinds that render as compact "leaf" containers (no children, centered layout)
-const COMPACT_KINDS = new Set(['subnet-public', 'subnet-private', 'subnet-firewall', 'subnet-tgw'])
 
 export function GroupNode({ data, selected, width, height }: NodeProps) {
   const d = data as GroupNodeData
   const border = kindBorderColor(d.kind)
   const bg = kindBackground(d.kind)
-  const autoDash = d.dashed || d.kind === 'subnet-tgw' || d.kind === 'subnet-firewall' || d.kind === 'on-premises'
-  const isCompact = COMPACT_KINDS.has(d.kind)
-  const iconSize = isCompact ? 24 : 32
+
+  const isSubnet = d.kind.startsWith('subnet')
+  const isDashed =
+    d.dashed ||
+    d.kind === 'root' ||
+    d.kind === 'on-premises' ||
+    d.kind.startsWith('subnet-') ||
+    d.kind === 'subnet'
+  const borderStyle = isDashed ? 'dashed' : 'solid'
+
+  const getHeaderText = () => {
+    if (d.kind === 'vpc') {
+      const firstCidr = Array.isArray(d.cidrs) && d.cidrs.length > 0
+        ? d.cidrs[0]
+        : (typeof d.cidr === 'string' ? d.cidr : '')
+      return `${d.label}${firstCidr ? ` (${firstCidr})` : ''}`
+    }
+    if (d.kind === 'account' || d.kind === 'management-account') {
+      const email = typeof d.email === 'string' ? d.email : ''
+      return `${d.label}${email ? ` (${email})` : ''}`
+    }
+    return d.label
+  }
 
   return (
     <div
       style={{
         width: width ?? 200,
         height: height ?? 80,
-        border: `${autoDash ? '2px dashed' : '2px solid'} ${border}`,
-        borderRadius: 10,
-        background: selected ? bg.replace(/0\.\d+\)/, '0.18)') : bg,
+        border: `2px ${borderStyle} ${border}`,
+        borderRadius: 8,
+        background: selected ? bg.replace(/0\.\d+\)/, '0.15)') : bg,
         position: 'relative',
         boxSizing: 'border-box',
         boxShadow: selected
-          ? `0 0 0 3px ${border}55, 0 2px 8px rgba(0,0,0,0.12)`
+          ? `0 0 0 3px ${border}44`
           : '0 1px 4px rgba(0,0,0,0.06)',
         transition: 'box-shadow 0.15s',
       }}
     >
-      {/* Label bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: isCompact ? 8 : 10,
-          left: 10,
-          right: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          zIndex: 1,
-        }}
-      >
-        <AwsIcon kind={d.kind as IconKind} size={iconSize} />
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: isCompact ? 11 : 13,
-              fontWeight: 700,
-              color: border,
-              fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-              lineHeight: 1.25,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {d.label}
-          </div>
-          {d.sublabel && (
-            <div style={{ fontSize: 10, color: '#666', fontFamily: 'monospace', marginTop: 1 }}>
-              {d.sublabel}
+      {isSubnet ? (
+        <div
+          style={{
+            padding: '8px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          }}
+        >
+          <AwsIcon kind={d.kind as IconKind} size={22} />
+          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: border,
+                lineHeight: 1.25,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {d.label}
             </div>
-          )}
+            <div
+              style={{
+                fontSize: 10,
+                color: '#666',
+                lineHeight: 1.25,
+                marginTop: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {d.cidr || d.sublabel} {d.az ? `[AZ: ${d.az.toUpperCase()}]` : ''}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            top: -2,
+            left: -2,
+            background: border,
+            color: '#fff',
+            padding: '4px 10px',
+            borderTopLeftRadius: 8,
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 8,
+            borderBottomLeftRadius: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            fontWeight: 700,
+            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+            whiteSpace: 'nowrap',
+            zIndex: 2,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          }}
+        >
+          <AwsIcon kind={d.kind as IconKind} size={14} style={{ filter: 'brightness(0) invert(1)' }} />
+          <span>{getHeaderText()}</span>
+        </div>
+      )}
 
       <Handle type="source" position={Position.Top}    id="top-s"    style={{ opacity: 0 }} />
       <Handle type="target" position={Position.Top}    id="top-t"    style={{ opacity: 0 }} />
