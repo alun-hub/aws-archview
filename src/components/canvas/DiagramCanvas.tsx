@@ -41,6 +41,8 @@ const nodeTypes = {
   root:              GroupNode,
   ou:                GroupNode,
   account:           GroupNode,
+  'on-premises':     GroupNode,
+  'tgw-rt-group':    GroupNode,
   vpc:               GroupNode,
   'subnet-public':   GroupNode,
   'subnet-private':  GroupNode,
@@ -48,6 +50,7 @@ const nodeTypes = {
   'subnet-tgw':      GroupNode,
   // ── Leaf service kinds ───────────────────────────────────────────────────
   tgw:               ServiceNode,
+  'tgw-rt':         ServiceNode,
   vpn:               ServiceNode,
   cgw:               ServiceNode,
   'client-vpn':      ServiceNode,
@@ -55,9 +58,9 @@ const nodeTypes = {
   route53:           ServiceNode,
   nlb:               ServiceNode,
   alb:               ServiceNode,
-  'network-firewall': ServiceNode,
-  'nat-gateway':     ServiceNode,
-  igw:               ServiceNode,
+  'network-firewall':  ServiceNode,
+  'nat-gateway':       ServiceNode,
+  igw:                 ServiceNode,
   'security-hub':    ServiceNode,
   guardduty:         ServiceNode,
   inspector:         ServiceNode,
@@ -87,10 +90,15 @@ const nodeTypes = {
 
 // Default sizes for leaf vs group nodes (ELK will compute group sizes)
 // Leaf nodes: fixed dimensions passed to ELK (no compound children)
-const LEAF_W = 96
-const LEAF_H = 96
+const LEAF_W = 100
+const LEAF_H = 110
+
+// Per-kind size overrides for compact service nodes
+const LEAF_SIZE_OVERRIDE: Record<string, { w: number; h: number }> = {
+  'tgw-rt': { w: 80, h: 80 },
+}
 const LEAF_SIZE = new Set([
-  'tgw', 'vpn', 'cgw', 'client-vpn', 'dx', 'route53', 'nlb', 'alb',
+  'tgw', 'tgw-rt', 'vpn', 'cgw', 'client-vpn', 'dx', 'route53', 'nlb', 'alb', 'igw',
   'network-firewall', 'nat-gateway', 'igw', 'security-hub', 'guardduty',
   'inspector', 'macie', 'iam', 'iam-core', 'detective', 'audit-manager',
   'acm', 'kms', 'firewall-manager', 's3', 'backup', 'lambda', 'ec2',
@@ -100,20 +108,23 @@ const LEAF_SIZE = new Set([
 
 // Container nodes: initial dimensions (ELK resizes when they have children)
 const GROUP_MIN: Record<string, { w: number; h: number }> = {
-  root:              { w: 340, h: 140 },
-  ou:                { w: 260, h: 110 },
-  account:           { w: 220, h: 100 },
-  vpc:               { w: 220, h: 100 },
-  'subnet-public':   { w: 180, h:  80 },
-  'subnet-private':  { w: 180, h:  80 },
-  'subnet-firewall': { w: 180, h:  80 },
-  'subnet-tgw':      { w: 180, h:  80 },
+  root:              { w: 380, h: 160 },
+  ou:                { w: 280, h: 120 },
+  account:           { w: 240, h: 110 },
+  'on-premises':     { w: 240, h: 110 },
+  'tgw-rt-group':   { w: 240, h: 120 },
+  vpc:               { w: 240, h: 110 },
+  'subnet-public':   { w: 190, h:  76 },
+  'subnet-private':  { w: 190, h:  76 },
+  'subnet-firewall': { w: 190, h:  76 },
+  'subnet-tgw':      { w: 190, h:  76 },
 }
 
 function toFlowNodes(model: GraphModel): Node[] {
   return model.nodes.map((n) => {
     const isLeaf = LEAF_SIZE.has(n.kind)
     const group = GROUP_MIN[n.kind]
+    const override = LEAF_SIZE_OVERRIDE[n.kind]
     return {
       id: n.id,
       type: n.kind,
@@ -121,7 +132,7 @@ function toFlowNodes(model: GraphModel): Node[] {
       position: { x: 0, y: 0 },
       parentId: n.parentId,
       ...(isLeaf
-        ? { width: LEAF_W, height: LEAF_H }
+        ? { width: override?.w ?? LEAF_W, height: override?.h ?? LEAF_H }
         : { width: group?.w ?? 220, height: group?.h ?? 100 }),
       ...(n.parentId ? { extent: 'parent' as const } : {}),
     }
@@ -129,28 +140,56 @@ function toFlowNodes(model: GraphModel): Node[] {
 }
 
 const EDGE_STYLES: Record<string, { color: string; dash?: string }> = {
-  tgw:     { color: '#6B3FA0', dash: '6 3' },
-  vpn:     { color: '#CC7700', dash: '4 4' },
-  peering: { color: '#1A6CAE', dash: '5 3' },
-  flow:    { color: '#248814' },
+  'tgw':     { color: '#6B3FA0', dash: '6 3' },
+  'tgw-hub': { color: '#6B3FA0', dash: '6 3' }, // same style, different handle routing
+  'vpn':     { color: '#CC7700', dash: '4 4' },
+  'peering': { color: '#1A6CAE', dash: '5 3' },
+  'flow':    { color: '#248814' },
 }
 
 function toFlowEdges(model: GraphModel): Edge[] {
   return model.edges.map((e) => {
     const style = EDGE_STYLES[e.kind ?? 'tgw']
+
+    // tgw-hub:  TGW below hub account → TGW top-s → hub bottom-t
+    // tgw:      TGW above spokes     → TGW bottom-s → spoke top-t
+    // vpn→tgw:  On-Premises is RIGHT of TGW → VPN left-s → TGW right-t
+    const isTgwHub    = e.kind === 'tgw-hub'
+    const isTgwSpoke  = e.kind === 'tgw'
+    const isVpnToTgw  = e.kind === 'vpn' && e.source.startsWith('vpn:') && e.target.startsWith('tgw:')
+
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       type: 'smoothstep',
+      pathOptions: { borderRadius: 16 },
+      ...(isTgwHub   ? { sourceHandle: 'top-s',    targetHandle: 'bottom-t' } : {}),
+      ...(isTgwSpoke ? { sourceHandle: 'bottom-s', targetHandle: 'top-t'    } : {}),
+      ...(isVpnToTgw ? { sourceHandle: 'left-s',   targetHandle: 'right-t'  } : {}),
       style: {
         stroke: style.color,
-        strokeWidth: 1.5,
+        strokeWidth: 2,
         ...(style.dash ? { strokeDasharray: style.dash } : {}),
       },
-      markerEnd: { type: 'arrowclosed' as const, color: style.color, width: 12, height: 12 },
+      markerEnd: { type: 'arrowclosed' as const, color: style.color, width: 14, height: 14 },
       zIndex: 9999,
       animated: false,
+      // Route table label shown as a small pill on the edge
+      ...(e.label
+        ? {
+            label: e.label,
+            labelStyle: {
+              fontSize: 10,
+              fontWeight: 600,
+              fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+              fill: style.color,
+            },
+            labelBgStyle: { fill: '#fff', fillOpacity: 0.85 },
+            labelBgPadding: [4, 6] as [number, number],
+            labelBgBorderRadius: 4,
+          }
+        : {}),
     }
   })
 }
@@ -244,6 +283,7 @@ export function DiagramCanvas({ model }: Props) {
       <MiniMap
         nodeColor={(n) => {
           const kind = (n.data as { kind?: string })?.kind ?? ''
+          if (kind === 'on-premises')                             return '#5A5A5A'
           if (['root', 'ou', 'account'].includes(kind))          return '#E7157B'
           if (kind === 'vpc')                                     return '#8C4FFF'
           if (kind === 'subnet-public')                           return '#248814'

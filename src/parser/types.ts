@@ -139,9 +139,10 @@ export interface IamConfig {
 // ── Parsed graph model ────────────────────────────────────────────────────────
 
 export type NodeKind =
-  | 'root' | 'ou' | 'account'
+  | 'root' | 'ou' | 'account' | 'on-premises'
   | 'vpc' | 'subnet' | 'subnet-public' | 'subnet-private' | 'subnet-firewall' | 'subnet-tgw'
-  | 'tgw' | 'vpn' | 'cgw' | 'dx' | 'nlb' | 'alb' | 'network-firewall' | 'nat-gateway' | 'igw'
+  | 'tgw' | 'tgw-rt-group' | 'tgw-rt' | 'vpn' | 'cgw' | 'dx'
+  | 'nlb' | 'alb' | 'network-firewall' | 'nat-gateway' | 'igw'
   | 'route53' | 'cloudwatch' | 'cloudtrail' | 'config' | 'organizations' | 'control-tower'
   | 'security-hub' | 'guardduty' | 'inspector' | 'macie' | 'iam' | 'acm' | 'kms'
   | 'detective' | 'audit-manager' | 'firewall-manager' | 's3' | 'backup' | 'lambda' | 'service'
@@ -159,7 +160,7 @@ export interface GraphEdge {
   source: string
   target: string
   label?: string
-  kind?: 'tgw' | 'vpn' | 'peering' | 'flow'
+  kind?: 'tgw' | 'tgw-hub' | 'vpn' | 'peering' | 'flow'
 }
 
 export interface GraphModel {

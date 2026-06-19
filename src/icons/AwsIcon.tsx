@@ -6,10 +6,11 @@ import type { CSSProperties } from 'react'
 
 export type IconKind =
   // ── Boundary / group icons ───────────────────────────────────────────────
-  | 'cloud' | 'root' | 'ou' | 'account' | 'management-account' | 'region'
+  | 'cloud' | 'root' | 'ou' | 'account' | 'management-account' | 'region' | 'on-premises'
   | 'vpc' | 'subnet-public' | 'subnet-private' | 'subnet-firewall' | 'subnet-tgw'
+  | 'tgw-rt-group'
   // ── Networking ────────────────────────────────────────────────────────────
-  | 'tgw' | 'vpn' | 'cgw' | 'client-vpn' | 'dx' | 'route53' | 'nlb' | 'alb'
+  | 'tgw' | 'tgw-rt' | 'vpn' | 'cgw' | 'client-vpn' | 'dx' | 'route53' | 'nlb' | 'alb'
   | 'network-firewall' | 'igw' | 'nat-gateway'
   // ── Management & Governance ───────────────────────────────────────────────
   | 'organizations' | 'control-tower' | 'cloudtrail' | 'config' | 'cloudformation'
@@ -35,11 +36,15 @@ const SVG_MAP: Partial<Record<IconKind, string>> = {
   vpc:                  'vpc.svg',
   'subnet-public':      'subnet-public.svg',
   'subnet-private':     'subnet-private.svg',
-  'subnet-firewall':    'subnet-private.svg',   // closest available
-  'subnet-tgw':         'subnet-private.svg',
+  'subnet-firewall':    'network-firewall.svg',
+  'subnet-tgw':         'tgw.svg',
+  'on-premises':        'dx.svg',               // Direct Connect icon for on-prem
   // Networking
   tgw:                  'tgw.svg',
+  'tgw-rt':             'tgw.svg',
+  'tgw-rt-group':       'tgw.svg',
   vpn:                  'vpn.svg',
+  igw:                  'igw.svg',
   cgw:                  'cgw.svg',
   'client-vpn':         'client-vpn.svg',
   dx:                   'dx.svg',
@@ -124,6 +129,10 @@ export function kindBorderColor(kind: string): string {
       return '#6B3FA0'
     case 'region':
       return '#4A90D9'
+    case 'on-premises':
+      return '#5A5A5A'
+    case 'tgw-rt-group':
+      return '#6B3FA0'
     default:
       return '#232F3E'
   }
@@ -139,6 +148,8 @@ export function kindBackground(kind: string): string {
     case 'subnet-firewall':                        return 'rgba(204,51,0,0.06)'
     case 'subnet-tgw':                             return 'rgba(107,63,160,0.06)'
     case 'region':                                 return 'rgba(74,144,217,0.04)'
+    case 'on-premises':                            return 'rgba(90,90,90,0.06)'
+    case 'tgw-rt-group':                           return 'rgba(107,63,160,0.06)'
     default:                                       return 'rgba(35,47,62,0.03)'
   }
 }
