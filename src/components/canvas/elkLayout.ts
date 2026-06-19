@@ -63,6 +63,79 @@ function computeBox(
   const cols = maxCols(parentKind)
   const PT = padTop(parentKind)
   const childPos = new Map<string, { x: number; y: number }>()
+
+  if (parentKind === 'vpc') {
+    const subnets = children.filter(c => c.type?.startsWith('subnet'))
+    const nonSubnets = children.filter(c => !c.type?.startsWith('subnet'))
+
+    // Sort unique AZs and Tiers
+    const azs = [...new Set(subnets.map(c => ((c.data as { az?: string })?.az ?? 'a').toLowerCase()))].sort()
+    const TIER_ORDER = ['subnet-public', 'subnet-firewall', 'subnet-private', 'subnet-tgw']
+    const tiers = [...new Set(subnets.map(c => (c.data as { kind?: string })?.kind ?? 'subnet-private'))]
+      .sort((x, y) => TIER_ORDER.indexOf(x) - TIER_ORDER.indexOf(y))
+
+    // Calculate dynamic column widths and row heights
+    const colWidths = new Array(azs.length).fill(0)
+    const rowHeights = new Array(tiers.length).fill(0)
+    for (const { id: cId, box } of childBoxes) {
+      const c = nodeMap.get(cId)!
+      if (!c.type?.startsWith('subnet')) continue
+      const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
+      const kind = (c.data as { kind?: string })?.kind ?? 'subnet-private'
+      const colIdx = azs.indexOf(az)
+      const rowIdx = tiers.indexOf(kind)
+      if (colIdx !== -1) colWidths[colIdx] = Math.max(colWidths[colIdx], box.width)
+      if (rowIdx !== -1) rowHeights[rowIdx] = Math.max(rowHeights[rowIdx], box.height)
+    }
+
+    // Positions for non-subnet items (like IGW) at the top of VPC
+    let nonSubnetMaxHeight = 0
+    let nsX = PAD_H
+    for (const ns of nonSubnets) {
+      const box = childBoxes.find(cb => cb.id === ns.id)?.box
+      const h = box ? box.height : 110
+      const w = box ? box.width : 100
+      childPos.set(ns.id, { x: nsX, y: PT })
+      nsX += w + H_GAP
+      nonSubnetMaxHeight = Math.max(nonSubnetMaxHeight, h)
+    }
+
+    // Grid start Y coordinate
+    const gridStartY = PT + (nonSubnetMaxHeight > 0 ? nonSubnetMaxHeight + V_GAP : 0)
+
+    // Assign positions to subnets in the AZ grid
+    for (const { id: cId } of childBoxes) {
+      const c = nodeMap.get(cId)!
+      if (!c.type?.startsWith('subnet')) continue
+      const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
+      const kind = (c.data as { kind?: string })?.kind ?? 'subnet-private'
+      const colIdx = azs.indexOf(az)
+      const rowIdx = tiers.indexOf(kind)
+
+      // Calculate prefix sums for column offsets and row offsets
+      let xOffset = PAD_H
+      for (let i = 0; i < colIdx; i++) {
+        xOffset += colWidths[i] + H_GAP
+      }
+      let yOffset = gridStartY
+      for (let i = 0; i < rowIdx; i++) {
+        yOffset += rowHeights[i] + V_GAP
+      }
+
+      childPos.set(cId, { x: xOffset, y: yOffset })
+    }
+
+    // Total width is based on the column width prefix sums
+    const totalGridWidth = colWidths.reduce((sum, w) => sum + w, 0) + (colWidths.length - 1) * H_GAP + PAD_H * 2
+    const totalGridHeight = gridStartY + rowHeights.reduce((sum, h) => sum + h, 0) + (rowHeights.length - 1) * V_GAP + PAD_BOTTOM
+
+    return {
+      width: Math.max(totalGridWidth, nsX + PAD_H, 200),
+      height: Math.max(totalGridHeight, 120),
+      childPos,
+    }
+  }
+
   let rowX = PAD_H, rowY = PT, rowMaxH = 0, colsInRow = 0, totalW = 0
 
   for (const { id: cId, box } of childBoxes) {
