@@ -22,7 +22,7 @@ export function parseYaml<T>(content: string): T {
 
 export function buildOrganizationGraph(configs: LzaConfigs) {
   if (!configs.organization || !configs.accounts) return null
-  return parseOrganization(configs.organization, configs.accounts)
+  return parseOrganization(configs.organization, configs.accounts, configs.security, configs.iam)
 }
 
 export function buildNetworkGraph(configs: LzaConfigs) {

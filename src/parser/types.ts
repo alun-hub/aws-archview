@@ -120,6 +120,7 @@ export interface SecurityConfig {
   securityHub?: { enable: boolean }
   awsConfig?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
   cloudwatch?: { enable?: boolean }
+  cloudtrail?: { enable: boolean }
 }
 
 // ── IAM config ────────────────────────────────────────────────────────────────

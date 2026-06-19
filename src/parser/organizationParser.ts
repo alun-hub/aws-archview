@@ -1,4 +1,4 @@
-import type { AccountsConfig, GraphEdge, GraphModel, GraphNode, OUConfig, OrganizationConfig } from './types'
+import type { AccountsConfig, GraphEdge, GraphModel, GraphNode, OUConfig, OrganizationConfig, SecurityConfig, IamConfig } from './types'
 
 function collectOUs(
   ous: OUConfig[],
@@ -24,6 +24,8 @@ function collectOUs(
 export function parseOrganization(
   orgConfig: OrganizationConfig,
   accountsConfig: AccountsConfig,
+  securityConfig?: SecurityConfig,
+  iamConfig?: IamConfig,
 ): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
@@ -62,6 +64,70 @@ export function parseOrganization(
       },
       parentId: nodeSet.has(parentId) ? parentId : rootId,
     })
+
+    // Inject security services under the respective central accounts
+    if (account.name === 'Audit' && securityConfig) {
+      if (securityConfig.guardduty?.enable) {
+        nodes.push({
+          id: `guardduty:${account.name}`,
+          kind: 'guardduty',
+          label: 'GuardDuty',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+      if (securityConfig.securityHub?.enable) {
+        nodes.push({
+          id: `security-hub:${account.name}`,
+          kind: 'security-hub',
+          label: 'Security Hub',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+      if (securityConfig.macie?.enable) {
+        nodes.push({
+          id: `macie:${account.name}`,
+          kind: 'macie',
+          label: 'Macie',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+      if (securityConfig.awsConfig?.enableConfigurationRecorder) {
+        nodes.push({
+          id: `config:${account.name}`,
+          kind: 'config',
+          label: 'AWS Config',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+    }
+
+    if (account.name === 'LogArchive' && securityConfig) {
+      if (securityConfig.cloudtrail?.enable !== false) {
+        nodes.push({
+          id: `cloudtrail:${account.name}`,
+          kind: 'cloudtrail',
+          label: 'CloudTrail',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+    }
+
+    if (account.name === 'Management' && iamConfig) {
+      if (iamConfig.identityCenter?.enable) {
+        nodes.push({
+          id: `iam:${account.name}`,
+          kind: 'iam',
+          label: 'IAM Identity Center',
+          data: { kind: 'service' },
+          parentId: id,
+        })
+      }
+    }
   }
 
   return { nodes, edges }
