@@ -115,21 +115,21 @@ const FIELD_LABEL: Record<string, string> = {
   s3BucketName:      'S3 Log Bucket',
   iamAssignments:    'IAM Assignments',
   // Global config fields
-  homeRegion:        'Hem-region',
-  enabledRegions:    'Aktiverade regioner',
-  logRetentionDays:  'Logglagringstid (dagar)',
+  homeRegion:        'Home Region',
+  enabledRegions:    'Enabled Regions',
+  logRetentionDays:  'Log Retention (days)',
   managementRole:    'Management Access Role',
-  mandatoryTags:     'Obligatoriska taggar',
-  vaults:            'Backup-valv',
-  enabled:           'Aktiverad',
-  budgets:           'Budgetar',
+  mandatoryTags:     'Mandatory Tags',
+  vaults:            'Backup Vaults',
+  enabled:           'Enabled',
+  budgets:           'Budgets',
   // Customizations fields
   isStackSet:        'Stack Set',
-  description:       'Beskrivning',
-  template:          'Template-fil',
-  regions:           'Regioner',
-  parameters:        'Parametrar',
-  provider:          'Leverantör',
+  description:       'Description',
+  template:          'Template File',
+  regions:           'Regions',
+  parameters:        'Parameters',
+  provider:          'Provider',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)
@@ -225,19 +225,19 @@ export function DetailPanel({ node }: Props) {
   const columns: TableProps<IdentityCenterAssignmentConfig>['columnDefinitions'] = useMemo(() => [
     {
       id: 'principal',
-      header: 'SSO-grupp (Principal)',
+      header: 'SSO Group (Principal)',
       cell: item => item.principalId,
       sortingField: 'principal'
     },
     {
       id: 'role',
-      header: 'Behörighet (Permission Set)',
+      header: 'Permission Set',
       cell: item => item.permissionSetName,
       sortingField: 'role'
     },
     {
       id: 'description',
-      header: 'Beskrivning',
+      header: 'Description',
       cell: item => {
         const ps = permissionSetsMap.get(item.permissionSetName)
         return ps?.description ?? '-'
@@ -245,7 +245,7 @@ export function DetailPanel({ node }: Props) {
     },
     {
       id: 'duration',
-      header: 'Sessionslängd',
+      header: 'Session Duration',
       cell: item => {
         const ps = permissionSetsMap.get(item.permissionSetName)
         return ps?.sessionDuration ?? '-'
@@ -253,13 +253,13 @@ export function DetailPanel({ node }: Props) {
     },
     {
       id: 'policies',
-      header: 'Policys',
+      header: 'Policies',
       cell: item => {
         const ps = permissionSetsMap.get(item.permissionSetName)
         if (!ps) return '-'
         const aws = ps.awsManagedPolicies?.map(arn => arn.split('/').pop()) ?? []
         const cust = ps.customerManagedPolicies?.map(p => p.name) ?? []
-        return [...aws, ...cust].join(', ') || 'Inga bifogade'
+        return [...aws, ...cust].join(', ') || 'None attached'
       }
     }
   ], [permissionSetsMap])
@@ -299,7 +299,7 @@ export function DetailPanel({ node }: Props) {
   if (!node) {
     return (
       <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'sans-serif', padding: '8px 0' }}>
-        Klicka på en nod i diagrammet för att se detaljer.
+        Click on a node in the diagram to view details.
       </div>
     )
   }
@@ -338,13 +338,13 @@ export function DetailPanel({ node }: Props) {
 
       {matchingAssignments.length > 0 && (
         <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
-          <Header variant="h3">SSO-tilldelningar</Header>
+          <Header variant="h3">SSO Assignments</Header>
           <div style={{ height: 8 }} />
           <SpaceBetween size="s">
             <Box variant="p">
-              Det finns <strong>{matchingAssignments.length}</strong> aktiva SSO-rolltilldelningar för detta objekt.
+              There are <strong>{matchingAssignments.length}</strong> active SSO assignments for this object.
             </Box>
-            <Button onClick={() => setModalOpen(true)}>Visa SSO-tilldelningar</Button>
+            <Button onClick={() => setModalOpen(true)}>Show SSO Assignments</Button>
           </SpaceBetween>
         </div>
       )}
@@ -352,16 +352,16 @@ export function DetailPanel({ node }: Props) {
       <Modal
         onDismiss={() => setModalOpen(false)}
         visible={modalOpen}
-        header={`SSO-tilldelningar för ${node?.label}`}
+        header={`SSO Assignments for ${node?.label}`}
         size="large"
-        closeAriaLabel="Stäng modal"
+        closeAriaLabel="Close modal"
       >
         <SpaceBetween size="m">
           <Input
             value={filteringText}
             onChange={({ detail }) => setFilteringText(detail.value)}
-            placeholder="Sök grupp eller roll..."
-            clearAriaLabel="Rensa sökning"
+            placeholder="Search group or role..."
+            clearAriaLabel="Clear search"
           />
           <Table
             columnDefinitions={columns}
@@ -374,7 +374,7 @@ export function DetailPanel({ node }: Props) {
             }}
             empty={
               <Box textAlign="center" color="inherit">
-                Inga SSO-tilldelningar hittades
+                No SSO assignments found
               </Box>
             }
           />

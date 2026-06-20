@@ -242,12 +242,12 @@ function toFlowEdges(model: GraphModel): Edge[] {
 // ── SearchBar ────────────────────────────────────────────────────────────────
 
 const KIND_LABEL: Record<string, string> = {
-  root: 'Root', ou: 'OU', account: 'Konto', region: 'Region',
-  vpc: 'VPC', 'subnet-public': 'Publikt subnät', 'subnet-private': 'Privat subnät',
-  'subnet-firewall': 'Firewall-subnät', 'subnet-tgw': 'TGW-subnät',
+  root: 'Root', ou: 'OU', account: 'Account', region: 'Region',
+  vpc: 'VPC', 'subnet-public': 'Public Subnet', 'subnet-private': 'Private Subnet',
+  'subnet-firewall': 'Firewall Subnet', 'subnet-tgw': 'TGW Subnet',
   tgw: 'Transit Gateway', vpn: 'VPN', cgw: 'Customer Gateway',
   'on-premises': 'On-Premises', 'security-hub': 'Security Hub',
-  guardduty: 'GuardDuty', 'tgw-rt-group': 'Route Table-grupp',
+  guardduty: 'GuardDuty', 'tgw-rt-group': 'Route Table Group',
   'network-firewall': 'Network Firewall', 'nat-gateway': 'NAT Gateway',
 }
 
@@ -307,7 +307,7 @@ function SearchBar() {
             onKeyDown={e => {
               if (e.key === 'Escape') { setQuery(''); setResults([]); inputRef.current?.blur() }
             }}
-            placeholder="Sök nod… (⌘K)"
+            placeholder="Search node… (⌘K)"
             style={{
               width: '100%',
               padding: '8px 10px 8px 30px',
@@ -373,11 +373,11 @@ function SearchBar() {
 // ── Legend ───────────────────────────────────────────────────────────────────
 
 const LEGEND_EDGES = [
-  { label: 'TGW-koppling',   color: '#6B3FA0', dash: '6 3' },
+  { label: 'TGW Attachment', color: '#6B3FA0', dash: '6 3' },
   { label: 'VPN',            color: '#CC7700', dash: '4 4' },
   { label: 'Peering',        color: '#1A6CAE', dash: '5 3' },
-  { label: 'Propagering',    color: '#6B3FA0', dash: '2 3' },
-  { label: 'Internet-flöde', color: '#248814', dash: undefined },
+  { label: 'Propagation',    color: '#6B3FA0', dash: '2 3' },
+  { label: 'Internet Flow',  color: '#248814', dash: undefined },
 ]
 
 const KBD: React.CSSProperties = {
@@ -418,7 +418,7 @@ function Legend() {
             fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
           }}
         >
-          <span>Förklaring</span>
+          <span>Legend</span>
           <span style={{ opacity: 0.45, fontSize: 9, marginLeft: 8 }}>{open ? '▲' : '▼'}</span>
         </button>
         {open && (
@@ -433,15 +433,15 @@ function Legend() {
               </div>
             ))}
             <div style={{ borderTop: '1px solid #eee', marginTop: 4, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#999', marginBottom: 1 }}>Genvägar</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#999', marginBottom: 1 }}>Shortcuts</div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <kbd style={KBD}>F</kbd> Anpassa vy
+                <kbd style={KBD}>F</kbd> Fit view
               </div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <kbd style={KBD}>Esc</kbd> Avmarkera
+                <kbd style={KBD}>Esc</kbd> Deselect
               </div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <kbd style={KBD}>⌘K</kbd> Sök nod
+                <kbd style={KBD}>⌘K</kbd> Search node
               </div>
             </div>
           </div>

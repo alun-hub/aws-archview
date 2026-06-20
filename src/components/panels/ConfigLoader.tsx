@@ -80,8 +80,8 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           marginBottom: 16,
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Dra och släpp YAML-filer här</div>
-        <div style={{ color: '#aaa', fontSize: 11 }}>eller klicka för att välja</div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Drag and drop YAML files here</div>
+        <div style={{ color: '#aaa', fontSize: 11 }}>or click to select</div>
         <input
           ref={inputRef}
           type="file"
@@ -93,7 +93,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>
-        Förväntade filer
+        Expected files
       </div>
       {expectedFiles.map((f) => {
         const loaded = f in loadedFiles

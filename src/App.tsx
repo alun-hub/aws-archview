@@ -22,10 +22,10 @@ import type { GraphNode } from './parser'
 // ── Left navigation panel ────────────────────────────────────────────────────
 
 const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
-  { id: 'organization',   label: 'Organisation',  requiredConfig: 'organization-config.yaml' },
-  { id: 'network',        label: 'Nätverk',        requiredConfig: 'network-config.yaml'       },
+  { id: 'organization',   label: 'Organization',  requiredConfig: 'organization-config.yaml' },
+  { id: 'network',        label: 'Network',        requiredConfig: 'network-config.yaml'       },
   { id: 'global',         label: 'Global',         requiredConfig: 'global-config.yaml'        },
-  { id: 'customizations', label: 'Anpassningar',   requiredConfig: 'customizations-config.yaml'},
+  { id: 'customizations', label: 'Customizations',   requiredConfig: 'customizations-config.yaml'},
 ]
 
 function LeftPanel() {
@@ -97,34 +97,34 @@ function LeftPanel() {
           </div>
         </ExpandableSection>
 
-        {/* Visa / Dölj koppel — only in network view */}
+        {/* Show / Hide connections — only in network view */}
         {config.activeView === 'network' && (
-          <ExpandableSection header="Visa / Dölj koppel" defaultExpanded variant="navigation">
+          <ExpandableSection header="Show / Hide connections" defaultExpanded variant="navigation">
             <div style={{ padding: '4px 0 8px' }}>
               <SpaceBetween size="s">
                 <Checkbox
                   checked={config.showTgwAttachments}
                   onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'tgwAttachments' })}
                 >
-                  Transit Gateway-kopplingar
+                  Transit Gateway attachments
                 </Checkbox>
                 <Checkbox
                   checked={config.showPropagations}
                   onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'propagations' })}
                 >
-                  TGW RT-propageringar
+                  TGW RT propagations
                 </Checkbox>
                 <Checkbox
                   checked={config.showVpnConnections}
                   onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'vpnConnections' })}
                 >
-                  VPN-anslutningar
+                  VPN connections
                 </Checkbox>
                 <Checkbox
                   checked={config.showInternetFlows}
                   onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'internetFlows' })}
                 >
-                  Internet-flöden
+                  Internet flows
                 </Checkbox>
               </SpaceBetween>
             </div>
@@ -138,10 +138,10 @@ function LeftPanel() {
 // ── App shell ────────────────────────────────────────────────────────────────
 
 const VIEW_LABELS: Record<ViewKind, string> = {
-  organization:   'Organisation',
-  network:        'Nätverk',
+  organization:   'Organization',
+  network:        'Network',
   global:         'Global',
-  customizations: 'Anpassningar',
+  customizations: 'Customizations',
 }
 
 function AppContent() {
@@ -170,6 +170,7 @@ function AppContent() {
 
   // Auto-open detail panel when a node is selected
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (config.selectedNodeId) setToolsOpen(true)
   }, [config.selectedNodeId])
 
@@ -183,7 +184,7 @@ function AppContent() {
       toolsWidth={280}
       navigation={<LeftPanel />}
       tools={
-        <Container header={<Header variant="h3">Detaljer</Header>}>
+        <Container header={<Header variant="h3">Details</Header>}>
           <DetailPanel node={selectedNode} />
         </Container>
       }

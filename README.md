@@ -1,107 +1,129 @@
 # AWS ArchView
 
-Interactive architecture visualizer for [AWS Landing Zone Accelerator (LZA)](https://aws.amazon.com/solutions/implementations/landing-zone-accelerator-on-aws/) configurations. Drop your LZA YAML files onto the canvas and explore your AWS organization and network topology as interactive diagrams — no deployment required.
+AWS ArchView is an interactive, browser-based architecture visualizer for [AWS Landing Zone Accelerator (LZA)](https://aws.amazon.com/solutions/implementations/landing-zone-accelerator-on-aws/) configurations. Simply drag and drop your LZA configuration YAML files onto the canvas to map out and explore your organization structure and network topologies.
 
-![AWS ArchView](docs/screenshot.png)
+Because AWS ArchView is a pure client-side web application, **no server-side processing is performed, and your data never leaves your browser**.
 
-## What it does
+---
 
-AWS ArchView reads your LZA configuration files and renders two interactive views:
+## Key Features
 
-**Organization view** — shows your AWS Organizations hierarchy: root, organizational units (OUs), accounts, Service Control Policies (SCPs), IAM permission sets, and security service assignments (Security Hub, GuardDuty, etc.).
+- **Interactive Diagrams** — Pan, zoom, search, select, and filter nodes dynamically.
+- **Organization View** — Renders your AWS Organization structure: Root, Organizational Units (OUs), Accounts, Service Control Policies (SCPs), security configurations (Macie, GuardDuty, Config, Security Hub, CloudTrail), and AWS IAM Identity Center SSO assignments.
+- **VPC Peering Visualization** — Automatically parses `vpcPeering` configurations from `network-config.yaml` and visualizes peering connections as blue dashed lines between VPC side handles.
+- **SSO Assignments details Modal** — View detailed AWS IAM Identity Center group permissions inside a searchable and sortable Cloudscape Modal Table for any Account or OU, resolving both direct and inherited assignments dynamically.
+- **Network View** — Renders network topology: VPCs, subnets classified by function (public, private, TGW, firewall), Transit Gateways (TGWs), NAT Gateways, Load Balancers, Network Firewalls, and VPN connections.
+- **Dynamic Connection Filters** — Toggle layers in the sidebar to show or hide TGW attachments, TGW route table propagations, VPN connections, and internet flows.
+- **Legend & Shortcuts** — Easily identify edge types and navigate using keybindings (e.g. `⌘K` / `Ctrl+K` to search nodes, `F` to auto-fit view, `Esc` to deselect).
 
-**Network view** — shows your network topology: VPCs, subnets (public/private), Transit Gateways, TGW attachments and route table propagations, and central services.
+---
 
-Clicking any node opens a detail panel with its full configuration properties.
-
-## Getting started
+## Getting Started
 
 ### Prerequisites
-
 - Node.js 18 or later
 - npm
 
-### Install and run
+### Install & Run Locally
+
+To run the application locally on your machine:
 
 ```bash
-git clone https://github.com/your-org/aws-archview.git
+# 1. Clone the repository
+git clone https://github.com/alun-hub/aws-archview.git
 cd aws-archview
+
+# 2. Install dependencies
 npm install
+
+# 3. Start the hot-reloading development server
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173](http://localhost:5173) in your web browser.
 
-### Load your configs
+---
 
-1. Drag and drop one or more LZA YAML files onto the **Config** panel on the left.
-2. The app maps files by name — supported filenames:
+## Using the Application
 
-| File | Content |
+### 1. Load Configurations
+Drag and drop your LZA YAML configuration files directly onto the **Configuration** panel on the left. The application auto-detects and loads them by name:
+
+| Filename | Purpose |
 |---|---|
-| `organization-config.yaml` | OU structure and SCPs |
-| `accounts-config.yaml` | Account definitions |
-| `network-config.yaml` | VPCs, subnets, TGWs |
-| `security-config.yaml` | Security service assignments |
-| `iam-config.yaml` | Permission sets and assignments |
+| `organization-config.yaml` | Defines OUs, root, and SCP attachments. |
+| `accounts-config.yaml` | Defines mandatory and workload account hierarchies. |
+| `network-config.yaml` | Defines VPCs, subnets, TGWs, CGWs, VPNs, and VPC peerings. |
+| `security-config.yaml` | Maps central security logging and protection policies. |
+| `iam-config.yaml` | Defines permission sets and Identity Center assignments. |
 
-3. Switch between **Organisation** and **Nätverk** (Network) in the left navigation.
+### 2. Try the Samples
+The repository includes test configs you can drag-and-drop to try out the visualizer:
+- **`samples/`**: A minimal set of configurations covering all basic views.
+- **`samples-adv/`**: A richer enterprise configuration demonstrating advanced networks (Transit Gateways, route tables, VPNs, and VPC Peerings).
 
-### Try the sample configs
+---
 
-The `samples/` directory contains minimal configs that cover all views:
+## Shortcuts
 
-```bash
-# Just drag these files onto the Config panel in the UI:
-samples/organization-config.yaml
-samples/accounts-config.yaml
-samples/network-config.yaml
-samples/security-config.yaml
-samples/iam-config.yaml
-```
-
-The `samples-adv/` directory contains a more complete example with advanced network features (Transit Gateway, route tables, central services).
-
-## Features
-
-- **No backend** — everything runs in the browser; your config files never leave your machine.
-- **Auto-layout** — diagrams are arranged automatically using ELK hierarchical layout.
-- **Interactive** — pan, zoom, and click nodes to inspect properties.
-- **AWS icon language** — nodes use official AWS Architecture Icons.
-- **Multi-file** — load all five config files together for the richest view, or load just one to explore a single domain.
-
-## Development
-
-```bash
-npm run dev      # Dev server with hot reload at http://localhost:5173
-npm run build    # Type-check + production bundle → dist/
-npm run lint     # ESLint
-npm run test     # Vitest unit tests
-```
-
-## Tech stack
-
-| Layer | Library |
+| Key | Action |
 |---|---|
-| UI framework | React 19 + TypeScript + Vite |
-| App shell | Cloudscape Design System |
-| Diagram engine | ReactFlow (`@xyflow/react`) |
-| Graph layout | ELK.js — hierarchical auto-layout |
-| YAML parser | js-yaml v4 |
-| Icons | Official AWS Architecture Icons |
+| `⌘K` / `Ctrl+K` | Open search bar to search for nodes by name/ID |
+| `F` | Auto-fit the canvas view to frame all nodes |
+| `Esc` | Clear node selection and close details panel |
 
-## Project structure
+---
 
+## Deployment & Production Running
+
+Since AWS ArchView builds into a static Single Page Application (SPA), it does not require a Node.js backend in production and can be served by any static web server or CDN.
+
+### Build Production Assets
+Generate optimized static assets in the `dist/` directory:
+```bash
+npm run build
 ```
-src/
-├── parser/          LZA YAML → graph model (nodes + edges)
-├── store/           App state (React Context + useReducer)
-├── icons/           AWS icon component
-└── components/
-    ├── nodes/       ReactFlow custom node components
-    ├── canvas/      ELK layout + ReactFlow canvas wiring
-    └── panels/      Config loader + detail panel
+
+### Options for Deployment
+
+#### A. AWS Static Hosting (S3 + CloudFront)
+1. Upload the files in `dist/` to an Amazon S3 bucket configured for static website hosting.
+2. Front the bucket with an Amazon CloudFront distribution to serve it securely over HTTPS.
+
+#### B. Cloud Static Providers
+Connect your Git repository directly to modern hosting providers such as:
+- **GitHub Pages**
+- **Cloudflare Pages**
+- **Vercel**
+- **Netlify**
+Configure `npm run build` as the build command and `dist` as the output directory.
+
+#### C. Docker Container
+Run the application in a lightweight Nginx container. Build the image using the provided multi-stage build:
+
+```dockerfile
+# Dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
 ```
+
+Build and run the container locally:
+```bash
+docker build -t aws-archview .
+docker run -p 8080:80 aws-archview
+```
+Open [http://localhost:8080](http://localhost:8080).
+
+---
 
 ## License
 
