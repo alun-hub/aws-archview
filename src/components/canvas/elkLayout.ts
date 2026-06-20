@@ -66,7 +66,7 @@ function computeBox(
 
   if (parentKind === 'vpc') {
     const getSubnetTierPrefix = (name: string): string => {
-      return name.replace(/[-_][A-Za-z]$/, '')
+      return name.replace(/[-_](?:[a-z]{2}-[a-z]+-\d)?[a-z0-9]?[a-z]$/i, '')
     }
 
     const getSubnetKind = (name: string): string => {
@@ -77,11 +77,16 @@ function computeBox(
       return 'subnet-private'
     }
 
+    const getAzLetter = (az?: string): string => {
+      const raw = (az ?? 'a').toLowerCase()
+      return raw.length > 0 ? raw.slice(-1) : 'a'
+    }
+
     const subnets = children.filter(c => c.type?.startsWith('subnet'))
     const nonSubnets = children.filter(c => !c.type?.startsWith('subnet'))
 
     // Sort unique AZs and Tier prefixes
-    const azs = [...new Set(subnets.map(c => ((c.data as { az?: string })?.az ?? 'a').toLowerCase()))].sort()
+    const azs = [...new Set(subnets.map(c => getAzLetter((c.data as { az?: string })?.az)))].sort()
     const TIER_ORDER = ['subnet-public', 'subnet-firewall', 'subnet-private', 'subnet-tgw']
     
     const uniquePrefixes = [...new Set(subnets.map(c => getSubnetTierPrefix((c.data as { label?: string })?.label ?? '')))]
@@ -103,9 +108,9 @@ function computeBox(
       const c = nodeMap.get(cId)!
       if (!c.type?.startsWith('subnet')) continue
       const label = (c.data as { label?: string })?.label ?? ''
-      const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
+      const azLetter = getAzLetter((c.data as { az?: string })?.az)
       const prefix = getSubnetTierPrefix(label)
-      const colIdx = azs.indexOf(az)
+      const colIdx = azs.indexOf(azLetter)
       const rowIdx = uniquePrefixes.indexOf(prefix)
       if (colIdx !== -1) colWidths[colIdx] = Math.max(colWidths[colIdx], box.width)
       if (rowIdx !== -1) rowHeights[rowIdx] = Math.max(rowHeights[rowIdx], box.height)
@@ -131,9 +136,9 @@ function computeBox(
       const c = nodeMap.get(cId)!
       if (!c.type?.startsWith('subnet')) continue
       const label = (c.data as { label?: string })?.label ?? ''
-      const az = ((c.data as { az?: string })?.az ?? 'a').toLowerCase()
+      const azLetter = getAzLetter((c.data as { az?: string })?.az)
       const prefix = getSubnetTierPrefix(label)
-      const colIdx = azs.indexOf(az)
+      const colIdx = azs.indexOf(azLetter)
       const rowIdx = uniquePrefixes.indexOf(prefix)
 
       // Calculate prefix sums for column offsets and row offsets

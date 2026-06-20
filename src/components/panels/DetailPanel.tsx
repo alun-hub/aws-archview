@@ -88,6 +88,8 @@ const FIELD_LABEL: Record<string, string> = {
   deliveryChannel:   'Delivery Channel',
   permissionSets:    'IAM Permission Sets',
   trailEnabled:      'CloudTrail Active',
+  tunnels:           'VPN Tunnels',
+  vpcs:              'VPCs',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)

@@ -87,6 +87,7 @@ const nodeTypes = {
   'service-catalog': ServiceNode,
   service:           ServiceNode,
   subnet:            ServiceNode,
+  cloud:             ServiceNode,
 }
 
 // Default sizes for leaf vs group nodes (ELK will compute group sizes)
@@ -100,11 +101,12 @@ const LEAF_SIZE_OVERRIDE: Record<string, { w: number; h: number }> = {
 }
 const LEAF_SIZE = new Set([
   'tgw', 'tgw-rt', 'vpn', 'cgw', 'client-vpn', 'dx', 'route53', 'nlb', 'alb', 'igw',
-  'network-firewall', 'nat-gateway', 'igw', 'security-hub', 'guardduty',
+  'network-firewall', 'nat-gateway', 'security-hub', 'guardduty',
   'inspector', 'macie', 'iam', 'iam-core', 'detective', 'audit-manager',
   'acm', 'kms', 'firewall-manager', 's3', 'backup', 'lambda', 'ec2',
   'cloudwatch', 'cloudtrail', 'config', 'control-tower', 'organizations',
   'cloudformation', 'systems-manager', 'service-catalog', 'service', 'subnet',
+  'cloud',
 ])
 
 // Container nodes: initial dimensions (ELK resizes when they have children)
@@ -142,11 +144,12 @@ function toFlowNodes(model: GraphModel): Node[] {
 }
 
 const EDGE_STYLES: Record<string, { color: string; dash?: string }> = {
-  'tgw':     { color: '#6B3FA0', dash: '6 3' },
-  'tgw-hub': { color: '#6B3FA0', dash: '6 3' }, // same style, different handle routing
-  'vpn':     { color: '#CC7700', dash: '4 4' },
-  'peering': { color: '#1A6CAE', dash: '5 3' },
-  'flow':    { color: '#248814' },
+  'tgw':         { color: '#6B3FA0', dash: '6 3' },
+  'tgw-hub':     { color: '#6B3FA0', dash: '6 3' }, // same style, different handle routing
+  'vpn':         { color: '#CC7700', dash: '4 4' },
+  'peering':     { color: '#1A6CAE', dash: '5 3' },
+  'flow':        { color: '#248814' },
+  'propagation': { color: '#6B3FA0', dash: '2 3' },
 }
 
 function toFlowEdges(model: GraphModel): Edge[] {

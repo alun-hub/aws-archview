@@ -13,7 +13,6 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()
-  const regionsSeen = new Set<string>()
 
   const ensureAccount = (account: string) => {
     if (!accountsSeen.has(account)) {
@@ -118,6 +117,17 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     }
   }
 
+  // Create an Internet node if any VPC has an IGW
+  const hasIgw = (networkConfig.vpcs ?? []).some(vpc => vpc.internetGateway)
+  if (hasIgw) {
+    nodes.push({
+      id: 'internet',
+      kind: 'cloud',
+      label: 'Internet',
+      data: { kind: 'cloud' }
+    })
+  }
+
   // ── Customer Gateways + VPN connections ───────────────────────────────────
   const gateways = networkConfig.customerGateways ?? []
   if (gateways.length > 0) {
@@ -131,16 +141,32 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         const vpnId  = `vpn:${vpn.name}`
         const rtSet  = rtByVpn.get(vpn.name) ?? new Set()
         const rtLabel = rtSet.size > 0 ? [...rtSet].join(', ') : undefined
+        const tunnels = vpn.tunnelSpecifications?.map(t => t.tunnelInsideCidr) ?? []
         nodes.push({
           id:       vpnId,
           kind:     'vpn',
           label:    vpn.name,
-          data:     { kind: 'vpn', staticRoutes: vpn.staticRoutesOnly },
+          data:     {
+            kind: 'vpn',
+            staticRoutes: vpn.staticRoutesOnly,
+            tunnels: tunnels.length > 0 ? tunnels : undefined,
+          },
           parentId: 'on-premises',
         })
         const tgwId = `tgw:${vpn.transitGateway}`
         edges.push({ id: `${vpnId}->${tgwId}`, source: vpnId, target: tgwId, kind: 'vpn', label: rtLabel })
         edges.push({ id: `${cgwId}->${vpnId}`, source: cgwId, target: vpnId, kind: 'vpn' })
+
+        // VPN Route Table Propagations to TGW Route Tables
+        for (const prop of vpn.routeTablePropagations ?? []) {
+          edges.push({
+            id: `prop:vpn:${vpn.name}->tgw-rt:${prop.routeTableName}`,
+            source: vpnId,
+            target: `tgw-rt:${prop.routeTableName}`,
+            kind: 'propagation',
+            label: 'Propagates',
+          })
+        }
       }
 
       nodes.push({
@@ -158,15 +184,25 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     ensureAccount(vpc.account)
     
     const regionId = `region:${vpc.account}:${vpc.region}`
-    if (!regionsSeen.has(regionId)) {
-      regionsSeen.add(regionId)
-      nodes.push({
+    let regionNode = nodes.find(n => n.id === regionId)
+    if (!regionNode) {
+      regionNode = {
         id: regionId,
         kind: 'region',
         label: vpc.region,
-        data: { kind: 'region' },
+        data: {
+          kind: 'region',
+          region: vpc.region,
+          account: vpc.account,
+          vpcs: []
+        },
         parentId: `account:${vpc.account}`,
-      })
+      }
+      nodes.push(regionNode)
+    }
+    const regionVpcs = regionNode.data.vpcs as string[]
+    if (!regionVpcs.includes(vpc.name)) {
+      regionVpcs.push(vpc.name)
     }
 
     const vpcId = `vpc:${vpc.name}:${vpc.account}`
@@ -181,13 +217,42 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
 
     // ① Internet Gateway — add first so it appears leftmost in VPC
     if (vpc.internetGateway) {
+      const igwId = `igw:${vpc.name}`
       nodes.push({
-        id:       `igw:${vpc.name}`,
+        id:       igwId,
         kind:     'igw',
         label:    'Internet Gateway',
         data:     { kind: 'igw' },
         parentId: vpcId,
       })
+      // Edge from IGW to Internet cloud node
+      edges.push({
+        id: `${igwId}->internet`,
+        source: igwId,
+        target: 'internet',
+        kind: 'flow',
+        label: 'Public Routing',
+      })
+    }
+
+    // Process explicit sub-resources
+    const explicitNats = new Set(vpc.natGateways?.map(n => n.subnet) ?? [])
+    const explicitAlbs = new Set<string>()
+    for (const alb of vpc.loadBalancers?.applicationLoadBalancers ?? []) {
+      for (const sub of alb.subnets ?? []) explicitAlbs.add(sub)
+    }
+    const explicitNlbs = new Set<string>()
+    for (const nlb of vpc.loadBalancers?.networkLoadBalancers ?? []) {
+      for (const sub of nlb.subnets ?? []) explicitNlbs.add(sub)
+    }
+    
+    // Central network firewalls in this VPC
+    const explicitFws = new Set<string>()
+    const firewalls = networkConfig.centralNetworkServices?.networkFirewall?.firewalls ?? []
+    for (const fw of firewalls) {
+      if (fw.vpc === vpc.name) {
+        for (const sub of fw.subnets ?? []) explicitFws.add(sub)
+      }
     }
 
     // ② Subnets — output each subnet individually
@@ -208,8 +273,13 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         parentId: vpcId,
       })
 
-      // If subnet name contains 'nat', add a NAT Gateway leaf node inside it
-      if (subnet.name.toLowerCase().includes('nat')) {
+      // Determine if a leaf node should be placed inside this subnet
+      const hasNat = explicitNats.has(subnet.name) || (vpc.natGateways === undefined && subnet.name.toLowerCase().includes('nat'))
+      const hasAlb = explicitAlbs.has(subnet.name) || (vpc.loadBalancers === undefined && subnet.name.toLowerCase().includes('alb'))
+      const hasNlb = explicitNlbs.has(subnet.name) || (vpc.loadBalancers === undefined && subnet.name.toLowerCase().includes('nlb'))
+      const hasFw  = explicitFws.has(subnet.name) || (networkConfig.centralNetworkServices === undefined && (subnet.name.toLowerCase().includes('firewall') || subnet.name.toLowerCase().includes('anfw')))
+
+      if (hasNat) {
         nodes.push({
           id: `natgw:${vpcId}:${subnet.name}`,
           kind: 'nat-gateway',
@@ -219,8 +289,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         })
       }
 
-      // If subnet name contains 'firewall' or 'anfw', add a Network Firewall leaf node
-      if (subnet.name.toLowerCase().includes('firewall') || subnet.name.toLowerCase().includes('anfw')) {
+      if (hasFw) {
         nodes.push({
           id: `fw:${vpcId}:${subnet.name}`,
           kind: 'network-firewall',
@@ -230,8 +299,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         })
       }
 
-      // If subnet name contains 'nlb', add a Network Load Balancer leaf node
-      if (subnet.name.toLowerCase().includes('nlb')) {
+      if (hasNlb) {
         nodes.push({
           id: `nlb:${vpcId}:${subnet.name}`,
           kind: 'nlb',
@@ -241,8 +309,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
         })
       }
 
-      // If subnet name contains 'alb', add an Application Load Balancer leaf node
-      if (subnet.name.toLowerCase().includes('alb')) {
+      if (hasAlb) {
         nodes.push({
           id: `alb:${vpcId}:${subnet.name}`,
           kind: 'alb',
@@ -269,6 +336,17 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           target: `account:${vpc.account}`,
           kind:   isHub ? 'tgw-hub' : 'tgw',
           label:  rtLabel,
+        })
+      }
+
+      // VPC Route Table Propagations to TGW Route Tables
+      for (const prop of att.routeTablePropagations ?? []) {
+        edges.push({
+          id: `prop:${vpcId}->tgw-rt:${prop.routeTableName}`,
+          source: vpcId,
+          target: `tgw-rt:${prop.routeTableName}`,
+          kind: 'propagation',
+          label: 'Propagates',
         })
       }
     }

@@ -61,6 +61,11 @@ export interface VpcConfig {
   enableDnsSupport?: boolean
   subnets?: SubnetConfig[]
   transitGatewayAttachments?: TgwAttachmentConfig[]
+  natGateways?: { name: string; subnet: string }[]
+  loadBalancers?: {
+    applicationLoadBalancers?: { name: string; subnets: string[] }[]
+    networkLoadBalancers?: { name: string; subnets: string[] }[]
+  }
   tags?: Record<string, string>[]
 }
 
@@ -109,6 +114,11 @@ export interface NetworkConfig {
   transitGateways?: TgwConfig[]
   transitGatewayRouteTables?: TgwRouteTableConfig[]
   customerGateways?: CustomerGatewayConfig[]
+  centralNetworkServices?: {
+    networkFirewall?: {
+      firewalls?: { name: string; vpc: string; subnets: string[] }[]
+    }
+  }
 }
 
 // ── Security config ────────────────────────────────────────────────────────────
@@ -152,6 +162,7 @@ export type NodeKind =
   | 'route53' | 'cloudwatch' | 'cloudtrail' | 'config' | 'organizations' | 'control-tower'
   | 'security-hub' | 'guardduty' | 'inspector' | 'macie' | 'iam' | 'acm' | 'kms'
   | 'detective' | 'audit-manager' | 'firewall-manager' | 's3' | 'backup' | 'lambda' | 'service'
+  | 'cloud'
 
 export interface GraphNode {
   id: string
@@ -166,7 +177,7 @@ export interface GraphEdge {
   source: string
   target: string
   label?: string
-  kind?: 'tgw' | 'tgw-hub' | 'vpn' | 'peering' | 'flow'
+  kind?: 'tgw' | 'tgw-hub' | 'vpn' | 'peering' | 'flow' | 'propagation'
 }
 
 export interface GraphModel {
