@@ -205,8 +205,8 @@ function toFlowEdges(model: GraphModel): Edge[] {
       sourceHandle = 'right-s'
       targetHandle = 'left-t'
     } else if (e.target === 'internet') {
-      sourceHandle = 'left-s'
-      targetHandle = 'right-t'
+      sourceHandle = 'top-s'
+      targetHandle = 'bottom-t'
     }
 
     return {

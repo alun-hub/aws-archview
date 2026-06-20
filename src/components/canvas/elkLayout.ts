@@ -24,7 +24,7 @@ function maxCols(kind: string): number {
     case 'root':           return 4
     case 'ou':             return 4
     case 'account':
-    case 'on-premises':    return 2
+    case 'on-premises':    return 4
     case 'vpc':            return 3
     case 'tgw-rt-group':   return 4   // all route-table nodes in one row
     default:               return 3
@@ -256,10 +256,13 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
   })
 
   // ── Compute zone widths for centering ─────────────────────────────────────
-  // Zone A (top): internet node + hub accounts side by side
-  const zoneAItems = internetNode ? [internetNode, ...hubNodes] : hubNodes
-  const zoneAW = zoneAItems.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-  const zoneAH = zoneAItems.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
+  // Zone 0 (topmost): internet node (if present)
+  const zone0W = internetNode ? boxOf.get(internetNode.id)!.width : 0
+  const zone0H = internetNode ? boxOf.get(internetNode.id)!.height : 0
+
+  // Zone A: hub accounts side by side
+  const hubW = hubNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
+  const hubH = hubNodes.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
 
   // Zone B (center): TGW nodes in a row
   const tgwW = tgwNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
@@ -281,26 +284,29 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
     tgwW +
     (onPremW > 0 ? onPremW + R_H * 2 : 0)
 
-  // Canvas reference width = widest of hub / spoke rows / Zone B
-  const refW = Math.max(zoneAW, firstSpokeRowW, tgwW, zoneBTotalW)
+  // Canvas reference width = widest of Zone 0 / hub / spoke rows / Zone B
+  const refW = Math.max(zone0W, hubW, firstSpokeRowW, tgwW, zoneBTotalW)
 
   const rootPos = new Map<string, { x: number; y: number }>()
 
-  // ── Zone A: hub accounts only (top row, centered over spoke columns) ──────
-  const zoneAY = 0
-  const zoneAStartX = Math.round((refW - zoneAW) / 2)
-  let ax = zoneAStartX
-  for (const n of zoneAItems) {
-    const h = boxOf.get(n.id)!.height
-    const yOffset = n.id === 'internet'
-      ? Math.round((zoneAH - h) / 2)
-      : 0 // Keep hub accounts top-aligned
-    rootPos.set(n.id, { x: ax, y: zoneAY + yOffset })
-    ax += boxOf.get(n.id)!.width + R_H
+  // ── Zone 0: internet node (top row, centered) ─────────────────────────────
+  const zone0Y = 0
+  if (internetNode) {
+    const ix = Math.round((refW - zone0W) / 2)
+    rootPos.set(internetNode.id, { x: ix, y: zone0Y })
+  }
+
+  // ── Zone A: hub accounts (second row, centered over spoke columns) ────────
+  const zoneAY = zone0Y + (zone0H > 0 ? zone0H + R_V : 0)
+  const hubStartX = Math.round((refW - hubW) / 2)
+  let hx = hubStartX
+  for (const n of hubNodes) {
+    rootPos.set(n.id, { x: hx, y: zoneAY })
+    hx += boxOf.get(n.id)!.width + R_H
   }
 
   // ── Zone B: [RT Tables] [TGW] [On-Premises] in one row ───────────────────
-  const zoneBY = zoneAY + (zoneAH > 0 ? zoneAH + HUB_TO_TGW : 0)
+  const zoneBY = zoneAY + (hubH > 0 ? hubH + HUB_TO_TGW : 0)
 
   // Center TGW over spoke row; place RT tables to the left, On-Premises to the right
   const tgwStartX = Math.round((refW - tgwW) / 2)
