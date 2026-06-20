@@ -11,7 +11,7 @@ function getFlowEl(): HTMLElement | null {
 }
 
 async function capturePng(el: HTMLElement): Promise<string> {
-  return toPng(el, { backgroundColor: '#ffffff', pixelRatio: 2, filter: captureFilter })
+  return toPng(el, { backgroundColor: '#ffffff', pixelRatio: 4, filter: captureFilter })
 }
 
 // ── PNG ──────────────────────────────────────────────────────────────────────
