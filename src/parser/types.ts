@@ -109,9 +109,35 @@ export interface CustomerGatewayConfig {
   vpnConnections?: VpnConnectionConfig[]
 }
 
+export interface VpcPeeringConfig {
+  name: string
+  vpcs: string[]
+  tags?: Record<string, string>[]
+}
+
+export interface PermissionSetConfig {
+  name: string
+  description?: string
+  sessionDuration?: string
+  awsManagedPolicies?: string[]
+  customerManagedPolicies?: { name: string }[]
+}
+
+export interface IdentityCenterAssignmentConfig {
+  name: string
+  permissionSetName: string
+  principalType: 'GROUP' | 'USER'
+  principalId: string
+  deploymentTargets: {
+    accounts?: string[]
+    organizationalUnits?: string[]
+  }
+}
+
 export interface NetworkConfig {
   defaultVpc?: { delete: boolean }
   vpcs?: VpcConfig[]
+  vpcPeering?: VpcPeeringConfig[]
   transitGateways?: TgwConfig[]
   transitGatewayRouteTables?: TgwRouteTableConfig[]
   customerGateways?: CustomerGatewayConfig[]
@@ -157,14 +183,14 @@ export interface IamAssignment {
 }
 
 export interface IamConfig {
-  permissionSets?: IamPermissionSet[]
   identityCenter?: {
     enable?: boolean
     name?: string
     delegatedAdminAccount?: string
     [key: string]: unknown
   }
-  identityCenterAssignments?: IamAssignment[]
+  permissionSets?: PermissionSetConfig[]
+  identityCenterAssignments?: IdentityCenterAssignmentConfig[]
 }
 
 // ── Parsed graph model ────────────────────────────────────────────────────────
