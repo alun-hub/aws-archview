@@ -1,0 +1,52 @@
+enable: true
+
+organizationalUnits:
+  - name: Security
+    organizationalUnits:
+      - name: DevSecOps
+  - name: Infrastructure
+    organizationalUnits:
+      - name: Network
+      - name: SharedServices
+  - name: Workloads
+    organizationalUnits:
+      - name: Dev
+      - name: Stage
+      - name: Prod
+  - name: Sandbox
+  - name: Suspended
+
+serviceControlPolicies:
+  - name: DenyRootUserAccess
+    description: Restricts usage of root credentials in all managed accounts.
+    deploymentTargets:
+      organizationalUnits:
+        - Security
+        - Infrastructure
+        - Workloads
+  - name: EnforcePublicS3Block
+    description: Guardrail enforcing block public access on S3 buckets and preventing public buckets.
+    deploymentTargets:
+      organizationalUnits:
+        - Infrastructure
+        - Workloads
+        - Sandbox
+  - name: RestrictAllowedRegions
+    description: Restricts AWS API calls to eu-west-1 and us-east-1 only.
+    deploymentTargets:
+      organizationalUnits:
+        - Security
+        - Infrastructure
+        - Workloads
+        - Sandbox
+  - name: ProtectSecurityControls
+    description: Prevents modifications to config recorders, guardduty and security hub.
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Sandbox
+  - name: RequireMFAForDestructiveActions
+    description: Denies deleting databases or CloudTrail logs without MFA verification.
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads

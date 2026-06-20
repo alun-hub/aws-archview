@@ -1,0 +1,26 @@
+identityCenter:
+  name: Enterprise-Identity-Center
+  delegatedAdminAccount: Audit
+
+permissionSets:
+  - name: AdministratorAccess
+    description: Full administrative access. Placed on Management and Core accounts.
+    sessionDuration: PT4H
+  - name: ReadOnlyAccess
+    description: Global read-only access for auditing and troubleshooting.
+    sessionDuration: PT12H
+  - name: SecurityOps
+    description: Access to security services (Security Hub, GuardDuty, Macie, Config) in the Audit account.
+    sessionDuration: PT8H
+  - name: CloudOps
+    description: Network administration and infrastructure provisioning.
+    sessionDuration: PT8H
+  - name: ApplicationDeveloper
+    description: Limited read-write access to dev/test environments for application services.
+    sessionDuration: PT12H
+  - name: DatabaseAdmin
+    description: Manage databases, RDS instances, and DynamoDB tables.
+    sessionDuration: PT6H
+  - name: FinancialAuditor
+    description: Access to cost management, billing dashboards, and invoices.
+    sessionDuration: PT4H

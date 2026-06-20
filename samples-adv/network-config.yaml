@@ -1,0 +1,234 @@
+transitGateways:
+  - name: Hub-TGW
+    account: Network
+    region: eu-west-1
+    asn: 64512
+  - name: Hub-TGW-US
+    account: Network
+    region: us-east-1
+    asn: 64513
+
+transitGatewayRouteTables:
+  - name: Core-RT
+    transitGateway:
+      name: Hub-TGW
+      account: Network
+  - name: SharedServices-RT
+    transitGateway:
+      name: Hub-TGW
+      account: Network
+  - name: Workloads-RT
+    transitGateway:
+      name: Hub-TGW
+      account: Network
+
+customerGateways:
+  - name: HQ-Office
+    account: Network
+    region: eu-west-1
+    ipAddress: 198.51.100.5
+    asn: 65111
+    vpnConnections:
+      - name: VPN-HQ-to-TGW
+        transitGateway: Hub-TGW
+        routeTableAssociations:
+          - routeTableName: Core-RT
+        routeTablePropagations:
+          - routeTableName: Core-RT
+        staticRoutesOnly: false
+
+vpcs:
+  # Network VPC in eu-west-1
+  - name: Network-VPC
+    account: Network
+    region: eu-west-1
+    cidrs:
+      - 10.10.0.0/16
+    internetGateway: true
+    subnets:
+      - name: Firewall-Subnet-A
+        availabilityZone: a
+        routeTable: Firewall-RT
+        ipv4CidrBlock: 10.10.1.0/24
+      - name: Firewall-Subnet-B
+        availabilityZone: b
+        routeTable: Firewall-RT
+        ipv4CidrBlock: 10.10.2.0/24
+      - name: Firewall-Subnet-C
+        availabilityZone: c
+        routeTable: Firewall-RT
+        ipv4CidrBlock: 10.10.3.0/24
+      - name: Public-NAT-Subnet-A
+        availabilityZone: a
+        routeTable: Public-RT
+        ipv4CidrBlock: 10.10.10.0/24
+      - name: Public-NAT-Subnet-B
+        availabilityZone: b
+        routeTable: Public-RT
+        ipv4CidrBlock: 10.10.11.0/24
+      - name: Public-NAT-Subnet-C
+        availabilityZone: c
+        routeTable: Public-RT
+        ipv4CidrBlock: 10.10.12.0/24
+      - name: TGW-Attachment-Subnet-A
+        availabilityZone: a
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.10.20.0/24
+      - name: TGW-Attachment-Subnet-B
+        availabilityZone: b
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.10.21.0/24
+      - name: TGW-Attachment-Subnet-C
+        availabilityZone: c
+        routeTable: TGW-RT
+        ipv4CidrBlock: 10.10.22.0/24
+    transitGatewayAttachments:
+      - name: Network-VPC-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Core-RT
+        routeTablePropagations:
+          - routeTableName: Core-RT
+        subnets:
+          - TGW-Attachment-Subnet-A
+          - TGW-Attachment-Subnet-B
+          - TGW-Attachment-Subnet-C
+
+  # SharedServices VPC in eu-west-1
+  - name: SharedServices-VPC
+    account: SharedServices
+    region: eu-west-1
+    cidrs:
+      - 10.20.0.0/16
+    subnets:
+      - name: SS-Private-Subnet-A
+        availabilityZone: a
+        routeTable: SS-Private-RT
+        ipv4CidrBlock: 10.20.1.0/24
+      - name: SS-Private-Subnet-B
+        availabilityZone: b
+        routeTable: SS-Private-RT
+        ipv4CidrBlock: 10.20.2.0/24
+      - name: SS-Private-Subnet-C
+        availabilityZone: c
+        routeTable: SS-Private-RT
+        ipv4CidrBlock: 10.20.3.0/24
+
+  # Aurora Prod VPC in eu-west-1
+  - name: Aurora-Prod-VPC
+    account: Aurora-Prod
+    region: eu-west-1
+    cidrs:
+      - 10.30.0.0/16
+    subnets:
+      - name: Aurora-ALB-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-Web-RT
+        ipv4CidrBlock: 10.30.1.0/24
+      - name: Aurora-ALB-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-Web-RT
+        ipv4CidrBlock: 10.30.2.0/24
+      - name: Aurora-ALB-Subnet-C
+        availabilityZone: c
+        routeTable: Aurora-Web-RT
+        ipv4CidrBlock: 10.30.3.0/24
+      - name: Aurora-App-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.10.0/24
+      - name: Aurora-App-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.11.0/24
+      - name: Aurora-App-Subnet-C
+        availabilityZone: c
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.12.0/24
+      - name: Aurora-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.20.0/24
+      - name: Aurora-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.21.0/24
+      - name: Aurora-TGW-Subnet-C
+        availabilityZone: c
+        routeTable: Aurora-App-RT
+        ipv4CidrBlock: 10.30.22.0/24
+    transitGatewayAttachments:
+      - name: Aurora-Prod-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+        subnets:
+          - Aurora-TGW-Subnet-A
+          - Aurora-TGW-Subnet-B
+          - Aurora-TGW-Subnet-C
+
+  # Aurora Prod VPC in us-east-1
+  - name: Aurora-Prod-VPC-US
+    account: Aurora-Prod
+    region: us-east-1
+    cidrs:
+      - 10.31.0.0/16
+    subnets:
+      - name: Aurora-US-App-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.1.0/24
+      - name: Aurora-US-App-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.2.0/24
+      - name: Aurora-US-App-Subnet-C
+        availabilityZone: c
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.3.0/24
+
+  # Nebula Prod VPC in eu-west-1
+  - name: Nebula-Prod-VPC
+    account: Nebula-Prod
+    region: eu-west-1
+    cidrs:
+      - 10.40.0.0/16
+    subnets:
+      - name: Nebula-App-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-App-RT
+        ipv4CidrBlock: 10.40.1.0/24
+      - name: Nebula-App-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-App-RT
+        ipv4CidrBlock: 10.40.2.0/24
+      - name: Nebula-App-Subnet-C
+        availabilityZone: c
+        routeTable: Nebula-App-RT
+        ipv4CidrBlock: 10.40.3.0/24
+
+  # Nebula Prod VPC in us-east-1
+  - name: Nebula-Prod-VPC-US
+    account: Nebula-Prod
+    region: us-east-1
+    cidrs:
+      - 10.41.0.0/16
+    subnets:
+      - name: Nebula-US-App-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-US-App-RT
+        ipv4CidrBlock: 10.41.1.0/24
+      - name: Nebula-US-App-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-US-App-RT
+        ipv4CidrBlock: 10.41.2.0/24
+      - name: Nebula-US-App-Subnet-C
+        availabilityZone: c
+        routeTable: Nebula-US-App-RT
+        ipv4CidrBlock: 10.41.3.0/24

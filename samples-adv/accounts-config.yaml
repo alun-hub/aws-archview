@@ -1,0 +1,68 @@
+mandatoryAccounts:
+  - name: Management
+    email: master-admin@enterprise.org
+    organizationalUnit: Root
+    description: AWS Organization Management Account.
+  - name: LogArchive
+    email: log-archive@enterprise.org
+    organizationalUnit: Security
+    description: Centralized secure log repository account.
+  - name: Audit
+    email: security-audit@enterprise.org
+    organizationalUnit: Security
+    description: Delegated administration account for security services.
+  - name: Network
+    email: core-network@enterprise.org
+    organizationalUnit: Infrastructure/Network
+    description: Hub network management account.
+  - name: SharedServices
+    email: shared-services@enterprise.org
+    organizationalUnit: Infrastructure/SharedServices
+    description: Shared operations, Active Directory, and tooling.
+
+workloadAccounts:
+  # Aurora Workload Accounts
+  - name: Aurora-Dev
+    email: aurora-dev@enterprise.org
+    organizationalUnit: Workloads/Dev
+    description: Development and testing environment for Aurora services.
+    tags:
+      Project: Aurora
+      Env: Dev
+  - name: Aurora-Stage
+    email: aurora-stage@enterprise.org
+    organizationalUnit: Workloads/Stage
+    description: Staging and pre-production verification environment for Aurora.
+    tags:
+      Project: Aurora
+      Env: Stage
+  - name: Aurora-Prod
+    email: aurora-prod@enterprise.org
+    organizationalUnit: Workloads/Prod
+    description: Production environment for Aurora services.
+    tags:
+      Project: Aurora
+      Env: Prod
+
+  # Nebula Workload Accounts
+  - name: Nebula-Dev
+    email: nebula-dev@enterprise.org
+    organizationalUnit: Workloads/Dev
+    description: Development and testing environment for Nebula services.
+    tags:
+      Project: Nebula
+      Env: Dev
+  - name: Nebula-Stage
+    email: nebula-stage@enterprise.org
+    organizationalUnit: Workloads/Stage
+    description: Pre-production staging environment for Nebula.
+    tags:
+      Project: Nebula
+      Env: Stage
+  - name: Nebula-Prod
+    email: nebula-prod@enterprise.org
+    organizationalUnit: Workloads/Prod
+    description: High-availability production environment for Nebula.
+    tags:
+      Project: Nebula
+      Env: Prod
