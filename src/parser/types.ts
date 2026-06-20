@@ -140,7 +140,7 @@ export interface IamConfig {
 // ── Parsed graph model ────────────────────────────────────────────────────────
 
 export type NodeKind =
-  | 'root' | 'ou' | 'account' | 'on-premises'
+  | 'root' | 'ou' | 'account' | 'region' | 'on-premises'
   | 'vpc' | 'subnet' | 'subnet-public' | 'subnet-private' | 'subnet-firewall' | 'subnet-tgw'
   | 'tgw' | 'tgw-rt-group' | 'tgw-rt' | 'vpn' | 'cgw' | 'dx'
   | 'nlb' | 'alb' | 'network-firewall' | 'nat-gateway' | 'igw'

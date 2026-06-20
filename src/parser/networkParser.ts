@@ -13,6 +13,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()
+  const regionsSeen = new Set<string>()
 
   const ensureAccount = (account: string) => {
     if (!accountsSeen.has(account)) {
@@ -155,6 +156,19 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
   // ── VPCs + IGW + subnets + TGW attachments ────────────────────────────────
   for (const vpc of networkConfig.vpcs ?? []) {
     ensureAccount(vpc.account)
+    
+    const regionId = `region:${vpc.account}:${vpc.region}`
+    if (!regionsSeen.has(regionId)) {
+      regionsSeen.add(regionId)
+      nodes.push({
+        id: regionId,
+        kind: 'region',
+        label: vpc.region,
+        data: { kind: 'region' },
+        parentId: `account:${vpc.account}`,
+      })
+    }
+
     const vpcId = `vpc:${vpc.name}:${vpc.account}`
 
     nodes.push({
@@ -162,7 +176,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       kind: 'vpc',
       label: vpc.name,
       data: { kind: 'vpc', account: vpc.account, region: vpc.region, cidrs: vpc.cidrs, internetGateway: vpc.internetGateway },
-      parentId: `account:${vpc.account}`,
+      parentId: regionId,
     })
 
     // ① Internet Gateway — add first so it appears leftmost in VPC
@@ -201,6 +215,39 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           kind: 'nat-gateway',
           label: 'NAT Gateway',
           data: { kind: 'nat-gateway' },
+          parentId: subnetNodeId,
+        })
+      }
+
+      // If subnet name contains 'firewall' or 'anfw', add a Network Firewall leaf node
+      if (subnet.name.toLowerCase().includes('firewall') || subnet.name.toLowerCase().includes('anfw')) {
+        nodes.push({
+          id: `fw:${vpcId}:${subnet.name}`,
+          kind: 'network-firewall',
+          label: 'Network Firewall',
+          data: { kind: 'network-firewall' },
+          parentId: subnetNodeId,
+        })
+      }
+
+      // If subnet name contains 'nlb', add a Network Load Balancer leaf node
+      if (subnet.name.toLowerCase().includes('nlb')) {
+        nodes.push({
+          id: `nlb:${vpcId}:${subnet.name}`,
+          kind: 'nlb',
+          label: 'NLB',
+          data: { kind: 'nlb' },
+          parentId: subnetNodeId,
+        })
+      }
+
+      // If subnet name contains 'alb', add an Application Load Balancer leaf node
+      if (subnet.name.toLowerCase().includes('alb')) {
+        nodes.push({
+          id: `alb:${vpcId}:${subnet.name}`,
+          kind: 'alb',
+          label: 'ALB',
+          data: { kind: 'alb' },
           parentId: subnetNodeId,
         })
       }

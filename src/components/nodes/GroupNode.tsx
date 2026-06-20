@@ -13,7 +13,7 @@ export interface GroupNodeData {
   [key: string]: unknown
 }
 
-export function GroupNode({ data, selected, width, height }: NodeProps) {
+export function GroupNode({ data, selected }: NodeProps) {
   const d = data as GroupNodeData
   const border = kindBorderColor(d.kind)
   const bg = kindBackground(d.kind)
@@ -43,8 +43,8 @@ export function GroupNode({ data, selected, width, height }: NodeProps) {
   return (
     <div
       style={{
-        width: width ?? 200,
-        height: height ?? 80,
+        width: '100%',
+        height: '100%',
         border: `2px ${borderStyle} ${border}`,
         borderRadius: 8,
         background: selected ? bg.replace(/0\.\d+\)/, '0.15)') : bg,

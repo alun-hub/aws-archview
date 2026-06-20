@@ -20,6 +20,14 @@ describe('networkParser', () => {
     }
 
     const model = parseNetwork(config)
+
+    const regionNode = model.nodes.find(n => n.kind === 'region')
+    expect(regionNode).toBeDefined()
+    expect(regionNode?.id).toBe('region:Dev:eu-west-1')
+    expect(regionNode?.parentId).toBe('account:Dev')
+
+    const vpcNode = model.nodes.find(n => n.kind === 'vpc')
+    expect(vpcNode?.parentId).toBe('region:Dev:eu-west-1')
     
     const subnets = model.nodes.filter(n => n.parentId === 'vpc:Dev-VPC:Dev')
     expect(subnets.length).toBe(4)
@@ -45,6 +53,11 @@ describe('networkParser', () => {
     expect(subF?.data.cidr).toBe('10.0.2.0/24')
     expect(subF?.data.sublabel).toBe('10.0.2.0/24')
     expect(subF?.data.az).toBe('a')
+
+    const firewallGw = model.nodes.find(n => n.parentId === subF?.id)
+    expect(firewallGw).toBeDefined()
+    expect(firewallGw?.kind).toBe('network-firewall')
+    expect(firewallGw?.label).toBe('Network Firewall')
 
     const natSub = subnets.find(s => s.label === 'NAT-Public-Subnet-A')
     expect(natSub?.id).toBe('subnet:vpc:Dev-VPC:Dev:NAT-Public-Subnet-A')
