@@ -389,7 +389,7 @@ const KBD: React.CSSProperties = {
 }
 
 function Legend() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   return (
     <Panel position="bottom-left" style={{ margin: 10 }}>
