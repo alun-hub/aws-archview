@@ -16,7 +16,7 @@ function padTop(kind: string): number {
 const R_H = 64   // horizontal gap between root nodes
 const R_V = 72   // vertical gap between root rows
 const HUB_TO_TGW   = 100  // gap: hub account bottom → TGW top
-const TGW_TO_SPOKE = 100  // gap: TGW bottom → spoke account tops
+const TGW_TO_SPOKE = 260  // gap: TGW bottom → spoke account tops
 
 // Max children per row per parent kind
 function maxCols(kind: string): number {
