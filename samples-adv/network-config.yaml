@@ -3,12 +3,28 @@ transitGateways:
     account: Network
     region: eu-west-1
     asn: 64512
+    defaultRouteTableAssociation: disable
+    defaultRouteTablePropagation: disable
+    autoAcceptSharingAttachments: enable
+    shareTargets:
+      organizationalUnits:
+        - Workloads
+      accounts:
+        - SharedServices
+
   - name: Hub-TGW-US
     account: Network
     region: us-east-1
     asn: 64513
+    defaultRouteTableAssociation: disable
+    defaultRouteTablePropagation: disable
+    autoAcceptSharingAttachments: enable
+    shareTargets:
+      organizationalUnits:
+        - Workloads
 
 transitGatewayRouteTables:
+  # eu-west-1 route tables
   - name: Core-RT
     transitGateway:
       name: Hub-TGW
@@ -20,6 +36,16 @@ transitGatewayRouteTables:
   - name: Workloads-RT
     transitGateway:
       name: Hub-TGW
+      account: Network
+
+  # us-east-1 route tables
+  - name: Core-RT-US
+    transitGateway:
+      name: Hub-TGW-US
+      account: Network
+  - name: Workloads-RT-US
+    transitGateway:
+      name: Hub-TGW-US
       account: Network
 
 customerGateways:
@@ -35,10 +61,15 @@ customerGateways:
           - routeTableName: Core-RT
         routeTablePropagations:
           - routeTableName: Core-RT
+          - routeTableName: Workloads-RT
+          - routeTableName: SharedServices-RT
         staticRoutesOnly: false
+        tunnelSpecifications:
+          - tunnelInsideCidr: 169.254.10.0/30
+          - tunnelInsideCidr: 169.254.10.4/30
 
 vpcs:
-  # Network VPC in eu-west-1
+  # ── Network Hub VPC (eu-west-1) ─────────────────────────────────────────────
   - name: Network-VPC
     account: Network
     region: eu-west-1
@@ -70,15 +101,15 @@ vpcs:
         availabilityZone: c
         routeTable: Public-RT
         ipv4CidrBlock: 10.10.12.0/24
-      - name: TGW-Attachment-Subnet-A
+      - name: TGW-Attach-Subnet-A
         availabilityZone: a
         routeTable: TGW-RT
         ipv4CidrBlock: 10.10.20.0/24
-      - name: TGW-Attachment-Subnet-B
+      - name: TGW-Attach-Subnet-B
         availabilityZone: b
         routeTable: TGW-RT
         ipv4CidrBlock: 10.10.21.0/24
-      - name: TGW-Attachment-Subnet-C
+      - name: TGW-Attach-Subnet-C
         availabilityZone: c
         routeTable: TGW-RT
         ipv4CidrBlock: 10.10.22.0/24
@@ -91,12 +122,14 @@ vpcs:
           - routeTableName: Core-RT
         routeTablePropagations:
           - routeTableName: Core-RT
+          - routeTableName: Workloads-RT
+          - routeTableName: SharedServices-RT
         subnets:
-          - TGW-Attachment-Subnet-A
-          - TGW-Attachment-Subnet-B
-          - TGW-Attachment-Subnet-C
+          - TGW-Attach-Subnet-A
+          - TGW-Attach-Subnet-B
+          - TGW-Attach-Subnet-C
 
-  # SharedServices VPC in eu-west-1
+  # ── SharedServices VPC (eu-west-1) ──────────────────────────────────────────
   - name: SharedServices-VPC
     account: SharedServices
     region: eu-west-1
@@ -115,8 +148,34 @@ vpcs:
         availabilityZone: c
         routeTable: SS-Private-RT
         ipv4CidrBlock: 10.20.3.0/24
+      - name: SS-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: SS-TGW-RT
+        ipv4CidrBlock: 10.20.20.0/28
+      - name: SS-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: SS-TGW-RT
+        ipv4CidrBlock: 10.20.21.0/28
+      - name: SS-TGW-Subnet-C
+        availabilityZone: c
+        routeTable: SS-TGW-RT
+        ipv4CidrBlock: 10.20.22.0/28
+    transitGatewayAttachments:
+      - name: SS-VPC-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: SharedServices-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+          - routeTableName: Core-RT
+        subnets:
+          - SS-TGW-Subnet-A
+          - SS-TGW-Subnet-B
+          - SS-TGW-Subnet-C
 
-  # Aurora Prod VPC in eu-west-1
+  # ── Aurora Prod VPC (eu-west-1) ──────────────────────────────────────────────
   - name: Aurora-Prod-VPC
     account: Aurora-Prod
     region: eu-west-1
@@ -149,16 +208,16 @@ vpcs:
         ipv4CidrBlock: 10.30.12.0/24
       - name: Aurora-TGW-Subnet-A
         availabilityZone: a
-        routeTable: Aurora-App-RT
-        ipv4CidrBlock: 10.30.20.0/24
+        routeTable: Aurora-TGW-RT
+        ipv4CidrBlock: 10.30.20.0/28
       - name: Aurora-TGW-Subnet-B
         availabilityZone: b
-        routeTable: Aurora-App-RT
-        ipv4CidrBlock: 10.30.21.0/24
+        routeTable: Aurora-TGW-RT
+        ipv4CidrBlock: 10.30.21.0/28
       - name: Aurora-TGW-Subnet-C
         availabilityZone: c
-        routeTable: Aurora-App-RT
-        ipv4CidrBlock: 10.30.22.0/24
+        routeTable: Aurora-TGW-RT
+        ipv4CidrBlock: 10.30.22.0/28
     transitGatewayAttachments:
       - name: Aurora-Prod-Attach
         transitGateway:
@@ -168,32 +227,85 @@ vpcs:
           - routeTableName: Workloads-RT
         routeTablePropagations:
           - routeTableName: Workloads-RT
+          - routeTableName: SharedServices-RT
         subnets:
           - Aurora-TGW-Subnet-A
           - Aurora-TGW-Subnet-B
           - Aurora-TGW-Subnet-C
 
-  # Aurora Prod VPC in us-east-1
-  - name: Aurora-Prod-VPC-US
-    account: Aurora-Prod
-    region: us-east-1
+  # ── Aurora Dev VPC (eu-west-1) ───────────────────────────────────────────────
+  - name: Aurora-Dev-VPC
+    account: Aurora-Dev
+    region: eu-west-1
     cidrs:
-      - 10.31.0.0/16
+      - 10.50.0.0/16
     subnets:
-      - name: Aurora-US-App-Subnet-A
+      - name: Aurora-Dev-App-Subnet-A
         availabilityZone: a
-        routeTable: Aurora-US-App-RT
-        ipv4CidrBlock: 10.31.1.0/24
-      - name: Aurora-US-App-Subnet-B
+        routeTable: Aurora-Dev-App-RT
+        ipv4CidrBlock: 10.50.1.0/24
+      - name: Aurora-Dev-App-Subnet-B
         availabilityZone: b
-        routeTable: Aurora-US-App-RT
-        ipv4CidrBlock: 10.31.2.0/24
-      - name: Aurora-US-App-Subnet-C
-        availabilityZone: c
-        routeTable: Aurora-US-App-RT
-        ipv4CidrBlock: 10.31.3.0/24
+        routeTable: Aurora-Dev-App-RT
+        ipv4CidrBlock: 10.50.2.0/24
+      - name: Aurora-Dev-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-Dev-TGW-RT
+        ipv4CidrBlock: 10.50.20.0/28
+      - name: Aurora-Dev-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-Dev-TGW-RT
+        ipv4CidrBlock: 10.50.21.0/28
+    transitGatewayAttachments:
+      - name: Aurora-Dev-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+        subnets:
+          - Aurora-Dev-TGW-Subnet-A
+          - Aurora-Dev-TGW-Subnet-B
 
-  # Nebula Prod VPC in eu-west-1
+  # ── Aurora Stage VPC (eu-west-1) ─────────────────────────────────────────────
+  - name: Aurora-Stage-VPC
+    account: Aurora-Stage
+    region: eu-west-1
+    cidrs:
+      - 10.51.0.0/16
+    subnets:
+      - name: Aurora-Stage-App-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-Stage-App-RT
+        ipv4CidrBlock: 10.51.1.0/24
+      - name: Aurora-Stage-App-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-Stage-App-RT
+        ipv4CidrBlock: 10.51.2.0/24
+      - name: Aurora-Stage-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-Stage-TGW-RT
+        ipv4CidrBlock: 10.51.20.0/28
+      - name: Aurora-Stage-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-Stage-TGW-RT
+        ipv4CidrBlock: 10.51.21.0/28
+    transitGatewayAttachments:
+      - name: Aurora-Stage-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+        subnets:
+          - Aurora-Stage-TGW-Subnet-A
+          - Aurora-Stage-TGW-Subnet-B
+
+  # ── Nebula Prod VPC (eu-west-1) ──────────────────────────────────────────────
   - name: Nebula-Prod-VPC
     account: Nebula-Prod
     region: eu-west-1
@@ -212,8 +324,146 @@ vpcs:
         availabilityZone: c
         routeTable: Nebula-App-RT
         ipv4CidrBlock: 10.40.3.0/24
+      - name: Nebula-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-TGW-RT
+        ipv4CidrBlock: 10.40.20.0/28
+      - name: Nebula-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-TGW-RT
+        ipv4CidrBlock: 10.40.21.0/28
+      - name: Nebula-TGW-Subnet-C
+        availabilityZone: c
+        routeTable: Nebula-TGW-RT
+        ipv4CidrBlock: 10.40.22.0/28
+    transitGatewayAttachments:
+      - name: Nebula-Prod-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+          - routeTableName: SharedServices-RT
+        subnets:
+          - Nebula-TGW-Subnet-A
+          - Nebula-TGW-Subnet-B
+          - Nebula-TGW-Subnet-C
 
-  # Nebula Prod VPC in us-east-1
+  # ── Nebula Dev VPC (eu-west-1) ───────────────────────────────────────────────
+  - name: Nebula-Dev-VPC
+    account: Nebula-Dev
+    region: eu-west-1
+    cidrs:
+      - 10.60.0.0/16
+    subnets:
+      - name: Nebula-Dev-App-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-Dev-App-RT
+        ipv4CidrBlock: 10.60.1.0/24
+      - name: Nebula-Dev-App-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-Dev-App-RT
+        ipv4CidrBlock: 10.60.2.0/24
+      - name: Nebula-Dev-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-Dev-TGW-RT
+        ipv4CidrBlock: 10.60.20.0/28
+      - name: Nebula-Dev-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-Dev-TGW-RT
+        ipv4CidrBlock: 10.60.21.0/28
+    transitGatewayAttachments:
+      - name: Nebula-Dev-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+        subnets:
+          - Nebula-Dev-TGW-Subnet-A
+          - Nebula-Dev-TGW-Subnet-B
+
+  # ── Nebula Stage VPC (eu-west-1) ─────────────────────────────────────────────
+  - name: Nebula-Stage-VPC
+    account: Nebula-Stage
+    region: eu-west-1
+    cidrs:
+      - 10.61.0.0/16
+    subnets:
+      - name: Nebula-Stage-App-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-Stage-App-RT
+        ipv4CidrBlock: 10.61.1.0/24
+      - name: Nebula-Stage-App-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-Stage-App-RT
+        ipv4CidrBlock: 10.61.2.0/24
+      - name: Nebula-Stage-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-Stage-TGW-RT
+        ipv4CidrBlock: 10.61.20.0/28
+      - name: Nebula-Stage-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-Stage-TGW-RT
+        ipv4CidrBlock: 10.61.21.0/28
+    transitGatewayAttachments:
+      - name: Nebula-Stage-Attach
+        transitGateway:
+          name: Hub-TGW
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT
+        routeTablePropagations:
+          - routeTableName: Workloads-RT
+        subnets:
+          - Nebula-Stage-TGW-Subnet-A
+          - Nebula-Stage-TGW-Subnet-B
+
+  # ── Aurora Prod VPC (us-east-1) ──────────────────────────────────────────────
+  - name: Aurora-Prod-VPC-US
+    account: Aurora-Prod
+    region: us-east-1
+    cidrs:
+      - 10.31.0.0/16
+    subnets:
+      - name: Aurora-US-App-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.1.0/24
+      - name: Aurora-US-App-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.2.0/24
+      - name: Aurora-US-App-Subnet-C
+        availabilityZone: c
+        routeTable: Aurora-US-App-RT
+        ipv4CidrBlock: 10.31.3.0/24
+      - name: Aurora-US-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Aurora-US-TGW-RT
+        ipv4CidrBlock: 10.31.20.0/28
+      - name: Aurora-US-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Aurora-US-TGW-RT
+        ipv4CidrBlock: 10.31.21.0/28
+    transitGatewayAttachments:
+      - name: Aurora-Prod-US-Attach
+        transitGateway:
+          name: Hub-TGW-US
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT-US
+        routeTablePropagations:
+          - routeTableName: Workloads-RT-US
+        subnets:
+          - Aurora-US-TGW-Subnet-A
+          - Aurora-US-TGW-Subnet-B
+
+  # ── Nebula Prod VPC (us-east-1) ──────────────────────────────────────────────
   - name: Nebula-Prod-VPC-US
     account: Nebula-Prod
     region: us-east-1
@@ -232,3 +482,23 @@ vpcs:
         availabilityZone: c
         routeTable: Nebula-US-App-RT
         ipv4CidrBlock: 10.41.3.0/24
+      - name: Nebula-US-TGW-Subnet-A
+        availabilityZone: a
+        routeTable: Nebula-US-TGW-RT
+        ipv4CidrBlock: 10.41.20.0/28
+      - name: Nebula-US-TGW-Subnet-B
+        availabilityZone: b
+        routeTable: Nebula-US-TGW-RT
+        ipv4CidrBlock: 10.41.21.0/28
+    transitGatewayAttachments:
+      - name: Nebula-Prod-US-Attach
+        transitGateway:
+          name: Hub-TGW-US
+          account: Network
+        routeTableAssociations:
+          - routeTableName: Workloads-RT-US
+        routeTablePropagations:
+          - routeTableName: Workloads-RT-US
+        subnets:
+          - Nebula-US-TGW-Subnet-A
+          - Nebula-US-TGW-Subnet-B

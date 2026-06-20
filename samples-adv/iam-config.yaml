@@ -1,26 +1,105 @@
 identityCenter:
-  name: Enterprise-Identity-Center
+  enable: true
   delegatedAdminAccount: Audit
 
 permissionSets:
   - name: AdministratorAccess
-    description: Full administrative access. Placed on Management and Core accounts.
+    description: Full administrative access. Assigned to Management and core infrastructure accounts.
     sessionDuration: PT4H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AdministratorAccess
+
   - name: ReadOnlyAccess
     description: Global read-only access for auditing and troubleshooting.
     sessionDuration: PT12H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/ReadOnlyAccess
+
   - name: SecurityOps
     description: Access to security services (Security Hub, GuardDuty, Macie, Config) in the Audit account.
     sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/SecurityAudit
+    customerManagedPolicies:
+      - name: SecurityOpsPolicy
+
   - name: CloudOps
     description: Network administration and infrastructure provisioning.
     sessionDuration: PT8H
+    customerManagedPolicies:
+      - name: CloudOpsPolicy
+
   - name: ApplicationDeveloper
     description: Limited read-write access to dev/test environments for application services.
     sessionDuration: PT12H
+    customerManagedPolicies:
+      - name: ApplicationDeveloperPolicy
+
   - name: DatabaseAdmin
     description: Manage databases, RDS instances, and DynamoDB tables.
     sessionDuration: PT6H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AmazonRDSFullAccess
+      - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+
   - name: FinancialAuditor
     description: Access to cost management, billing dashboards, and invoices.
     sessionDuration: PT4H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess
+
+identityCenterAssignments:
+  - name: AdminAccess-Management
+    permissionSetName: AdministratorAccess
+    principalType: GROUP
+    principalId: cloud-admins
+    deploymentTargets:
+      accounts:
+        - Management
+        - Audit
+        - Network
+        - SharedServices
+
+  - name: ReadOnly-All
+    permissionSetName: ReadOnlyAccess
+    principalType: GROUP
+    principalId: cloud-readonly
+    deploymentTargets:
+      organizationalUnits:
+        - Security
+        - Infrastructure
+        - Workloads
+
+  - name: SecurityOps-Audit
+    permissionSetName: SecurityOps
+    principalType: GROUP
+    principalId: security-team
+    deploymentTargets:
+      accounts:
+        - Audit
+        - LogArchive
+
+  - name: CloudOps-Infra
+    permissionSetName: CloudOps
+    principalType: GROUP
+    principalId: cloud-ops
+    deploymentTargets:
+      accounts:
+        - Network
+        - SharedServices
+
+  - name: AppDev-Dev
+    permissionSetName: ApplicationDeveloper
+    principalType: GROUP
+    principalId: app-developers
+    deploymentTargets:
+      organizationalUnits:
+        - Dev
+
+  - name: DBAdmin-Prod
+    permissionSetName: DatabaseAdmin
+    principalType: GROUP
+    principalId: dba-team
+    deploymentTargets:
+      organizationalUnits:
+        - Prod

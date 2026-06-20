@@ -1,19 +1,44 @@
+centralSecurityServices:
+  delegatedAdminAccount: Audit
+
 securityHub:
   enable: true
-  excludeRegions: []
+  deploymentTargets:
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
+      - Sandbox
   standards:
-    - aws-foundational-security-best-practices-v1.0.0
-    - cis-aws-foundational-benchmarks-v1.2.0
-    - pci-dss-v3.2.1
+    - name: aws-foundational-security-best-practices-v1.0.0
+    - name: cis-aws-foundational-benchmarks-v1.2.0
+    - name: pci-dss-v3.2.1
+
 guardduty:
   enable: true
+  deploymentTargets:
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
+      - Sandbox
   s3Protection:
     enable: true
+
 macie:
   enable: true
+  deploymentTargets:
+    organizationalUnits:
+      - Security
+      - Infrastructure
+      - Workloads
   policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+
 awsConfig:
   enableConfigurationRecorder: true
   enableDeliveryChannel: true
+
 cloudtrail:
   enable: true
+  organizationTrail: true
+  s3BucketName: aws-accelerator-logs

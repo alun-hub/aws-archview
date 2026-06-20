@@ -19,34 +19,48 @@ organizationalUnits:
 serviceControlPolicies:
   - name: DenyRootUserAccess
     description: Restricts usage of root credentials in all managed accounts.
+    policy: service-control-policies/deny-root-user.json
     deploymentTargets:
       organizationalUnits:
         - Security
+        - DevSecOps
         - Infrastructure
         - Workloads
+        - Sandbox
+
   - name: EnforcePublicS3Block
     description: Guardrail enforcing block public access on S3 buckets and preventing public buckets.
+    policy: service-control-policies/enforce-s3-block-public.json
     deploymentTargets:
       organizationalUnits:
         - Infrastructure
         - Workloads
         - Sandbox
+
   - name: RestrictAllowedRegions
     description: Restricts AWS API calls to eu-west-1 and us-east-1 only.
+    policy: service-control-policies/restrict-regions.json
     deploymentTargets:
       organizationalUnits:
         - Security
+        - DevSecOps
         - Infrastructure
         - Workloads
         - Sandbox
+
   - name: ProtectSecurityControls
     description: Prevents modifications to config recorders, guardduty and security hub.
+    policy: service-control-policies/protect-security-controls.json
     deploymentTargets:
       organizationalUnits:
         - Workloads
         - Sandbox
+        - DevSecOps
+
   - name: RequireMFAForDestructiveActions
     description: Denies deleting databases or CloudTrail logs without MFA verification.
+    policy: service-control-policies/require-mfa-destructive.json
     deploymentTargets:
       organizationalUnits:
         - Workloads
+        - Sandbox
