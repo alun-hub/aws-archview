@@ -52,10 +52,12 @@ Drag and drop your LZA YAML configuration files directly onto the **Configuratio
 | Filename | Purpose |
 |---|---|
 | `organization-config.yaml` | Defines OUs, root, and SCP attachments. |
-| `accounts-config.yaml` | Defines mandatory and workload account hierarchies. |
+| `accounts-config.yaml` | Defines workload account and mandatory account hierarchies. |
 | `network-config.yaml` | Defines VPCs, subnets, TGWs, CGWs, VPNs, and VPC peerings. |
 | `security-config.yaml` | Maps central security logging and protection policies. |
 | `iam-config.yaml` | Defines permission sets and Identity Center assignments. |
+| `global-config.yaml` | Defines global parameters, regions, and baseline setups. |
+| `customizations-config.yaml` | Defines custom CloudFormation templates, landing zone policies, and customizations. |
 
 ### 2. Try the Samples
 The repository includes test configs you can drag-and-drop to try out the visualizer:
