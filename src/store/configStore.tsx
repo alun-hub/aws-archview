@@ -7,18 +7,27 @@ interface State {
   activeView: ViewKind
   selectedNodeId: string | null
   loadedFiles: Record<string, string>
+  showPropagations: boolean
+  showTgwAttachments: boolean
+  showVpnConnections: boolean
+  showInternetFlows: boolean
 }
 
 type Action =
   | { type: 'SET_FILE'; filename: string; content: string; parsed: Partial<LzaConfigs> }
   | { type: 'SET_VIEW'; view: ViewKind }
   | { type: 'SELECT_NODE'; id: string | null }
+  | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
 
 const initial: State = {
   configs: {},
   activeView: 'organization',
   selectedNodeId: null,
   loadedFiles: {},
+  showPropagations: false, // Default false to keep diagram clean
+  showTgwAttachments: true,
+  showVpnConnections: true,
+  showInternetFlows: true,
 }
 
 function reducer(state: State, action: Action): State {
@@ -33,6 +42,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, activeView: action.view, selectedNodeId: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
+    case 'TOGGLE_LAYER':
+      return {
+        ...state,
+        showPropagations: action.layer === 'propagations' ? !state.showPropagations : state.showPropagations,
+        showTgwAttachments: action.layer === 'tgwAttachments' ? !state.showTgwAttachments : state.showTgwAttachments,
+        showVpnConnections: action.layer === 'vpnConnections' ? !state.showVpnConnections : state.showVpnConnections,
+        showInternetFlows: action.layer === 'internetFlows' ? !state.showInternetFlows : state.showInternetFlows,
+      }
     default:
       return state
   }
