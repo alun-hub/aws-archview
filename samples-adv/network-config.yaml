@@ -502,3 +502,13 @@ vpcs:
         subnets:
           - Nebula-US-TGW-Subnet-A
           - Nebula-US-TGW-Subnet-B
+
+vpcPeering:
+  - name: DevToStagePeering
+    vpcs:
+      - Aurora-Dev-VPC
+      - Aurora-Stage-VPC
+  - name: SharedServicesToNetworkPeering
+    vpcs:
+      - SharedServices-VPC
+      - Network-VPC
