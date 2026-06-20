@@ -24,6 +24,7 @@ export interface OUConfig {
 export interface SCP {
   name: string
   description?: string
+  policy?: string
   deploymentTargets?: { organizationalUnits?: string[]; accounts?: string[] }
 }
 
@@ -127,10 +128,10 @@ export interface SecurityConfig {
   enableDlpChecks?: boolean
   macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
   guardduty?: { enable: boolean; s3Protection?: { enable: boolean } }
-  securityHub?: { enable: boolean; standards?: string[] }
+  securityHub?: { enable: boolean; standards?: (string | { name: string })[] }
   awsConfig?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
   cloudwatch?: { enable?: boolean }
-  cloudtrail?: { enable: boolean }
+  cloudtrail?: { enable: boolean; organizationTrail?: boolean; s3BucketName?: string }
 }
 
 // ── IAM config ────────────────────────────────────────────────────────────────
@@ -140,6 +141,19 @@ export interface IamPermissionSet {
   description?: string
   sessionDuration?: string
   policies?: unknown[]
+  awsManagedPolicies?: string[]
+  customerManagedPolicies?: { name: string }[]
+}
+
+export interface IamAssignment {
+  name: string
+  permissionSetName: string
+  principalType: 'GROUP' | 'USER'
+  principalId: string
+  deploymentTargets: {
+    accounts?: string[]
+    organizationalUnits?: string[]
+  }
 }
 
 export interface IamConfig {
@@ -150,6 +164,7 @@ export interface IamConfig {
     delegatedAdminAccount?: string
     [key: string]: unknown
   }
+  identityCenterAssignments?: IamAssignment[]
 }
 
 // ── Parsed graph model ────────────────────────────────────────────────────────

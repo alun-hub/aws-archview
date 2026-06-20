@@ -90,6 +90,9 @@ const FIELD_LABEL: Record<string, string> = {
   trailEnabled:      'CloudTrail Active',
   tunnels:           'VPN Tunnels',
   vpcs:              'VPCs',
+  organizationTrail: 'Organization Trail',
+  s3BucketName:      'S3 Log Bucket',
+  iamAssignments:    'IAM Assignments',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)

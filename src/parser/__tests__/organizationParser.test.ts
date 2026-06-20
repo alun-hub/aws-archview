@@ -109,4 +109,99 @@ describe('organizationParser', () => {
     const iamNode = mgmtChildren.find(c => c.kind === 'iam')
     expect(iamNode?.data.permissionSets).toEqual(['AdminAccess (Duration: PT12H) - Administrator Access'])
   })
+
+  it('should parse advanced LZA SCP policies, IAM assignments, and central service properties', () => {
+    const org: OrganizationConfig = {
+      enable: true,
+      organizationalUnits: [
+        { name: 'Security' },
+        { name: 'Workloads' }
+      ],
+      serviceControlPolicies: [
+        {
+          name: 'RestrictRegions',
+          policy: 'policies/restrict-regions.json',
+          description: 'Allow only specific regions',
+          deploymentTargets: { organizationalUnits: ['Workloads'] }
+        }
+      ]
+    }
+    const accounts: AccountsConfig = {
+      mandatoryAccounts: [
+        { name: 'Audit', email: 'audit@test.com', organizationalUnit: 'Security' },
+        { name: 'LogArchive', email: 'logs@test.com', organizationalUnit: 'Security' },
+        { name: 'Management', email: 'mgmt@test.com', organizationalUnit: 'Root' }
+      ]
+    }
+    const security: SecurityConfig = {
+      securityHub: {
+        enable: true,
+        standards: [
+          { name: 'aws-foundational-security-best-practices-v1.0.0' }
+        ]
+      },
+      cloudtrail: {
+        enable: true,
+        organizationTrail: true,
+        s3BucketName: 'logs-bucket'
+      }
+    }
+    const iam: IamConfig = {
+      identityCenter: { enable: true },
+      permissionSets: [
+        {
+          name: 'Admin',
+          awsManagedPolicies: ['arn:aws:iam::aws:policy/AdministratorAccess'],
+          customerManagedPolicies: [{ name: 'CustomPolicy' }],
+          description: 'Admin access'
+        }
+      ],
+      identityCenterAssignments: [
+        {
+          name: 'Admin-Mgmt',
+          permissionSetName: 'Admin',
+          principalType: 'GROUP',
+          principalId: 'admins-group',
+          deploymentTargets: {
+            accounts: ['Management']
+          }
+        },
+        {
+          name: 'ReadOnly-Workloads',
+          permissionSetName: 'ReadOnlyAccess',
+          principalType: 'GROUP',
+          principalId: 'viewers-group',
+          deploymentTargets: {
+            organizationalUnits: ['Workloads']
+          }
+        }
+      ]
+    }
+
+    const model = parseOrganization(org, accounts, security, iam)
+
+    // 1. SCP policy path
+    const workloadsOu = model.nodes.find(n => n.id === 'ou:Workloads')
+    expect(workloadsOu?.data.scps).toEqual(['RestrictRegions (policies/restrict-regions.json) - Allow only specific regions'])
+
+    // 2. CloudTrail s3 log bucket and organization trail
+    const ctNode = model.nodes.find(n => n.kind === 'cloudtrail')
+    expect(ctNode?.data.organizationTrail).toBe(true)
+    expect(ctNode?.data.s3BucketName).toBe('logs-bucket')
+
+    // 3. Security Hub standards (parsed from name property)
+    const shNode = model.nodes.find(n => n.kind === 'security-hub')
+    expect(shNode?.data.standards).toEqual(['aws-foundational-security-best-practices-v1.0.0'])
+
+    // 4. Detailed Permission Sets formatting
+    const iamNode = model.nodes.find(n => n.kind === 'iam')
+    expect(iamNode?.data.permissionSets).toEqual(['Admin [Policies: AWS Managed: AdministratorAccess | Customer Managed: CustomPolicy] - Admin access'])
+
+    // 5. IAM assignments on accounts
+    const mgmtNode = model.nodes.find(n => n.id === 'account:Management')
+    expect(mgmtNode?.data.iamAssignments).toEqual(['Group: admins-group → Admin'])
+
+    // 6. IAM assignments on OUs
+    expect(workloadsOu?.data.iamAssignments).toEqual(['Group: viewers-group → ReadOnlyAccess'])
+  })
 })

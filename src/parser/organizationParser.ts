@@ -5,13 +5,18 @@ function collectOUs(
   parentId: string,
   nodes: GraphNode[],
   scps: SCP[],
+  iamConfig?: IamConfig,
 ) {
   for (const ou of ous) {
     if (ou.ignore) continue
     const id = `ou:${ou.name}`
     const attachedScps = scps
       .filter((s) => s.deploymentTargets?.organizationalUnits?.includes(ou.name))
-      .map((s) => `${s.name}${s.description ? ` - ${s.description}` : ''}`)
+      .map((s) => `${s.name}${s.policy ? ` (${s.policy})` : ''}${s.description ? ` - ${s.description}` : ''}`)
+
+    const ouAssignments = iamConfig?.identityCenterAssignments
+      ?.filter((a) => a.deploymentTargets?.organizationalUnits?.includes(ou.name))
+      ?.map((a) => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${a.permissionSetName}`) ?? []
 
     nodes.push({
       id,
@@ -21,11 +26,12 @@ function collectOUs(
         kind: 'ou',
         tags: ou.tags,
         scps: attachedScps.length > 0 ? attachedScps : undefined,
+        iamAssignments: ouAssignments.length > 0 ? ouAssignments : undefined,
       },
       parentId,
     })
     if (ou.organizationalUnits?.length) {
-      collectOUs(ou.organizationalUnits, id, nodes, scps)
+      collectOUs(ou.organizationalUnits, id, nodes, scps, iamConfig)
     }
   }
 }
@@ -46,7 +52,7 @@ export function parseOrganization(
   const scps = orgConfig.serviceControlPolicies ?? []
 
   if (orgConfig.organizationalUnits?.length) {
-    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps)
+    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps, iamConfig)
   }
 
   const nodeSet = new Set(nodes.map((n) => n.id))
@@ -65,7 +71,11 @@ export function parseOrganization(
 
     const attachedScps = scps
       .filter((s) => s.deploymentTargets?.accounts?.includes(account.name))
-      .map((s) => `${s.name}${s.description ? ` - ${s.description}` : ''}`)
+      .map((s) => `${s.name}${s.policy ? ` (${s.policy})` : ''}${s.description ? ` - ${s.description}` : ''}`)
+
+    const accountAssignments = iamConfig?.identityCenterAssignments
+      ?.filter((a) => a.deploymentTargets?.accounts?.includes(account.name))
+      ?.map((a) => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${a.permissionSetName}`) ?? []
 
     nodes.push({
       id,
@@ -77,6 +87,7 @@ export function parseOrganization(
         description: account.description,
         tags: account.tags,
         scps: attachedScps.length > 0 ? attachedScps : undefined,
+        iamAssignments: accountAssignments.length > 0 ? accountAssignments : undefined,
       },
       parentId: nodeSet.has(parentId) ? parentId : rootId,
     })
@@ -95,12 +106,17 @@ export function parseOrganization(
         })
       }
       if (securityConfig.securityHub?.enable) {
+        const stds = securityConfig.securityHub.standards?.map((s) => {
+          if (typeof s === 'string') return s
+          if (s && typeof s === 'object' && 'name' in s) return String(s.name)
+          return String(s)
+        })
         nodes.push({
           id: `security-hub:${account.name}`,
           kind: 'security-hub',
           label: 'Security Hub',
           data: {
-            standards: securityConfig.securityHub.standards,
+            standards: stds?.length ? stds : undefined,
           },
           parentId: id,
         })
@@ -138,6 +154,8 @@ export function parseOrganization(
           label: 'CloudTrail',
           data: {
             trailEnabled: securityConfig.cloudtrail.enable,
+            organizationTrail: securityConfig.cloudtrail.organizationTrail,
+            s3BucketName: securityConfig.cloudtrail.s3BucketName,
           },
           parentId: id,
         })
@@ -147,7 +165,15 @@ export function parseOrganization(
     if (account.name === 'Management' && iamConfig) {
       if (iamConfig.identityCenter && iamConfig.identityCenter.enable !== false) {
         const pSets = iamConfig.permissionSets?.map((p) => {
-          return `${p.name}${p.sessionDuration ? ` (Duration: ${p.sessionDuration})` : ''}${p.description ? ` - ${p.description}` : ''}`
+          const policiesList: string[] = []
+          if (p.awsManagedPolicies?.length) {
+            policiesList.push(`AWS Managed: ${p.awsManagedPolicies.map(arn => arn.split('/').pop()).join(', ')}`)
+          }
+          if (p.customerManagedPolicies?.length) {
+            policiesList.push(`Customer Managed: ${p.customerManagedPolicies.map(c => c.name).join(', ')}`)
+          }
+          const policiesStr = policiesList.length > 0 ? ` [Policies: ${policiesList.join(' | ')}]` : ''
+          return `${p.name}${p.sessionDuration ? ` (Duration: ${p.sessionDuration})` : ''}${policiesStr}${p.description ? ` - ${p.description}` : ''}`
         }) ?? []
         nodes.push({
           id: `iam:${account.name}`,
