@@ -4,6 +4,7 @@ import SideNavigation from '@cloudscape-design/components/side-navigation'
 import Container from '@cloudscape-design/components/container'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
+import Checkbox from '@cloudscape-design/components/checkbox'
 
 import { ConfigProvider, useConfig, useDispatch } from './store/configStore'
 import { buildNetworkGraph, buildOrganizationGraph, type ViewKind } from './parser'
@@ -64,6 +65,36 @@ function AppContent() {
           <Container header={<Header variant="h3">Konfiguration</Header>}>
             <ConfigLoader loadedFiles={config.loadedFiles} />
           </Container>
+          {config.activeView === 'network' && (
+            <Container header={<Header variant="h3">Visa / Dölj koppel</Header>}>
+              <SpaceBetween size="s">
+                <Checkbox
+                  checked={config.showTgwAttachments}
+                  onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'tgwAttachments' })}
+                >
+                  Transit Gateway-kopplingar
+                </Checkbox>
+                <Checkbox
+                  checked={config.showPropagations}
+                  onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'propagations' })}
+                >
+                  TGW RT-propageringar
+                </Checkbox>
+                <Checkbox
+                  checked={config.showVpnConnections}
+                  onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'vpnConnections' })}
+                >
+                  VPN-anslutningar
+                </Checkbox>
+                <Checkbox
+                  checked={config.showInternetFlows}
+                  onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'internetFlows' })}
+                >
+                  Internet-flöden
+                </Checkbox>
+              </SpaceBetween>
+            </Container>
+          )}
           <Container header={<Header variant="h3">Detaljer</Header>}>
             <DetailPanel node={selectedNode} />
           </Container>
