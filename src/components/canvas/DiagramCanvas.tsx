@@ -14,7 +14,7 @@ import '@xyflow/react/dist/style.css'
 import { GroupNode } from '../nodes/GroupNode'
 import { ServiceNode } from '../nodes/ServiceNode'
 import { ExportMenu } from './ExportMenu'
-import { useDispatch } from '../../store/configStore'
+import { useConfig, useDispatch } from '../../store/configStore'
 import type { GraphModel } from '../../parser'
 import { applyElkLayout } from './elkLayout'
 
@@ -238,18 +238,49 @@ interface Props {
 export function DiagramCanvas({ model }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const config = useConfig()
   const dispatch = useDispatch()
 
+  // 1. Re-calculate layout ONLY when model changes
   useEffect(() => {
     if (!model) return
     const rawNodes = toFlowNodes(model)
     const rawEdges = toFlowEdges(model)
     applyElkLayout(rawNodes, rawEdges).then((laid) => {
-      // ReactFlow requires parents before children in the array
       setNodes(sortParentsFirst(laid))
-      setEdges(rawEdges)
     })
-  }, [model, setNodes, setEdges])
+  }, [model, setNodes])
+
+  // 2. Filter and map edges when model or toggles change (no layout recalculation)
+  useEffect(() => {
+    if (!model) return
+
+    const filteredEdges = model.edges.filter((e) => {
+      if (e.kind === 'propagation') {
+        return config.showPropagations
+      }
+      if (e.kind === 'vpn') {
+        return config.showVpnConnections
+      }
+      if (e.kind === 'flow') {
+        return config.showInternetFlows
+      }
+      if (e.kind === 'tgw' || e.kind === 'tgw-hub') {
+        return config.showTgwAttachments
+      }
+      return true
+    })
+
+    // toFlowEdges expects a GraphModel, so we pass a partial model with filtered edges
+    setEdges(toFlowEdges({ ...model, edges: filteredEdges }))
+  }, [
+    model,
+    setEdges,
+    config.showPropagations,
+    config.showTgwAttachments,
+    config.showVpnConnections,
+    config.showInternetFlows,
+  ])
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
