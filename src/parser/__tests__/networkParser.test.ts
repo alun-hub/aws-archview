@@ -185,4 +185,23 @@ describe('networkParser', () => {
     expect(vpnPropEdge).toBeDefined()
     expect(vpnPropEdge?.kind).toBe('propagation')
   })
+
+  it('should parse VPC peering connections', () => {
+    const config: NetworkConfig = {
+      vpcs: [
+        { name: 'Dev-VPC', account: 'Dev', region: 'eu-west-1', cidrs: ['10.0.0.0/16'] },
+        { name: 'Prod-VPC', account: 'Prod', region: 'eu-west-1', cidrs: ['10.1.0.0/16'] }
+      ],
+      vpcPeering: [
+        { name: 'DevToProd', vpcs: ['Dev-VPC', 'Prod-VPC'] }
+      ]
+    }
+
+    const model = parseNetwork(config)
+    const peeringEdge = model.edges.find(e => e.kind === 'peering')
+    expect(peeringEdge).toBeDefined()
+    expect(peeringEdge?.source).toBe('vpc:Dev-VPC:Dev')
+    expect(peeringEdge?.target).toBe('vpc:Prod-VPC:Prod')
+    expect(peeringEdge?.label).toBe('DevToProd')
+  })
 })

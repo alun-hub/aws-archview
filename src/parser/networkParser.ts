@@ -179,6 +179,8 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     }
   }
 
+  const vpcNameToId = new Map<string, string>()
+
   // ── VPCs + IGW + subnets + TGW attachments ────────────────────────────────
   for (const vpc of networkConfig.vpcs ?? []) {
     ensureAccount(vpc.account)
@@ -206,6 +208,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     }
 
     const vpcId = `vpc:${vpc.name}:${vpc.account}`
+    vpcNameToId.set(vpc.name, vpcId)
 
     nodes.push({
       id:   vpcId,
@@ -349,6 +352,22 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           label: 'Propagates',
         })
       }
+    }
+  }
+
+  // ── VPC Peering Connections ────────────────────────────────────────────────
+  for (const peering of networkConfig.vpcPeering ?? []) {
+    if (peering.vpcs.length !== 2) continue
+    const sourceId = vpcNameToId.get(peering.vpcs[0])
+    const targetId = vpcNameToId.get(peering.vpcs[1])
+    if (sourceId && targetId) {
+      edges.push({
+        id: `peering:${peering.name}`,
+        source: sourceId,
+        target: targetId,
+        kind: 'peering',
+        label: peering.name,
+      })
     }
   }
 
