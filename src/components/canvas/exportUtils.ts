@@ -3,7 +3,7 @@ import jsPDF from 'jspdf'
 import type { Edge, Node } from '@xyflow/react'
 
 // ── Shared DOM filter: exclude UI chrome + grid from captures ───────────────
-const EXCLUDE = ['react-flow__controls', 'react-flow__minimap', 'export-menu-panel', 'react-flow__background']
+const EXCLUDE = ['react-flow__controls', 'react-flow__minimap', 'export-menu-panel', 'react-flow__background', 'react-flow__panel']
 const captureFilter = (node: Element) => !EXCLUDE.some((c) => node.classList?.contains(c))
 
 function getFlowEl(): HTMLElement | null {
