@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
-import type { LzaConfigs, ViewKind } from '../parser'
+import { resolveConfigKey, parsedForKey, type LzaConfigs, type ViewKind } from '../parser'
 
 interface State {
   configs: LzaConfigs
@@ -19,26 +19,66 @@ type Action =
   | { type: 'SELECT_NODE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
 
-const initial: State = {
-  configs: {},
-  activeView: 'organization',
-  selectedNodeId: null,
-  loadedFiles: {},
-  showPropagations: false, // Default false to keep diagram clean
-  showTgwAttachments: true,
-  showVpnConnections: true,
-  showInternetFlows: true,
+const getInitialState = (): State => {
+  let loadedFiles: Record<string, string> = {}
+  const configs: LzaConfigs = {}
+
+  if (typeof window !== 'undefined') {
+    try {
+      const savedFilesStr = localStorage.getItem('aws-archview:loadedFiles')
+      if (savedFilesStr) {
+        loadedFiles = JSON.parse(savedFilesStr)
+        for (const [filename, content] of Object.entries(loadedFiles)) {
+          const key = resolveConfigKey(filename)
+          if (key) {
+            Object.assign(configs, parsedForKey(key, content))
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse saved files from localStorage', e)
+    }
+  }
+
+  let activeView: ViewKind = 'organization'
+  if (typeof window !== 'undefined') {
+    const savedView = localStorage.getItem('aws-archview:activeView')
+    if (savedView === 'organization' || savedView === 'network' || savedView === 'global' || savedView === 'customizations') {
+      activeView = savedView
+    }
+  }
+
+  return {
+    configs,
+    activeView,
+    selectedNodeId: null,
+    loadedFiles,
+    showPropagations: false, // Default false to keep diagram clean
+    showTgwAttachments: true,
+    showVpnConnections: true,
+    showInternetFlows: true,
+  }
 }
+
+const initial = getInitialState()
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'SET_FILE':
+    case 'SET_FILE': {
+      const nextLoaded = { ...state.loadedFiles, [action.filename]: action.content }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('aws-archview:loadedFiles', JSON.stringify(nextLoaded))
+      }
       return {
         ...state,
-        loadedFiles: { ...state.loadedFiles, [action.filename]: action.content },
+        loadedFiles: nextLoaded,
         configs: { ...state.configs, ...action.parsed },
       }
+    }
     case 'SET_VIEW':
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('aws-archview:activeView', action.view)
+      }
       return { ...state, activeView: action.view, selectedNodeId: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }

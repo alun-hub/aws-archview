@@ -1,35 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useDispatch } from '../../store/configStore'
-import type { LzaConfigs } from '../../parser'
-import { parseYaml } from '../../parser'
-import type { AccountsConfig, NetworkConfig, OrganizationConfig, SecurityConfig, IamConfig, GlobalConfig, CustomizationsConfig } from '../../parser/types'
-
-const FILE_MAP: Record<string, keyof LzaConfigs> = {
-  'organization-config.yaml':  'organization',
-  'accounts-config.yaml':      'accounts',
-  'network-config.yaml':       'network',
-  'security-config.yaml':      'security',
-  'iam-config.yaml':           'iam',
-  'global-config.yaml':        'global',
-  'customizations-config.yaml':'customizations',
-}
-
-function resolveConfigKey(filename: string): keyof LzaConfigs | null {
-  const base = filename.toLowerCase().replace(/.*[\\/]/, '')
-  return FILE_MAP[base] ?? null
-}
-
-function parsedForKey(key: keyof LzaConfigs, content: string): Partial<LzaConfigs> {
-  switch (key) {
-    case 'organization':    return { organization:    parseYaml<OrganizationConfig>(content) }
-    case 'accounts':        return { accounts:        parseYaml<AccountsConfig>(content) }
-    case 'network':         return { network:         parseYaml<NetworkConfig>(content) }
-    case 'security':        return { security:        parseYaml<SecurityConfig>(content) }
-    case 'iam':             return { iam:             parseYaml<IamConfig>(content) }
-    case 'global':          return { global:          parseYaml<GlobalConfig>(content) }
-    case 'customizations':  return { customizations:  parseYaml<CustomizationsConfig>(content) }
-  }
-}
+import { resolveConfigKey, parsedForKey, FILE_MAP } from '../../parser'
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch = useDispatch()
