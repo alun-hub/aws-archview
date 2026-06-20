@@ -42,6 +42,21 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your web browser.
 
+### Build & Run Standalone Desktop App (Linux)
+
+You can also run AWS ArchView as a standalone desktop application packaged as an `AppImage`:
+
+```bash
+# 1. Package the AppImage
+npm run electron:build
+
+# 2. Make it executable
+chmod +x dist-desktop/AWS\ ArchView-0.0.0.AppImage
+
+# 3. Run the application standalone
+./dist-desktop/AWS\ ArchView-0.0.0.AppImage
+```
+
 ---
 
 ## Using the Application
