@@ -13,6 +13,7 @@ import '@xyflow/react/dist/style.css'
 
 import { GroupNode } from '../nodes/GroupNode'
 import { ServiceNode } from '../nodes/ServiceNode'
+import { ExportMenu } from './ExportMenu'
 import { useDispatch } from '../../store/configStore'
 import type { GraphModel } from '../../parser'
 import { applyElkLayout } from './elkLayout'
@@ -315,6 +316,7 @@ export function DiagramCanvas({ model }: Props) {
       {/* Subtle dot grid like draw.io */}
       <Background color="#d0d0d0" gap={20} size={1} />
       <Controls style={{ borderRadius: 6 }} />
+      <ExportMenu />
       <MiniMap
         nodeColor={(n) => {
           const kind = (n.data as { kind?: string })?.kind ?? ''
