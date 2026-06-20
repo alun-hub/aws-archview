@@ -1,36 +1,51 @@
-import { toPng, toSvg } from 'html-to-image'
+import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
 import type { Edge, Node } from '@xyflow/react'
 
-// ── Shared DOM filter: exclude UI chrome from captures ──────────────────────
-const EXCLUDE = ['react-flow__controls', 'react-flow__minimap', 'export-menu-panel']
+// ── Shared DOM filter: exclude UI chrome + grid from captures ───────────────
+const EXCLUDE = ['react-flow__controls', 'react-flow__minimap', 'export-menu-panel', 'react-flow__background']
 const captureFilter = (node: Element) => !EXCLUDE.some((c) => node.classList?.contains(c))
 
 function getFlowEl(): HTMLElement | null {
   return document.querySelector('.react-flow')
 }
 
+async function capturePng(el: HTMLElement): Promise<string> {
+  return toPng(el, { backgroundColor: '#ffffff', pixelRatio: 2, filter: captureFilter })
+}
+
 // ── PNG ──────────────────────────────────────────────────────────────────────
 export async function exportToPng(label = 'archview'): Promise<void> {
   const el = getFlowEl()
   if (!el) return
-  const url = await toPng(el, { backgroundColor: '#f8f8f8', pixelRatio: 2, filter: captureFilter })
-  download(url, `${label}.png`)
+  download(await capturePng(el), `${label}.png`)
 }
 
-// ── SVG ──────────────────────────────────────────────────────────────────────
+// ── SVG — embed PNG as <image> so all SVG viewers render it correctly ────────
+// html-to-image's toSvg() doesn't handle ReactFlow's CSS transforms reliably.
 export async function exportToSvg(label = 'archview'): Promise<void> {
   const el = getFlowEl()
   if (!el) return
-  const url = await toSvg(el, { backgroundColor: '#f8f8f8', filter: captureFilter })
-  download(url, `${label}.svg`)
+  const dataUrl = await capturePng(el)
+  const img = await loadImage(dataUrl)
+  const w = img.naturalWidth
+  const h = img.naturalHeight
+  const svg = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"`,
+    `     width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`,
+    `  <image href="${dataUrl}" width="${w}" height="${h}"/>`,
+    '</svg>',
+  ].join('\n')
+  const blob = new Blob([svg], { type: 'image/svg+xml' })
+  download(URL.createObjectURL(blob), `${label}.svg`)
 }
 
 // ── PDF (A3 Landscape) ───────────────────────────────────────────────────────
 export async function exportToPdf(label = 'archview'): Promise<void> {
   const el = getFlowEl()
   if (!el) return
-  const url = await toPng(el, { backgroundColor: '#ffffff', pixelRatio: 2, filter: captureFilter })
+  const url = await capturePng(el)
 
   const img = await loadImage(url)
   const A3_W_MM = 420
