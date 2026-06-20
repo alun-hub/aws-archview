@@ -96,7 +96,7 @@ export function AwsIcon({ kind, size = 32, style }: Props) {
   if (path) {
     return (
       <img
-        src={`/icons/aws/${path}`}
+        src={`./icons/aws/${path}`}
         width={size}
         height={size}
         alt={kind}
