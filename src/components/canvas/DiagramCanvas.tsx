@@ -96,7 +96,7 @@ const LEAF_H = 110
 
 // Per-kind size overrides for compact service nodes
 const LEAF_SIZE_OVERRIDE: Record<string, { w: number; h: number }> = {
-  'tgw-rt': { w: 80, h: 80 },
+  'tgw-rt': { w: 90, h: 100 },
 }
 const LEAF_SIZE = new Set([
   'tgw', 'tgw-rt', 'vpn', 'cgw', 'client-vpn', 'dx', 'route53', 'nlb', 'alb', 'igw',
