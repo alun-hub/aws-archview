@@ -172,6 +172,7 @@ function toFlowEdges(model: GraphModel): Edge[] {
     const isTgwSpoke     = e.kind === 'tgw'
     const isVpnToTgw     = e.kind === 'vpn' && e.source.startsWith('vpn:') && e.target.startsWith('tgw:')
     const isPropagation  = e.kind === 'propagation'
+    const isPeering      = e.kind === 'peering'
 
     let sourceHandle: string | undefined = undefined
     let targetHandle: string | undefined = undefined
@@ -202,6 +203,10 @@ function toFlowEdges(model: GraphModel): Edge[] {
           targetHandle = 'bottom-t'
         }
       }
+    } else if (isPeering) {
+      // Peering connects VPC to VPC: use right-s to left-t for horizontal flow
+      sourceHandle = 'right-s'
+      targetHandle = 'left-t'
     }
 
     return {
