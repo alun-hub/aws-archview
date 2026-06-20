@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   ReactFlow,
   Background,
@@ -17,6 +17,9 @@ import { ExportMenu } from './ExportMenu'
 import { useConfig, useDispatch } from '../../store/configStore'
 import type { GraphModel } from '../../parser'
 import { applyElkLayout } from './elkLayout'
+import { EdgeRoutingContext, getAbsolutePosition, getHandlePosition, getEdgeSegments, type Point, type Segment } from './edgeRouting'
+import { LoopEdge } from './LoopEdge'
+
 
 function sortParentsFirst(nodes: Node[]): Node[] {
   const result: Node[] = []
@@ -89,6 +92,10 @@ const nodeTypes = {
   service:           ServiceNode,
   subnet:            ServiceNode,
   cloud:             ServiceNode,
+}
+
+const edgeTypes = {
+  customLoop: LoopEdge,
 }
 
 // Default sizes for leaf vs group nodes (ELK will compute group sizes)
@@ -201,7 +208,7 @@ function toFlowEdges(model: GraphModel): Edge[] {
       id: e.id,
       source: e.source,
       target: e.target,
-      type: 'smoothstep',
+      type: 'customLoop', // Use custom loop edge type
       pathOptions: { borderRadius: 16 },
       ...(sourceHandle ? { sourceHandle } : {}),
       ...(targetHandle ? { targetHandle } : {}),
@@ -240,6 +247,35 @@ export function DiagramCanvas({ model }: Props) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const config = useConfig()
   const dispatch = useDispatch()
+
+  const routingContextValue = useMemo(() => {
+    if (nodes.length === 0) return null
+
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+    const absPosMap = new Map<string, Point>()
+    for (const n of nodes) {
+      absPosMap.set(n.id, getAbsolutePosition(n.id, nodeMap))
+    }
+
+    const otherVerticals: Segment[] = []
+    for (const e of edges) {
+      const sN = nodeMap.get(e.source)
+      const tN = nodeMap.get(e.target)
+      if (!sN || !tN) continue
+      const sa = absPosMap.get(e.source) ?? { x: 0, y: 0 }
+      const ta = absPosMap.get(e.target) ?? { x: 0, y: 0 }
+      const sp = getHandlePosition(sN, e.sourceHandle ?? null, sa)
+      const tp = getHandlePosition(tN, e.targetHandle ?? null, ta)
+      const segs = getEdgeSegments(sp.x, sp.y, tp.x, tp.y, e.sourceHandle ?? null, e.id)
+      for (const s of segs) {
+        if (!s.isHorizontal) {
+          otherVerticals.push(s)
+        }
+      }
+    }
+
+    return { nodeMap, absPosMap, otherVerticals }
+  }, [nodes, edges])
 
   // 1. Re-calculate layout ONLY when model changes
   useEffect(() => {
@@ -328,44 +364,47 @@ export function DiagramCanvas({ model }: Props) {
   }
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={onNodeClick}
-      onPaneClick={onPaneClick}
-      nodeTypes={nodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.15 }}
-      attributionPosition="bottom-right"
-      minZoom={0.1}
-      maxZoom={3}
-      style={{ background: '#f8f8f8' }}
-      elevateEdgesOnSelect
-    >
-      {/* Subtle dot grid like draw.io */}
-      <Background color="#d0d0d0" gap={20} size={1} />
-      <Controls style={{ borderRadius: 6 }} />
-      <ExportMenu />
-      <MiniMap
-        nodeColor={(n) => {
-          const kind = (n.data as { kind?: string })?.kind ?? ''
-          if (kind === 'on-premises')                             return '#5A5A5A'
-          if (['root', 'ou', 'account'].includes(kind))          return '#E7157B'
-          if (kind === 'vpc')                                     return '#8C4FFF'
-          if (kind === 'subnet-public')                           return '#248814'
-          if (kind === 'subnet-private')                          return '#1A6CAE'
-          if (kind === 'subnet-firewall')                         return '#CC3300'
-          if (kind === 'subnet-tgw')                             return '#6B3FA0'
-          if (['tgw', 'vpn', 'cgw', 'dx'].includes(kind))        return '#6B3FA0'
-          if (['security-hub', 'guardduty', 'macie', 'inspector'].includes(kind)) return '#DD3B25'
-          return '#888'
-        }}
-        pannable
-        zoomable
-        style={{ borderRadius: 6 }}
-      />
-    </ReactFlow>
+    <EdgeRoutingContext.Provider value={routingContextValue}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.15 }}
+        attributionPosition="bottom-right"
+        minZoom={0.1}
+        maxZoom={3}
+        style={{ background: '#f8f8f8' }}
+        elevateEdgesOnSelect
+      >
+        {/* Subtle dot grid like draw.io */}
+        <Background color="#d0d0d0" gap={20} size={1} />
+        <Controls style={{ borderRadius: 6 }} />
+        <ExportMenu />
+        <MiniMap
+          nodeColor={(n) => {
+            const kind = (n.data as { kind?: string })?.kind ?? ''
+            if (kind === 'on-premises')                             return '#5A5A5A'
+            if (['root', 'ou', 'account'].includes(kind))          return '#E7157B'
+            if (kind === 'vpc')                                     return '#8C4FFF'
+            if (kind === 'subnet-public')                           return '#248814'
+            if (kind === 'subnet-private')                          return '#1A6CAE'
+            if (kind === 'subnet-firewall')                         return '#CC3300'
+            if (kind === 'subnet-tgw')                             return '#6B3FA0'
+            if (['tgw', 'vpn', 'cgw', 'dx'].includes(kind))        return '#6B3FA0'
+            if (['security-hub', 'guardduty', 'macie', 'inspector'].includes(kind)) return '#DD3B25'
+            return '#888'
+          }}
+          pannable
+          zoomable
+          style={{ borderRadius: 6 }}
+        />
+      </ReactFlow>
+    </EdgeRoutingContext.Provider>
   )
 }
