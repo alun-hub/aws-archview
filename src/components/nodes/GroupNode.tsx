@@ -46,7 +46,9 @@ export function GroupNode({ data, selected }: NodeProps) {
         height: '100%',
         border: `2px ${borderStyle} ${border}`,
         borderRadius: 8,
-        background: selected ? bg.replace(/0\.\d+\)/, '0.15)') : bg,
+        background: selected
+          ? `linear-gradient(${bg.replace(/0\.\d+\)/, '0.15)')}, ${bg.replace(/0\.\d+\)/, '0.15)')}), #ffffff`
+          : `linear-gradient(${bg}, ${bg}), #ffffff`,
         position: 'relative',
         boxSizing: 'border-box',
         boxShadow: selected
