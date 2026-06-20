@@ -156,12 +156,45 @@ function toFlowEdges(model: GraphModel): Edge[] {
   return model.edges.map((e) => {
     const style = EDGE_STYLES[e.kind ?? 'tgw']
 
-    // tgw-hub:  TGW below hub account → TGW top-s → hub bottom-t
-    // tgw:      TGW above spokes     → TGW bottom-s → spoke top-t
-    // vpn→tgw:  On-Premises is RIGHT of TGW → VPN left-s → TGW right-t
-    const isTgwHub    = e.kind === 'tgw-hub'
-    const isTgwSpoke  = e.kind === 'tgw'
-    const isVpnToTgw  = e.kind === 'vpn' && e.source.startsWith('vpn:') && e.target.startsWith('tgw:')
+    // tgw-hub:      TGW below hub account → TGW top-s → hub bottom-t
+    // tgw:          TGW above spokes     → TGW bottom-s → spoke top-t
+    // vpn→tgw:      On-Premises is RIGHT of TGW → VPN left-s → TGW right-t
+    // propagation:  VPC/VPN to TGW RT. Route handles to avoid crossing.
+    const isTgwHub       = e.kind === 'tgw-hub'
+    const isTgwSpoke     = e.kind === 'tgw'
+    const isVpnToTgw     = e.kind === 'vpn' && e.source.startsWith('vpn:') && e.target.startsWith('tgw:')
+    const isPropagation  = e.kind === 'propagation'
+
+    let sourceHandle: string | undefined = undefined
+    let targetHandle: string | undefined = undefined
+
+    if (isTgwHub) {
+      sourceHandle = 'top-s'
+      targetHandle = 'bottom-t'
+    } else if (isTgwSpoke) {
+      sourceHandle = 'bottom-s'
+      targetHandle = 'top-t'
+    } else if (isVpnToTgw) {
+      sourceHandle = 'left-s'
+      targetHandle = 'right-t'
+    } else if (isPropagation) {
+      if (e.source.startsWith('vpn:')) {
+        // VPN to TGW RT: goes left from VPN to the right side of the TGW RT
+        sourceHandle = 'left-s'
+        targetHandle = 'right-t'
+      } else {
+        // VPC. If it's a Network VPC (above TGW), connect bottom-s to top-t
+        const isNetworkVpc = e.source.toLowerCase().endsWith(':network')
+        if (isNetworkVpc) {
+          sourceHandle = 'bottom-s'
+          targetHandle = 'top-t'
+        } else {
+          // Workload VPC (below TGW), connect top-s to bottom-t
+          sourceHandle = 'top-s'
+          targetHandle = 'bottom-t'
+        }
+      }
+    }
 
     return {
       id: e.id,
@@ -169,16 +202,14 @@ function toFlowEdges(model: GraphModel): Edge[] {
       target: e.target,
       type: 'smoothstep',
       pathOptions: { borderRadius: 16 },
-      ...(isTgwHub   ? { sourceHandle: 'top-s',    targetHandle: 'bottom-t' } : {}),
-      ...(isTgwSpoke ? { sourceHandle: 'bottom-s', targetHandle: 'top-t'    } : {}),
-      ...(isVpnToTgw ? { sourceHandle: 'left-s',   targetHandle: 'right-t'  } : {}),
+      ...(sourceHandle ? { sourceHandle } : {}),
+      ...(targetHandle ? { targetHandle } : {}),
       style: {
         stroke: style.color,
         strokeWidth: 2,
         ...(style.dash ? { strokeDasharray: style.dash } : {}),
       },
       markerEnd: { type: 'arrowclosed' as const, color: style.color, width: 14, height: 14 },
-      zIndex: 9999,
       animated: false,
       // Route table label shown as a small pill on the edge
       ...(e.label
@@ -280,7 +311,6 @@ export function DiagramCanvas({ model }: Props) {
       maxZoom={3}
       style={{ background: '#f8f8f8' }}
       elevateEdgesOnSelect
-      defaultEdgeOptions={{ zIndex: 9999 }}
     >
       {/* Subtle dot grid like draw.io */}
       <Background color="#d0d0d0" gap={20} size={1} />
