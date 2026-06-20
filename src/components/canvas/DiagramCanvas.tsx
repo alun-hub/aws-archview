@@ -204,6 +204,9 @@ function toFlowEdges(model: GraphModel): Edge[] {
     } else if (isPeering) {
       sourceHandle = 'right-s'
       targetHandle = 'left-t'
+    } else if (e.target === 'internet') {
+      sourceHandle = 'left-s'
+      targetHandle = 'right-t'
     }
 
     return {
