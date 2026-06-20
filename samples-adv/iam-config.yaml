@@ -3,103 +3,275 @@ identityCenter:
   delegatedAdminAccount: Audit
 
 permissionSets:
+  # ── Broad Access ─────────────────────────────────────────────────────────────
   - name: AdministratorAccess
-    description: Full administrative access. Assigned to Management and core infrastructure accounts.
+    description: Full AWS administrator access. Restricted to platform leads and emergency break-glass.
     sessionDuration: PT4H
     awsManagedPolicies:
       - arn:aws:iam::aws:policy/AdministratorAccess
 
   - name: ReadOnlyAccess
-    description: Global read-only access for auditing and troubleshooting.
-    sessionDuration: PT12H
+    description: Read-only access to all AWS services. Default role for developers doing audits.
+    sessionDuration: PT8H
     awsManagedPolicies:
       - arn:aws:iam::aws:policy/ReadOnlyAccess
 
-  - name: SecurityOps
-    description: Access to security services (Security Hub, GuardDuty, Macie, Config) in the Audit account.
+  # ── Security & Compliance ─────────────────────────────────────────────────────
+  - name: SecurityEngineer
+    description: Full access to security services — GuardDuty, Security Hub, Macie, Inspector, Detective.
     sessionDuration: PT8H
     awsManagedPolicies:
-      - arn:aws:iam::aws:policy/SecurityAudit
+      - arn:aws:iam::aws:policy/AmazonGuardDutyFullAccess
+      - arn:aws:iam::aws:policy/AWSSecurityHubFullAccess
+      - arn:aws:iam::aws:policy/ReadOnlyAccess
     customerManagedPolicies:
-      - name: SecurityOpsPolicy
+      - name: SecurityEngineerExtended
+        path: /enterprise/security/
 
-  - name: CloudOps
-    description: Network administration and infrastructure provisioning.
-    sessionDuration: PT8H
-    customerManagedPolicies:
-      - name: CloudOpsPolicy
-
-  - name: ApplicationDeveloper
-    description: Limited read-write access to dev/test environments for application services.
-    sessionDuration: PT12H
-    customerManagedPolicies:
-      - name: ApplicationDeveloperPolicy
-
-  - name: DatabaseAdmin
-    description: Manage databases, RDS instances, and DynamoDB tables.
-    sessionDuration: PT6H
-    awsManagedPolicies:
-      - arn:aws:iam::aws:policy/AmazonRDSFullAccess
-      - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
-
-  - name: FinancialAuditor
-    description: Access to cost management, billing dashboards, and invoices.
+  - name: SecurityAuditor
+    description: Read-only view of security posture — findings, compliance, IAM, and logs. Used by external auditors.
     sessionDuration: PT4H
     awsManagedPolicies:
+      - arn:aws:iam::aws:policy/SecurityAudit
+      - arn:aws:iam::aws:policy/AmazonGuardDutyReadOnlyAccess
+      - arn:aws:iam::aws:policy/AWSSecurityHubReadOnlyAccess
+
+  # ── Network & Infrastructure ──────────────────────────────────────────────────
+  - name: NetworkAdmin
+    description: Full network management — TGW, VPC, Security Groups, Route53, Network Firewall.
+    sessionDuration: PT4H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AmazonVPCFullAccess
+      - arn:aws:iam::aws:policy/AmazonRoute53FullAccess
+    customerManagedPolicies:
+      - name: NetworkAdminExtended
+        path: /enterprise/network/
+
+  - name: CloudOps
+    description: Operational access for SRE/CloudOps team — EC2, ECS, RDS read, CloudWatch, Systems Manager.
+    sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+      - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+      - arn:aws:iam::aws:policy/CloudWatchFullAccess
+      - arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess
+
+  # ── Application Development ───────────────────────────────────────────────────
+  - name: ApplicationDeveloper
+    description: Deploy applications — CodePipeline, ECR, ECS, Lambda, S3, CloudFormation stacks.
+    sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+      - arn:aws:iam::aws:policy/AmazonECR_FullAccess
+      - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+    customerManagedPolicies:
+      - name: AppDeveloperS3Access
+        path: /enterprise/apps/
+
+  - name: DevOpsEngineer
+    description: CI/CD and platform engineering — full access to CodePipeline, CodeBuild, CodeDeploy, EKS, and IAM role management.
+    sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+      - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
+      - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+      - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+
+  # ── Data & Analytics ──────────────────────────────────────────────────────────
+  - name: DataScientist
+    description: Managed access to SageMaker, Glue, Athena, S3 buckets, EMR, and Redshift.
+    sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+      - arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess
+      - arn:aws:iam::aws:policy/AmazonAthenaFullAccess
+    customerManagedPolicies:
+      - name: DataLakeAccess
+        path: /enterprise/data/
+
+  - name: DatabaseAdmin
+    description: Full access to RDS, ElastiCache, DynamoDB, and Secrets Manager for database operations.
+    sessionDuration: PT4H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AmazonRDSFullAccess
+      - arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess
+      - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+      - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+
+  # ── Finance & Compliance ──────────────────────────────────────────────────────
+  - name: FinancialAuditor
+    description: Read-only access to AWS Cost Explorer, Budgets, Billing, and Cost and Usage Reports.
+    sessionDuration: PT8H
+    awsManagedPolicies:
       - arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess
+      - arn:aws:iam::aws:policy/job-function/Billing
+    customerManagedPolicies:
+      - name: CostExplorerFullReadOnly
+        path: /enterprise/finance/
 
 identityCenterAssignments:
-  - name: AdminAccess-Management
-    permissionSetName: AdministratorAccess
+  # ── Platform & Security Engineering ──────────────────────────────────────────
+  - principalId: aws-platform-leads
     principalType: GROUP
-    principalId: cloud-admins
+    permissionSetName: AdministratorAccess
     deploymentTargets:
       accounts:
         - Management
-        - Audit
         - Network
         - SharedServices
+        - DevOpsTooling
 
-  - name: ReadOnly-All
-    permissionSetName: ReadOnlyAccess
+  - principalId: aws-security-engineers
     principalType: GROUP
-    principalId: cloud-readonly
-    deploymentTargets:
-      organizationalUnits:
-        - Security
-        - Infrastructure
-        - Workloads
-
-  - name: SecurityOps-Audit
-    permissionSetName: SecurityOps
-    principalType: GROUP
-    principalId: security-team
+    permissionSetName: SecurityEngineer
     deploymentTargets:
       accounts:
         - Audit
         - LogArchive
+      organizationalUnits:
+        - Root
 
-  - name: CloudOps-Infra
-    permissionSetName: CloudOps
+  - principalId: aws-external-auditors
     principalType: GROUP
-    principalId: cloud-ops
+    permissionSetName: SecurityAuditor
+    deploymentTargets:
+      accounts:
+        - Audit
+        - LogArchive
+      organizationalUnits:
+        - Production
+
+  - principalId: aws-network-admins
+    principalType: GROUP
+    permissionSetName: NetworkAdmin
     deploymentTargets:
       accounts:
         - Network
         - SharedServices
 
-  - name: AppDev-Dev
-    permissionSetName: ApplicationDeveloper
+  # ── SRE / CloudOps ────────────────────────────────────────────────────────────
+  - principalId: aws-cloudops
     principalType: GROUP
-    principalId: app-developers
+    permissionSetName: CloudOps
     deploymentTargets:
       organizationalUnits:
-        - Dev
+        - Production
+        - NonProduction
+        - Infrastructure
 
-  - name: DBAdmin-Prod
-    permissionSetName: DatabaseAdmin
+  - principalId: aws-devops-engineers
     principalType: GROUP
-    principalId: dba-team
+    permissionSetName: DevOpsEngineer
+    deploymentTargets:
+      accounts:
+        - DevOpsTooling
+      organizationalUnits:
+        - NonProduction
+
+  # ── Aurora Team ───────────────────────────────────────────────────────────────
+  - principalId: aurora-developers
+    principalType: GROUP
+    permissionSetName: ApplicationDeveloper
+    deploymentTargets:
+      accounts:
+        - Aurora-Dev
+        - Aurora-Test
+        - Aurora-Staging
+
+  - principalId: aurora-dbas
+    principalType: GROUP
+    permissionSetName: DatabaseAdmin
+    deploymentTargets:
+      accounts:
+        - Aurora-Prod
+        - Aurora-Staging
+
+  - principalId: aurora-ops
+    principalType: GROUP
+    permissionSetName: CloudOps
+    deploymentTargets:
+      accounts:
+        - Aurora-Prod
+
+  # ── Nebula Team ───────────────────────────────────────────────────────────────
+  - principalId: nebula-developers
+    principalType: GROUP
+    permissionSetName: ApplicationDeveloper
+    deploymentTargets:
+      accounts:
+        - Nebula-Dev
+        - Nebula-Test
+        - Nebula-Staging
+
+  - principalId: nebula-ops
+    principalType: GROUP
+    permissionSetName: CloudOps
+    deploymentTargets:
+      accounts:
+        - Nebula-Prod
+
+  # ── Orion Team ────────────────────────────────────────────────────────────────
+  - principalId: orion-developers
+    principalType: GROUP
+    permissionSetName: ApplicationDeveloper
+    deploymentTargets:
+      accounts:
+        - Orion-Dev
+        - Orion-Staging
+
+  - principalId: orion-dbas
+    principalType: GROUP
+    permissionSetName: DatabaseAdmin
+    deploymentTargets:
+      accounts:
+        - Orion-Prod
+
+  # ── Phoenix & Apex (Data Teams) ───────────────────────────────────────────────
+  - principalId: data-scientists
+    principalType: GROUP
+    permissionSetName: DataScientist
+    deploymentTargets:
+      accounts:
+        - Phoenix-Dev
+        - Phoenix-Prod
+        - Apex-Dev
+        - Apex-Prod
+
+  - principalId: bi-developers
+    principalType: GROUP
+    permissionSetName: ApplicationDeveloper
+    deploymentTargets:
+      accounts:
+        - Apex-Dev
+
+  - principalId: bi-analysts
+    principalType: GROUP
+    permissionSetName: ReadOnlyAccess
+    deploymentTargets:
+      accounts:
+        - Apex-Prod
+
+  # ── Finance & Compliance ──────────────────────────────────────────────────────
+  - principalId: finance-controllers
+    principalType: GROUP
+    permissionSetName: FinancialAuditor
+    deploymentTargets:
+      accounts:
+        - Management
+      organizationalUnits:
+        - Root
+
+  # ── Sandbox ───────────────────────────────────────────────────────────────────
+  - principalId: aws-all-employees
+    principalType: GROUP
+    permissionSetName: ReadOnlyAccess
     deploymentTargets:
       organizationalUnits:
-        - Prod
+        - Sandbox
+
+  - principalId: aws-platform-leads
+    principalType: GROUP
+    permissionSetName: AdministratorAccess
+    deploymentTargets:
+      organizationalUnits:
+        - Sandbox

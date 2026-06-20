@@ -1,68 +1,213 @@
 mandatoryAccounts:
   - name: Management
-    email: master-admin@enterprise.org
-    organizationalUnit: Root
-    description: AWS Organization Management Account.
+    email: aws-management@enterprise.org
+    organizationalUnit: Management
+    description: AWS Organization Management Account. Root billing and consolidated reporting.
   - name: LogArchive
-    email: log-archive@enterprise.org
+    email: aws-log-archive@enterprise.org
     organizationalUnit: Security
-    description: Centralized secure log repository account.
+    description: Immutable centralized log repository. Receives all CloudTrail and Config logs.
   - name: Audit
-    email: security-audit@enterprise.org
-    organizationalUnit: Security
-    description: Delegated administration account for security services.
+    email: aws-audit@enterprise.org
+    organizationalUnit: Security/DevSecOps
+    description: Delegated admin account for Security Hub, GuardDuty, Macie, Inspector, and Audit Manager.
   - name: Network
-    email: core-network@enterprise.org
+    email: aws-network@enterprise.org
     organizationalUnit: Infrastructure/Network
-    description: Hub network management account.
+    description: Hub networking account. Owns Transit Gateways, Network Firewall, and centralized egress.
   - name: SharedServices
-    email: shared-services@enterprise.org
+    email: aws-shared-services@enterprise.org
     organizationalUnit: Infrastructure/SharedServices
-    description: Shared operations, Active Directory, and tooling.
+    description: Shared platform services — Route53 Resolver, Active Directory, internal NTP, HashiCorp Vault.
 
 workloadAccounts:
-  # Aurora Workload Accounts
+  # ── DevOps Tooling ────────────────────────────────────────────────────────────
+  - name: DevOpsTooling
+    email: aws-devops@enterprise.org
+    organizationalUnit: Infrastructure/DevOpsTooling
+    description: CI/CD pipelines (CodePipeline, Jenkins), artifact registries, and deployment tooling.
+    tags:
+      Project: Platform
+      CostCenter: CC-0100
+
+  # ── Aurora — Payment Processing Platform ─────────────────────────────────────
   - name: Aurora-Dev
     email: aurora-dev@enterprise.org
-    organizationalUnit: Workloads/Dev
-    description: Development and testing environment for Aurora services.
+    organizationalUnit: Workloads/NonProduction/Development
+    description: Aurora development environment. Feature branches and integration testing.
     tags:
       Project: Aurora
-      Env: Dev
-  - name: Aurora-Stage
-    email: aurora-stage@enterprise.org
-    organizationalUnit: Workloads/Stage
-    description: Staging and pre-production verification environment for Aurora.
+      Environment: Dev
+      CostCenter: CC-1100
+      Owner: aurora-team
+
+  - name: Aurora-Test
+    email: aurora-test@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Test
+    description: Aurora automated QA and performance test environment.
     tags:
       Project: Aurora
-      Env: Stage
+      Environment: Test
+      CostCenter: CC-1100
+      Owner: aurora-team
+
+  - name: Aurora-Staging
+    email: aurora-staging@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Staging
+    description: Aurora pre-production staging with production-mirror configuration.
+    tags:
+      Project: Aurora
+      Environment: Staging
+      CostCenter: CC-1100
+      Owner: aurora-team
+
   - name: Aurora-Prod
     email: aurora-prod@enterprise.org
-    organizationalUnit: Workloads/Prod
-    description: Production environment for Aurora services.
+    organizationalUnit: Workloads/Production/ProdFinance
+    description: Aurora production — high-availability payment processing. PCI-DSS in scope.
     tags:
       Project: Aurora
-      Env: Prod
+      Environment: Prod
+      CostCenter: CC-1100
+      Owner: aurora-team
+      Compliance: PCI-DSS
 
-  # Nebula Workload Accounts
+  # ── Nebula — Customer Portal & API ───────────────────────────────────────────
   - name: Nebula-Dev
     email: nebula-dev@enterprise.org
-    organizationalUnit: Workloads/Dev
-    description: Development and testing environment for Nebula services.
+    organizationalUnit: Workloads/NonProduction/Development
+    description: Nebula development environment. Ephemeral stacks allowed.
     tags:
       Project: Nebula
-      Env: Dev
-  - name: Nebula-Stage
-    email: nebula-stage@enterprise.org
-    organizationalUnit: Workloads/Stage
-    description: Pre-production staging environment for Nebula.
+      Environment: Dev
+      CostCenter: CC-1200
+      Owner: nebula-team
+
+  - name: Nebula-Test
+    email: nebula-test@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Test
+    description: Nebula test environment. Load and integration tests run nightly.
     tags:
       Project: Nebula
-      Env: Stage
+      Environment: Test
+      CostCenter: CC-1200
+      Owner: nebula-team
+
+  - name: Nebula-Staging
+    email: nebula-staging@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Staging
+    description: Nebula staging — final validation before production deployment.
+    tags:
+      Project: Nebula
+      Environment: Staging
+      CostCenter: CC-1200
+      Owner: nebula-team
+
   - name: Nebula-Prod
     email: nebula-prod@enterprise.org
-    organizationalUnit: Workloads/Prod
-    description: High-availability production environment for Nebula.
+    organizationalUnit: Workloads/Production/ProdEcommerce
+    description: Nebula production — customer-facing portal serving 2M+ users.
     tags:
       Project: Nebula
-      Env: Prod
+      Environment: Prod
+      CostCenter: CC-1200
+      Owner: nebula-team
+
+  # ── Orion — Internal ERP & HR Systems ────────────────────────────────────────
+  - name: Orion-Dev
+    email: orion-dev@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Development
+    description: Orion development environment for ERP customizations and integrations.
+    tags:
+      Project: Orion
+      Environment: Dev
+      CostCenter: CC-1300
+      Owner: orion-team
+
+  - name: Orion-Staging
+    email: orion-staging@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Staging
+    description: Orion staging for UAT with business stakeholders.
+    tags:
+      Project: Orion
+      Environment: Staging
+      CostCenter: CC-1300
+      Owner: orion-team
+
+  - name: Orion-Prod
+    email: orion-prod@enterprise.org
+    organizationalUnit: Workloads/Production/ProdPlatform
+    description: Orion production — ERP and HR platform. SOX compliance in scope.
+    tags:
+      Project: Orion
+      Environment: Prod
+      CostCenter: CC-1300
+      Owner: orion-team
+      Compliance: SOX
+
+  # ── Phoenix — Data Lake & Analytics ──────────────────────────────────────────
+  - name: Phoenix-Dev
+    email: phoenix-dev@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Development
+    description: Phoenix data engineering and ML experimentation environment.
+    tags:
+      Project: Phoenix
+      Environment: Dev
+      CostCenter: CC-1400
+      Owner: data-team
+
+  - name: Phoenix-Prod
+    email: phoenix-prod@enterprise.org
+    organizationalUnit: Workloads/Production/ProdData
+    description: Phoenix production data lake — S3, Glue, Athena, EMR, SageMaker.
+    tags:
+      Project: Phoenix
+      Environment: Prod
+      CostCenter: CC-1400
+      Owner: data-team
+
+  # ── Apex — Business Intelligence & Reporting ──────────────────────────────────
+  - name: Apex-Dev
+    email: apex-dev@enterprise.org
+    organizationalUnit: Workloads/NonProduction/Development
+    description: Apex BI development — QuickSight, Redshift sandbox, dbt development.
+    tags:
+      Project: Apex
+      Environment: Dev
+      CostCenter: CC-1500
+      Owner: bi-team
+
+  - name: Apex-Prod
+    email: apex-prod@enterprise.org
+    organizationalUnit: Workloads/BusinessIntelligence
+    description: Apex production BI — Redshift cluster, QuickSight, reporting pipelines.
+    tags:
+      Project: Apex
+      Environment: Prod
+      CostCenter: CC-1500
+      Owner: bi-team
+
+  # ── Sandbox Accounts ─────────────────────────────────────────────────────────
+  - name: Sandbox-Alpha
+    email: sandbox-alpha@enterprise.org
+    organizationalUnit: Sandbox
+    description: Sandbox for platform engineering team — infrastructure experiments.
+    tags:
+      Environment: Sandbox
+      Owner: platform-team
+
+  - name: Sandbox-Beta
+    email: sandbox-beta@enterprise.org
+    organizationalUnit: Sandbox
+    description: Sandbox for security team — offensive security research and detection testing.
+    tags:
+      Environment: Sandbox
+      Owner: security-team
+
+  - name: Sandbox-Gamma
+    email: sandbox-gamma@enterprise.org
+    organizationalUnit: Sandbox
+    description: Open sandbox for application teams — approved spike work and prototypes.
+    tags:
+      Environment: Sandbox
+      Owner: app-teams

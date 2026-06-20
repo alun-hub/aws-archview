@@ -1,0 +1,388 @@
+cloudFormationStacks:
+  # ── Baseline Stacks (all accounts) ───────────────────────────────────────────
+  - name: SC-Logging-Baseline
+    description: Centralized logging baseline — S3 bucket policies, CloudWatch log group retention, and KMS key for log encryption.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+    template: cfn-templates/logging-baseline.yaml
+    runOrder: 1
+    terminationProtection: true
+    parameters:
+      - name: RetentionDays
+        value: '3653'
+      - name: EnableEncryption
+        value: 'true'
+
+  - name: SC-SecurityHub-Config
+    description: Custom Security Hub insight and action targets for enterprise-specific finding workflows.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - Audit
+    template: cfn-templates/securityhub-config.yaml
+    runOrder: 2
+    terminationProtection: true
+
+  - name: SC-GuardDuty-ThreatIntel
+    description: GuardDuty custom threat intelligence IP sets sourced from enterprise SOC threat feeds.
+    regions:
+      - eu-west-1
+      - eu-north-1
+      - us-east-1
+    deploymentTargets:
+      accounts:
+        - Audit
+    template: cfn-templates/guardduty-threatintel.yaml
+    runOrder: 2
+    terminationProtection: true
+    parameters:
+      - name: ThreatIntelBucketName
+        value: enterprise-soc-threat-intel
+      - name: UpdateScheduleHours
+        value: '6'
+
+  # ── Network Stacks ────────────────────────────────────────────────────────────
+  - name: SC-Network-Firewall-Policy
+    description: AWS Network Firewall stateful and stateless rule groups for centralized east-west and egress inspection.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      accounts:
+        - Network
+    template: cfn-templates/network-firewall-policy.yaml
+    runOrder: 2
+    terminationProtection: true
+    parameters:
+      - name: LoggingBucket
+        value: enterprise-networkfirewall-logs
+      - name: BlockedDomainListBucket
+        value: enterprise-soc-blocklist
+      - name: AlertSnsArn
+        value: arn:aws:sns:eu-west-1:NETWORK_ACCOUNT_ID:SecurityAlerts
+
+  - name: SC-DNS-Resolver-Rules
+    description: Route53 Resolver forwarding rules for on-premises DNS domains and internal enterprise zones.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      accounts:
+        - SharedServices
+    template: cfn-templates/dns-resolver-rules.yaml
+    runOrder: 3
+    terminationProtection: true
+    parameters:
+      - name: OnPremDnsIp1
+        value: 10.0.0.2
+      - name: OnPremDnsIp2
+        value: 10.0.0.3
+      - name: InternalDomain
+        value: enterprise.internal
+
+  - name: SC-VPC-Flow-Log-Athena
+    description: Athena database, table, and named queries for centralized VPC Flow Log analysis.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - LogArchive
+    template: cfn-templates/vpc-flowlog-athena.yaml
+    runOrder: 4
+    terminationProtection: true
+
+  # ── Shared Services Stacks ────────────────────────────────────────────────────
+  - name: SC-ActiveDirectory-Managed
+    description: AWS Managed Microsoft AD for enterprise identity integration with IAM Identity Center.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - SharedServices
+    template: cfn-templates/managed-ad.yaml
+    runOrder: 3
+    terminationProtection: true
+    parameters:
+      - name: DomainName
+        value: corp.enterprise.internal
+      - name: DomainShortName
+        value: CORP
+      - name: Edition
+        value: Enterprise
+
+  - name: SC-Secrets-Baseline
+    description: AWS Secrets Manager rotation Lambdas and baseline secrets for shared credentials and service accounts.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      accounts:
+        - SharedServices
+    template: cfn-templates/secrets-baseline.yaml
+    runOrder: 4
+    terminationProtection: true
+
+  # ── Production Guardrails ─────────────────────────────────────────────────────
+  - name: SC-Prod-Config-Remediations
+    description: AWS Config auto-remediation rules using SSM Automation — re-enable encryption, revoke public security groups.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+    template: cfn-templates/config-remediations-prod.yaml
+    runOrder: 5
+    terminationProtection: true
+
+  - name: SC-Prod-EventBridge-Rules
+    description: EventBridge rules for production security events — root login, console access without MFA, IAM key creation.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+    template: cfn-templates/eventbridge-security-prod.yaml
+    runOrder: 5
+    terminationProtection: true
+    parameters:
+      - name: AlertSnsTopicArn
+        value: arn:aws:sns:eu-west-1:AUDIT_ACCOUNT_ID:SecurityAlerts
+
+  - name: SC-Aurora-Compliance
+    description: PCI-DSS compliance baseline for Aurora payment processing — WAF rules, additional CloudWatch metrics, RDS parameter group.
+    regions:
+      - eu-west-1
+      - us-east-1
+    deploymentTargets:
+      accounts:
+        - Aurora-Prod
+    template: cfn-templates/pci-compliance-aurora.yaml
+    runOrder: 6
+    terminationProtection: true
+    parameters:
+      - name: ComplianceStandard
+        value: PCI-DSS-3.2.1
+      - name: DataClassification
+        value: RESTRICTED
+
+  - name: SC-Orion-SOX-Controls
+    description: SOX IT General Controls for Orion ERP — access logging, change management dashboards, quarterly access review automation.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - Orion-Prod
+    template: cfn-templates/sox-controls-orion.yaml
+    runOrder: 6
+    terminationProtection: true
+
+  # ── Developer Experience ──────────────────────────────────────────────────────
+  - name: SC-Sandbox-Guardrails
+    description: Budget alerts, auto-stop Lambda for idle EC2, and resource TTL tags enforcement for sandbox accounts.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Sandbox
+    template: cfn-templates/sandbox-guardrails.yaml
+    runOrder: 3
+    terminationProtection: false
+    parameters:
+      - name: MonthlyCostLimit
+        value: '2000'
+      - name: IdleTimeoutHours
+        value: '8'
+
+  - name: SC-DevOps-Tooling-Baseline
+    description: Shared CodeArtifact domain, ECR lifecycle policies, and S3 artifact buckets for CI/CD pipelines.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - DevOpsTooling
+    template: cfn-templates/devops-tooling-baseline.yaml
+    runOrder: 3
+    terminationProtection: true
+
+  # ── Data Platform ─────────────────────────────────────────────────────────────
+  - name: SC-DataLake-Permissions
+    description: Lake Formation data lake permissions and cross-account grants for the Phoenix data lake.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - Phoenix-Prod
+        - Apex-Prod
+    template: cfn-templates/lakeformation-permissions.yaml
+    runOrder: 6
+    terminationProtection: true
+    parameters:
+      - name: DataLakeAccountId
+        value: PHOENIX_PROD_ACCOUNT_ID
+      - name: ConsumerAccountId
+        value: APEX_PROD_ACCOUNT_ID
+
+cloudFormationStackSets:
+  # ── Baseline Stack Sets ───────────────────────────────────────────────────────
+  - name: SSM-SessionManager-Config
+    description: SSM Session Manager preferences — CloudWatch and S3 logging for all interactive sessions.
+    regions:
+      - eu-west-1
+      - eu-north-1
+      - us-east-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Infrastructure
+    template: cfn-templates/ssm-session-manager.yaml
+    runOrder: 1
+    parameters:
+      - name: LogBucketName
+        value: enterprise-ssm-session-logs
+      - name: KmsKeyArn
+        value: ENTERPRISE_KMS_KEY_ARN
+
+  - name: CloudWatch-Agent-Baseline
+    description: CloudWatch Unified Agent configuration for EC2 OS-level metrics and application logs.
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+    template: cfn-templates/cloudwatch-agent.yaml
+    runOrder: 2
+
+  - name: Budget-Alerts-Per-Account
+    description: Per-account monthly budget with SNS alert at 80% and forecasted 100% thresholds.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Sandbox
+    template: cfn-templates/account-budget-alert.yaml
+    runOrder: 2
+    parameters:
+      - name: AlertEmail
+        value: finops@enterprise.org
+
+  - name: IAM-AccessAnalyzer-Org
+    description: IAM Access Analyzer analyzers (account-level) in every enabled region per workload account.
+    regions:
+      - eu-west-1
+      - eu-north-1
+      - us-east-1
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+    template: cfn-templates/iam-access-analyzer.yaml
+    runOrder: 1
+
+  - name: SSO-Emergency-BreakGlass
+    description: Emergency break-glass IAM role for platform leads, requiring MFA and logging every action.
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+    template: cfn-templates/emergency-breakglass-role.yaml
+    runOrder: 1
+    terminationProtection: true
+    parameters:
+      - name: AlertTopicArn
+        value: arn:aws:sns:eu-west-1:AUDIT_ACCOUNT_ID:SecurityAlerts
+      - name: AllowedPrincipals
+        value: arn:aws:iam::MANAGEMENT_ACCOUNT:root
+
+serviceCatalogPortfolios:
+  - name: Platform-Infrastructure-Products
+    description: Approved cloud infrastructure patterns — VPC, EKS cluster, RDS, Redis, and S3 bucket with enterprise defaults.
+    provider: Platform Engineering
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+    products:
+      - name: Standard-VPC
+        description: Pre-configured VPC with private/public subnets, flow logs, and TGW attachment.
+        owner: platform-engineering@enterprise.org
+        versions:
+          - name: v1.2
+            template: sc-products/standard-vpc.yaml
+      - name: EKS-Cluster
+        description: Production-ready EKS cluster with Fargate profiles, IRSA, and cluster autoscaler.
+        owner: platform-engineering@enterprise.org
+        versions:
+          - name: v2.1
+            template: sc-products/eks-cluster.yaml
+      - name: RDS-PostgreSQL
+        description: Multi-AZ RDS PostgreSQL with encrypted storage, automatic backups, and Parameter Store integration.
+        owner: platform-engineering@enterprise.org
+        versions:
+          - name: v1.5
+            template: sc-products/rds-postgresql.yaml
+      - name: ElastiCache-Redis
+        description: ElastiCache Redis with TLS, auth tokens, and CloudWatch alarms.
+        owner: platform-engineering@enterprise.org
+        versions:
+          - name: v1.0
+            template: sc-products/elasticache-redis.yaml
+
+  - name: Data-Platform-Products
+    description: Managed data platform products — data pipelines, ML workbench environments, and Redshift namespaces.
+    provider: Data Engineering
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - Phoenix-Dev
+        - Phoenix-Prod
+        - Apex-Dev
+        - Apex-Prod
+    products:
+      - name: Glue-ETL-Pipeline
+        description: Templated Glue ETL job with S3 source/sink, job bookmarks, and CloudWatch metrics.
+        owner: data-engineering@enterprise.org
+        versions:
+          - name: v1.3
+            template: sc-products/glue-etl-pipeline.yaml
+      - name: SageMaker-Studio-Domain
+        description: SageMaker Studio domain per project with VPC-only mode and IAM execution role.
+        owner: data-engineering@enterprise.org
+        versions:
+          - name: v2.0
+            template: sc-products/sagemaker-studio.yaml
+
+  - name: Security-Approved-Tools
+    description: Pre-approved security tooling that development teams can self-service deploy within guardrails.
+    provider: Security Engineering
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+        - NonProduction
+    products:
+      - name: WAF-Web-ACL
+        description: AWS WAF Web ACL with OWASP Top 10 managed rule groups, geo-blocking, and rate limiting.
+        owner: security@enterprise.org
+        versions:
+          - name: v1.1
+            template: sc-products/waf-web-acl.yaml
+      - name: Secrets-Manager-Rotation
+        description: Secrets Manager secret with automatic rotation Lambda for RDS, API keys, and OAuth tokens.
+        owner: security@enterprise.org
+        versions:
+          - name: v1.0
+            template: sc-products/secrets-rotation.yaml

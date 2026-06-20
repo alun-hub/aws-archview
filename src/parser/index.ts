@@ -1,9 +1,12 @@
 import yaml from 'js-yaml'
-import type { AccountsConfig, NetworkConfig, OrganizationConfig, SecurityConfig, IamConfig } from './types'
+import type { AccountsConfig, NetworkConfig, OrganizationConfig, SecurityConfig, IamConfig, GlobalConfig, CustomizationsConfig } from './types'
 import { parseNetwork } from './networkParser'
 import { parseOrganization } from './organizationParser'
+import { parseGlobal } from './globalParser'
+import { parseCustomizations } from './customizationsParser'
 
 export type { GraphEdge, GraphModel, GraphNode } from './types'
+export type { GlobalConfig, CustomizationsConfig } from './types'
 
 export interface LzaConfigs {
   organization?: OrganizationConfig
@@ -11,12 +14,13 @@ export interface LzaConfigs {
   network?: NetworkConfig
   security?: SecurityConfig
   iam?: IamConfig
+  global?: GlobalConfig
+  customizations?: CustomizationsConfig
 }
 
-export type ViewKind = 'organization' | 'network'
+export type ViewKind = 'organization' | 'network' | 'global' | 'customizations'
 
 export function parseYaml<T>(content: string): T {
-  // DEFAULT_SCHEMA (js-yaml v4) disallows JS-specific type tags (!!js/undefined etc.)
   return yaml.load(content, { schema: yaml.DEFAULT_SCHEMA }) as T
 }
 
@@ -28,4 +32,14 @@ export function buildOrganizationGraph(configs: LzaConfigs) {
 export function buildNetworkGraph(configs: LzaConfigs) {
   if (!configs.network) return null
   return parseNetwork(configs.network)
+}
+
+export function buildGlobalGraph(configs: LzaConfigs) {
+  if (!configs.global) return null
+  return parseGlobal(configs.global)
+}
+
+export function buildCustomizationsGraph(configs: LzaConfigs) {
+  if (!configs.customizations) return null
+  return parseCustomizations(configs.customizations)
 }

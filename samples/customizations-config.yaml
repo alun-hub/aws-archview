@@ -1,0 +1,60 @@
+cloudFormationStacks:
+  - name: SC-Logging-Baseline
+    description: Logging baseline resources for all accounts
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+    template: cfn-templates/logging-baseline.yaml
+    runOrder: 1
+    terminationProtection: true
+
+  - name: SC-Network-Firewall-Policy
+    description: Shared Network Firewall policy for Inspection VPC
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      accounts:
+        - Network
+    template: cfn-templates/network-firewall-policy.yaml
+    runOrder: 2
+    terminationProtection: true
+    parameters:
+      - name: LoggingBucket
+        value: aws-accelerator-firewall-logs
+
+  - name: SC-Sandbox-Guardrails
+    description: Budget and tagging guardrails for sandbox accounts
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Sandbox
+    template: cfn-templates/sandbox-guardrails.yaml
+    runOrder: 3
+    terminationProtection: false
+
+cloudFormationStackSets:
+  - name: SSM-SessionManager-Config
+    description: SSM Session Manager configuration across all workload accounts
+    regions:
+      - eu-west-1
+      - eu-north-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Infrastructure
+    template: cfn-templates/ssm-session-manager.yaml
+    runOrder: 1
+
+serviceCatalogPortfolios:
+  - name: Platform-Products
+    description: Approved cloud platform products for workload teams
+    provider: Platform Engineering
+    regions:
+      - eu-west-1
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads

@@ -1,44 +1,48 @@
 enable: true
 
 organizationalUnits:
+  - name: Management
+
   - name: Security
     organizationalUnits:
       - name: DevSecOps
+
   - name: Infrastructure
     organizationalUnits:
       - name: Network
       - name: SharedServices
+      - name: DevOpsTooling
+
   - name: Workloads
     organizationalUnits:
-      - name: Dev
-      - name: Stage
-      - name: Prod
+      - name: Production
+        organizationalUnits:
+          - name: ProdFinance
+          - name: ProdEcommerce
+          - name: ProdData
+          - name: ProdPlatform
+      - name: NonProduction
+        organizationalUnits:
+          - name: Development
+          - name: Test
+          - name: Staging
+      - name: BusinessIntelligence
+
   - name: Sandbox
+
   - name: Suspended
+    ignore: true
 
 serviceControlPolicies:
-  - name: DenyRootUserAccess
-    description: Restricts usage of root credentials in all managed accounts.
+  - name: SCP-DenyRootAccess
+    description: Prevent all root user API calls across every managed account.
     policy: service-control-policies/deny-root-user.json
     deploymentTargets:
       organizationalUnits:
-        - Security
-        - DevSecOps
-        - Infrastructure
-        - Workloads
-        - Sandbox
+        - Root
 
-  - name: EnforcePublicS3Block
-    description: Guardrail enforcing block public access on S3 buckets and preventing public buckets.
-    policy: service-control-policies/enforce-s3-block-public.json
-    deploymentTargets:
-      organizationalUnits:
-        - Infrastructure
-        - Workloads
-        - Sandbox
-
-  - name: RestrictAllowedRegions
-    description: Restricts AWS API calls to eu-west-1 and us-east-1 only.
+  - name: SCP-RestrictRegions
+    description: Restrict AWS API calls to approved regions (eu-west-1, eu-north-1, eu-central-1, us-east-1).
     policy: service-control-policies/restrict-regions.json
     deploymentTargets:
       organizationalUnits:
@@ -48,19 +52,92 @@ serviceControlPolicies:
         - Workloads
         - Sandbox
 
-  - name: ProtectSecurityControls
-    description: Prevents modifications to config recorders, guardduty and security hub.
+  - name: SCP-EnforceS3PublicBlock
+    description: Block any attempt to disable S3 Block Public Access settings.
+    policy: service-control-policies/enforce-s3-block-public.json
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+
+  - name: SCP-RequireIMDSv2
+    description: Enforce Instance Metadata Service v2 on all EC2 instances.
+    policy: service-control-policies/require-imdsv2.json
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+
+  - name: SCP-ProtectSecurityControls
+    description: Prevent disabling GuardDuty, Security Hub, Config Recorder, or CloudTrail.
     policy: service-control-policies/protect-security-controls.json
     deploymentTargets:
       organizationalUnits:
         - Workloads
         - Sandbox
-        - DevSecOps
+        - Infrastructure
 
-  - name: RequireMFAForDestructiveActions
-    description: Denies deleting databases or CloudTrail logs without MFA verification.
+  - name: SCP-DenyUnencryptedStorage
+    description: Require encryption-at-rest for EBS volumes, RDS instances, and S3 objects.
+    policy: service-control-policies/deny-unencrypted-storage.json
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+        - ProdFinance
+        - ProdEcommerce
+        - ProdData
+
+  - name: SCP-DenyVpcInternetGateway
+    description: Prevent workload accounts from creating internet-facing gateways directly.
+    policy: service-control-policies/deny-igw.json
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+        - ProdFinance
+        - ProdEcommerce
+        - ProdData
+
+  - name: SCP-RequireMFAForDestructive
+    description: Require MFA for deletion of RDS snapshots, CloudTrail trails, and Config rules.
     policy: service-control-policies/require-mfa-destructive.json
     deploymentTargets:
       organizationalUnits:
+        - Root
+
+  - name: SCP-EnforceTagging
+    description: Block creation of EC2, RDS, and S3 resources that lack mandatory cost-allocation tags.
+    policy: service-control-policies/enforce-mandatory-tags.json
+    deploymentTargets:
+      organizationalUnits:
         - Workloads
+
+  - name: SCP-DenySandboxLargeInstances
+    description: Restrict EC2 instance types to t3/t4g/m5 families in sandbox accounts.
+    policy: service-control-policies/sandbox-instance-limits.json
+    deploymentTargets:
+      organizationalUnits:
         - Sandbox
+
+  - name: SCP-DenyLeavingOrganization
+    description: Prevent any account from leaving the AWS Organization.
+    policy: service-control-policies/deny-leave-org.json
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+
+  - name: SCP-DenySuspendedAccess
+    description: Deny all API actions in accounts pending decommission.
+    policy: service-control-policies/deny-suspended-all.json
+    deploymentTargets:
+      organizationalUnits:
+        - Suspended
+
+taggingPolicies:
+  - name: TagPolicy-CostAllocation
+    description: Enforce cost allocation tags (Project, Environment, Owner, CostCenter) on EC2, RDS, S3.
+
+backupPolicies:
+  - name: BackupPolicy-ProdDaily
+    description: Daily backup at 03:00 UTC with 35-day retention for all production accounts.
+  - name: BackupPolicy-ProdMonthly
+    description: Monthly full backup with 7-year retention for finance and data accounts.
+  - name: BackupPolicy-NonProdWeekly
+    description: Weekly backup with 14-day retention for non-production accounts.

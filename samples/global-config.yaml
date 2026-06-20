@@ -1,0 +1,46 @@
+homeRegion: eu-west-1
+enabledRegions:
+  - eu-west-1
+  - eu-north-1
+managementAccountAccessRole: AWSControlTowerExecution
+cloudwatchLogRetentionInDays: 3653
+controlTower:
+  enable: true
+logging:
+  account: LogArchive
+  cloudtrail:
+    enable: true
+    organizationTrail: true
+    s3BucketName: aws-accelerator-cloudtrail
+  cloudwatchLogs:
+    enable: true
+  sessionManager:
+    sendToCloudWatchLogs: true
+    sendToS3: true
+reports:
+  budgets:
+    - name: Monthly-Total
+      amount: 5000
+      type: COST
+      unit: USD
+    - name: Sandbox-Budget
+      amount: 500
+      type: COST
+      unit: USD
+backup:
+  vaults:
+    - name: BackupVault-Default
+      deploymentTargets:
+        organizationalUnits:
+          - Root
+    - name: BackupVault-Sensitive
+      deploymentTargets:
+        organizationalUnits:
+          - Security
+tags:
+  - key: Accelerator
+    value: AWSAccelerator
+  - key: Environment
+    value: Production
+  - key: CostCenter
+    value: IT-Platform

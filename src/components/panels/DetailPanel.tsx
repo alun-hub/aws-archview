@@ -38,7 +38,12 @@ const KIND_LABEL: Record<string, string> = {
   config:         'AWS Config',
   cloudtrail:     'CloudTrail',
   iam:            'IAM Identity Center',
-  service:        'AWS Service',
+  service:           'AWS Service',
+  cloud:             'AWS Global Config',
+  cloudformation:    'CloudFormation Stack',
+  'service-catalog': 'Service Catalog Portfolio',
+  'control-tower':   'Control Tower',
+  backup:            'AWS Backup',
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -67,7 +72,12 @@ const KIND_COLOR: Record<string, string> = {
   macie:          '#CD2264',
   config:         '#CD2264',
   cloudtrail:     '#CD2264',
-  iam:            '#CD2264',
+  iam:               '#CD2264',
+  cloud:             '#232F3E',
+  cloudformation:    '#E7157B',
+  'service-catalog': '#E7157B',
+  'control-tower':   '#232F3E',
+  backup:            '#007DB8',
 }
 
 // Human-readable labels for known data keys
@@ -104,10 +114,26 @@ const FIELD_LABEL: Record<string, string> = {
   organizationTrail: 'Organization Trail',
   s3BucketName:      'S3 Log Bucket',
   iamAssignments:    'IAM Assignments',
+  // Global config fields
+  homeRegion:        'Hem-region',
+  enabledRegions:    'Aktiverade regioner',
+  logRetentionDays:  'Logglagringstid (dagar)',
+  managementRole:    'Management Access Role',
+  mandatoryTags:     'Obligatoriska taggar',
+  vaults:            'Backup-valv',
+  enabled:           'Aktiverad',
+  budgets:           'Budgetar',
+  // Customizations fields
+  isStackSet:        'Stack Set',
+  description:       'Beskrivning',
+  template:          'Template-fil',
+  regions:           'Regioner',
+  parameters:        'Parametrar',
+  provider:          'Leverantör',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)
-const SKIP_KEYS = new Set(['kind'])
+const SKIP_KEYS = new Set(['kind', 'sublabel'])
 
 interface Props {
   node: GraphNode | null

@@ -1,72 +1,106 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '@cloudscape-design/components/app-layout'
-import SideNavigation from '@cloudscape-design/components/side-navigation'
 import Container from '@cloudscape-design/components/container'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import Checkbox from '@cloudscape-design/components/checkbox'
+import ExpandableSection from '@cloudscape-design/components/expandable-section'
 
 import { ConfigProvider, useConfig, useDispatch } from './store/configStore'
-import { buildNetworkGraph, buildOrganizationGraph, type ViewKind } from './parser'
+import {
+  buildNetworkGraph,
+  buildOrganizationGraph,
+  buildGlobalGraph,
+  buildCustomizationsGraph,
+  type ViewKind,
+} from './parser'
 import { ConfigLoader } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import type { GraphNode } from './parser'
 
-const NAV_ITEMS = [
-  {
-    type: 'section' as const,
-    text: 'Vyer',
-    items: [
-      { type: 'link' as const, text: 'Organisation', href: '#organization' },
-      { type: 'link' as const, text: 'Nätverk', href: '#network' },
-    ],
-  },
+// ── Left navigation panel ────────────────────────────────────────────────────
+
+const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
+  { id: 'organization',   label: 'Organisation',  requiredConfig: 'organization-config.yaml' },
+  { id: 'network',        label: 'Nätverk',        requiredConfig: 'network-config.yaml'       },
+  { id: 'global',         label: 'Global',         requiredConfig: 'global-config.yaml'        },
+  { id: 'customizations', label: 'Anpassningar',   requiredConfig: 'customizations-config.yaml'},
 ]
 
-function AppContent() {
-  const config = useConfig()
+function LeftPanel() {
+  const config   = useConfig()
   const dispatch = useDispatch()
-  const [navOpen, setNavOpen] = useState(true)
-  const [toolsOpen, setToolsOpen] = useState(true)
-
-  const orgGraph = useMemo(() => buildOrganizationGraph(config.configs), [config.configs])
-  const netGraph = useMemo(() => buildNetworkGraph(config.configs), [config.configs])
-
-  const activeGraph = config.activeView === 'organization' ? orgGraph : netGraph
-
-  const selectedNode = useMemo<GraphNode | null>(() => {
-    if (!config.selectedNodeId || !activeGraph) return null
-    return activeGraph.nodes.find((n) => n.id === config.selectedNodeId) ?? null
-  }, [config.selectedNodeId, activeGraph])
-
-  const viewLabel = config.activeView === 'organization' ? 'Organisation' : 'Nätverk'
 
   return (
-    <AppLayout
-      navigationOpen={navOpen}
-      onNavigationChange={({ detail }) => setNavOpen(detail.open)}
-      toolsOpen={toolsOpen}
-      onToolsChange={({ detail }) => setToolsOpen(detail.open)}
-      navigation={
-        <SideNavigation
-          header={{ text: 'AWS ArchView', href: '#' }}
-          activeHref={`#${config.activeView}`}
-          items={NAV_ITEMS}
-          onFollow={(e) => {
-            e.preventDefault()
-            const view = e.detail.href.replace('#', '') as ViewKind
-            dispatch({ type: 'SET_VIEW', view })
-          }}
-        />
-      }
-      tools={
-        <SpaceBetween size="m">
-          <Container header={<Header variant="h3">Konfiguration</Header>}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* App header */}
+      <div style={{
+        padding: '14px 16px 12px',
+        borderBottom: '1px solid #e9ebed',
+        fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+      }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: '#232F3E', letterSpacing: 0.2 }}>
+          AWS ArchView
+        </div>
+        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+          LZA Configuration Visualizer
+        </div>
+      </div>
+
+      {/* Scrollable sections */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* Vyer */}
+        <ExpandableSection header="Vyer" defaultExpanded variant="navigation">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0' }}>
+            {VIEWS.map(({ id, label, requiredConfig }) => {
+              const active  = config.activeView === id
+              const loaded  = requiredConfig in config.loadedFiles
+              return (
+                <button
+                  key={id}
+                  onClick={() => dispatch({ type: 'SET_VIEW', view: id })}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '7px 12px',
+                    background: active ? 'rgba(0, 115, 187, 0.10)' : 'transparent',
+                    border: 'none',
+                    borderLeft: active ? '3px solid #0073bb' : '3px solid transparent',
+                    borderRadius: '0 4px 4px 0',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: active ? 700 : 400,
+                    color: active ? '#0073bb' : loaded ? '#414d5c' : '#aaa',
+                    fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+                    transition: 'all 0.1s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>{label}</span>
+                  {loaded && (
+                    <span style={{ fontSize: 10, color: active ? '#0073bb' : '#248814', opacity: 0.7 }}>✓</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </ExpandableSection>
+
+        {/* Konfiguration */}
+        <ExpandableSection header="Konfiguration" defaultExpanded variant="navigation">
+          <div style={{ padding: '4px 0 8px' }}>
             <ConfigLoader loadedFiles={config.loadedFiles} />
-          </Container>
-          {config.activeView === 'network' && (
-            <Container header={<Header variant="h3">Visa / Dölj koppel</Header>}>
+          </div>
+        </ExpandableSection>
+
+        {/* Visa / Dölj koppel — only in network view */}
+        {config.activeView === 'network' && (
+          <ExpandableSection header="Visa / Dölj koppel" defaultExpanded variant="navigation">
+            <div style={{ padding: '4px 0 8px' }}>
               <SpaceBetween size="s">
                 <Checkbox
                   checked={config.showTgwAttachments}
@@ -93,17 +127,69 @@ function AppContent() {
                   Internet-flöden
                 </Checkbox>
               </SpaceBetween>
-            </Container>
-          )}
-          <Container header={<Header variant="h3">Detaljer</Header>}>
-            <DetailPanel node={selectedNode} />
-          </Container>
-        </SpaceBetween>
+            </div>
+          </ExpandableSection>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── App shell ────────────────────────────────────────────────────────────────
+
+const VIEW_LABELS: Record<ViewKind, string> = {
+  organization:   'Organisation',
+  network:        'Nätverk',
+  global:         'Global',
+  customizations: 'Anpassningar',
+}
+
+function AppContent() {
+  const config = useConfig()
+  const [navOpen,   setNavOpen]   = useState(true)
+  const [toolsOpen, setToolsOpen] = useState(false)
+
+  const orgGraph     = useMemo(() => buildOrganizationGraph(config.configs),   [config.configs])
+  const netGraph     = useMemo(() => buildNetworkGraph(config.configs),         [config.configs])
+  const globalGraph  = useMemo(() => buildGlobalGraph(config.configs),          [config.configs])
+  const customGraph  = useMemo(() => buildCustomizationsGraph(config.configs),  [config.configs])
+
+  const activeGraph = (() => {
+    switch (config.activeView) {
+      case 'organization':   return orgGraph
+      case 'network':        return netGraph
+      case 'global':         return globalGraph
+      case 'customizations': return customGraph
+    }
+  })()
+
+  const selectedNode = useMemo<GraphNode | null>(() => {
+    if (!config.selectedNodeId || !activeGraph) return null
+    return activeGraph.nodes.find((n) => n.id === config.selectedNodeId) ?? null
+  }, [config.selectedNodeId, activeGraph])
+
+  // Auto-open detail panel when a node is selected
+  useEffect(() => {
+    if (config.selectedNodeId) setToolsOpen(true)
+  }, [config.selectedNodeId])
+
+  return (
+    <AppLayout
+      navigationOpen={navOpen}
+      onNavigationChange={({ detail }) => setNavOpen(detail.open)}
+      toolsOpen={toolsOpen}
+      onToolsChange={({ detail }) => setToolsOpen(detail.open)}
+      navigationWidth={300}
+      toolsWidth={280}
+      navigation={<LeftPanel />}
+      tools={
+        <Container header={<Header variant="h3">Detaljer</Header>}>
+          <DetailPanel node={selectedNode} />
+        </Container>
       }
-      toolsWidth={300}
       content={
         <Container
-          header={<Header variant="h2">{viewLabel}</Header>}
+          header={<Header variant="h2">{VIEW_LABELS[config.activeView]}</Header>}
           disableContentPaddings
           fitHeight
         >

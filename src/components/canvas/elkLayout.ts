@@ -48,8 +48,8 @@ function computeBox(
 
   if (children.length === 0) {
     return {
-      width:    (node.width  ?? 160) as number,
-      height:   (node.height ??  80) as number,
+      width:    (node.width  ?? 120) as number,
+      height:   (node.height ?? 160) as number,
       childPos: new Map(),
     }
   }

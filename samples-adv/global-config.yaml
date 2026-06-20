@@ -1,0 +1,206 @@
+homeRegion: eu-west-1
+enabledRegions:
+  - eu-west-1
+  - eu-north-1
+  - eu-central-1
+  - us-east-1
+managementAccountAccessRole: AWSControlTowerExecution
+cloudwatchLogRetentionInDays: 3653
+
+controlTower:
+  enable: true
+  landingZoneVersion: '3.3'
+  logging:
+    loggingBucketRetentionDays: 3653
+    accessLoggingBucketRetentionDays: 3653
+    organizationTrail: true
+
+logging:
+  account: LogArchive
+  centralizedLoggingRegion: eu-west-1
+  cloudtrail:
+    enable: true
+    organizationTrail: true
+    s3BucketName: enterprise-cloudtrail-org
+    cloudWatchLogGroupArn: ''
+    cloudWatchLogsEnabled: true
+    cloudWatchLogRetentionInDays: 90
+    s3KeyPrefix: CloudTrail
+    apiErrorRateInsight: true
+    apiCallRateInsight: true
+  sessionManager:
+    sendToCloudWatchLogs: true
+    sendToS3: true
+    excludeRegions: []
+    attachPolicyToIamRoles: []
+  cloudwatchLogs:
+    enable: true
+    dynamicPartitioning: true
+  flowLogs:
+    trafficType: ALL
+    maxAggregationInterval: 60
+    destinations:
+      - s3
+      - cloud-watch-logs
+    defaultFormat: false
+    customFields:
+      - version
+      - account-id
+      - interface-id
+      - srcaddr
+      - dstaddr
+      - srcport
+      - dstport
+      - protocol
+      - packets
+      - bytes
+      - start
+      - end
+      - action
+      - log-status
+      - vpc-id
+      - subnet-id
+      - instance-id
+      - tcp-flags
+      - type
+      - pkt-srcaddr
+      - pkt-dstaddr
+
+reports:
+  costAndUsageReport:
+    compression: Parquet
+    format: Parquet
+    reportName: enterprise-aws-cur
+    s3Prefix: cur
+    timeUnit: DAILY
+    refreshClosedReports: true
+    reportVersioning: OVERWRITE_REPORT
+    lifecycleRules:
+      - enabled: true
+        abortIncompleteMultipartUpload: 7
+        expiration: 3653
+        noncurrentVersionExpiration: 90
+  budgets:
+    - name: MonthlyOrganizationTotal
+      amount: 80000
+      type: COST
+      unit: USD
+      timeUnit: MONTHLY
+      includeCredit: false
+      includeDiscount: true
+      includeRefund: false
+      includeSubscription: true
+      useAmortized: false
+      notifications:
+        - threshold: 80
+          thresholdType: PERCENTAGE
+          type: ACTUAL
+          comparisonOperator: GREATER_THAN
+          address: finops@enterprise.org
+          subscriptionType: EMAIL
+        - threshold: 100
+          thresholdType: PERCENTAGE
+          type: FORECASTED
+          comparisonOperator: GREATER_THAN
+          address: finops@enterprise.org
+          subscriptionType: EMAIL
+    - name: ProductionWorkloadsMonthly
+      amount: 50000
+      type: COST
+      unit: USD
+      timeUnit: MONTHLY
+      deploymentTargets:
+        organizationalUnits:
+          - Production
+      notifications:
+        - threshold: 85
+          thresholdType: PERCENTAGE
+          type: ACTUAL
+          comparisonOperator: GREATER_THAN
+          address: finops@enterprise.org
+          subscriptionType: EMAIL
+    - name: SandboxMonthlyLimit
+      amount: 2000
+      type: COST
+      unit: USD
+      timeUnit: MONTHLY
+      deploymentTargets:
+        organizationalUnits:
+          - Sandbox
+      notifications:
+        - threshold: 80
+          thresholdType: PERCENTAGE
+          type: ACTUAL
+          comparisonOperator: GREATER_THAN
+          address: sandbox-owners@enterprise.org
+          subscriptionType: EMAIL
+    - name: DataPlatformMonthly
+      amount: 15000
+      type: COST
+      unit: USD
+      timeUnit: MONTHLY
+      deploymentTargets:
+        accounts:
+          - Phoenix-Prod
+          - Apex-Prod
+      notifications:
+        - threshold: 90
+          thresholdType: PERCENTAGE
+          type: ACTUAL
+          comparisonOperator: GREATER_THAN
+          address: data-team@enterprise.org
+          subscriptionType: EMAIL
+
+backup:
+  vaults:
+    - name: BackupVault-Default
+      deploymentTargets:
+        organizationalUnits:
+          - Root
+      policy:
+        minRetentionDays: 1
+        maxRetentionDays: 36500
+    - name: BackupVault-Sensitive
+      deploymentTargets:
+        organizationalUnits:
+          - Security
+          - Production/ProdFinance
+      encryption:
+        kmsMasterKeyId: alias/aws/backup
+      policy:
+        minRetentionDays: 30
+        maxRetentionDays: 36500
+    - name: BackupVault-DR
+      deploymentTargets:
+        organizationalUnits:
+          - Production
+        accounts:
+          - Aurora-Prod
+          - Nebula-Prod
+          - Orion-Prod
+
+snsTopics:
+  - name: SecurityAlerts
+    emailAddresses:
+      - security-alerts@enterprise.org
+      - soc@enterprise.org
+  - name: FinOpsAlerts
+    emailAddresses:
+      - finops@enterprise.org
+  - name: OperationalAlerts
+    emailAddresses:
+      - sre@enterprise.org
+
+tags:
+  - key: Accelerator
+    value: AWSAccelerator
+  - key: ManagedBy
+    value: LZA
+  - key: Organization
+    value: Enterprise
+  - key: CostCenter
+    value: IT-Platform
+  - key: DataClassification
+    value: Internal
+  - key: Compliance
+    value: SOC2

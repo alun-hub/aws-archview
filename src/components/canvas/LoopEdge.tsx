@@ -69,13 +69,24 @@ export function LoopEdge({
   }
 
   return (
-    <path
-      id={id}
-      d={pathD}
-      className="react-flow__edge-path"
-      style={style}
-      markerEnd={markerEnd}
-      fill="none"
-    />
+    <>
+      {/* Invisible wide path for easier clicking */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={18}
+        style={{ cursor: 'pointer' }}
+      />
+      {/* Visible path */}
+      <path
+        id={id}
+        d={pathD}
+        className="react-flow__edge-path"
+        style={{ ...style, strokeWidth: Math.max((style?.strokeWidth as number ?? 2), 2.5) }}
+        markerEnd={markerEnd}
+        fill="none"
+      />
+    </>
   )
 }

@@ -193,6 +193,66 @@ export interface IamConfig {
   identityCenterAssignments?: IdentityCenterAssignmentConfig[]
 }
 
+// ── Global config ─────────────────────────────────────────────────────────────
+
+export interface GlobalConfig {
+  homeRegion: string
+  enabledRegions?: string[]
+  managementAccountAccessRole?: string
+  cloudwatchLogRetentionInDays?: number
+  controlTower?: {
+    enable: boolean
+    regions?: { name: string }[]
+  }
+  logging?: {
+    account?: string
+    cloudtrail?: { enable: boolean; organizationTrail?: boolean; s3BucketName?: string }
+    sessionManager?: { sendToCloudWatchLogs?: boolean; sendToS3?: boolean }
+    cloudwatchLogs?: { enable: boolean }
+  }
+  reports?: {
+    costAndUsageReport?: unknown
+    budgets?: { name: string; amount: number; type: string; unit: string }[]
+  }
+  backup?: { vaults?: { name: string; deploymentTargets?: unknown }[] }
+  snsTopics?: unknown
+  tags?: { key: string; value: string }[]
+}
+
+// ── Customizations config ─────────────────────────────────────────────────────
+
+export interface CfnDeploymentTargets {
+  accounts?: string[]
+  organizationalUnits?: string[]
+  excludedAccounts?: string[]
+  excludedRegions?: string[]
+}
+
+export interface CfnStackConfig {
+  name: string
+  description?: string
+  regions?: string[]
+  deploymentTargets?: CfnDeploymentTargets
+  template?: string
+  runOrder?: number
+  terminationProtection?: boolean
+  parameters?: { name: string; value: string }[]
+  tags?: { key: string; value: string }[]
+}
+
+export interface CustomizationsConfig {
+  cloudFormationStacks?: CfnStackConfig[]
+  cloudFormationStackSets?: CfnStackConfig[]
+  serviceCatalogPortfolios?: {
+    name: string
+    description?: string
+    provider?: string
+    regions?: string[]
+    deploymentTargets?: CfnDeploymentTargets
+    products?: unknown[]
+  }[]
+}
+
 // ── Parsed graph model ────────────────────────────────────────────────────────
 
 export type NodeKind =
@@ -203,7 +263,7 @@ export type NodeKind =
   | 'route53' | 'cloudwatch' | 'cloudtrail' | 'config' | 'organizations' | 'control-tower'
   | 'security-hub' | 'guardduty' | 'inspector' | 'macie' | 'iam' | 'acm' | 'kms'
   | 'detective' | 'audit-manager' | 'firewall-manager' | 's3' | 'backup' | 'lambda' | 'service'
-  | 'cloud'
+  | 'cloud' | 'cloudformation' | 'service-catalog'
 
 export interface GraphNode {
   id: string

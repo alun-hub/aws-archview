@@ -1,44 +1,145 @@
 centralSecurityServices:
   delegatedAdminAccount: Audit
 
-securityHub:
-  enable: true
-  deploymentTargets:
-    organizationalUnits:
-      - Security
-      - Infrastructure
-      - Workloads
-      - Sandbox
-  standards:
-    - name: aws-foundational-security-best-practices-v1.0.0
-    - name: cis-aws-foundational-benchmarks-v1.2.0
-    - name: pci-dss-v3.2.1
+  securityHub:
+    enable: true
+    regionAggregation: true
+    standards:
+      - name: AWS Foundational Security Best Practices
+        enable: true
+        controlsToDisable:
+          - IAM.6
+      - name: CIS AWS Foundations Benchmark v1.4.0
+        enable: true
+        controlsToDisable:
+          - CIS.1.20
+      - name: NIST Special Publication 800-53 Revision 5
+        enable: true
+      - name: PCI DSS v3.2.1
+        enable: true
+    notifications:
+      emails:
+        - security-alerts@enterprise.org
+        - compliance@enterprise.org
+    excludeRegions: []
 
-guardduty:
-  enable: true
-  deploymentTargets:
-    organizationalUnits:
-      - Security
-      - Infrastructure
-      - Workloads
-      - Sandbox
-  s3Protection:
+  guardDuty:
+    enable: true
+    excludeRegions: []
+    s3Protection:
+      enable: true
+    eksProtection:
+      enable: true
+    rdsProtection:
+      enable: true
+    lambdaProtection:
+      enable: true
+    malwareProtection:
+      enable: true
+    exportConfiguration:
+      enable: true
+      overrideExisting: true
+      destinationType: S3
+      exportFrequency: FIFTEEN_MINUTES
+
+  macie:
+    enable: true
+    policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+    publishSensitivityFindings: true
+    excludeRegions:
+      - us-east-1
+
+  inspector:
+    enable: true
+    excludeRegions: []
+    enableScanTypes:
+      - EC2
+      - ECR
+      - LAMBDA
+
+  detective:
+    enable: true
+    excludeRegions: []
+
+  auditManager:
+    enable: true
+    excludeRegions: []
+    defaultReportsConfiguration:
+      enable: true
+      destinationType: S3
+
+  cloudtrail:
+    enable: true
+    organizationTrail: true
+    organizationTrailSettings:
+      multiRegionTrail: true
+      globalServiceEvents: true
+      managementEvents: true
+      dataEvents:
+        s3DataEvents: true
+        lambdaDataEvents: true
+    s3BucketName: aws-accelerator-cloudtrail
+    cloudWatchLogGroupArn: ''
+    cloudWatchLogsEnabled: true
+    logRetentionInDays: 3653
+
+  config:
+    enableConfigurationRecorder: true
+    enableDeliveryChannel: true
+    overrideExisting: true
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+    rules:
+      - name: ROOT_ACCOUNT_MFA_ENABLED
+        identifier: ROOT_ACCOUNT_MFA_ENABLED
+        complianceResourceTypes: []
+      - name: ACCESS_KEYS_ROTATED
+        identifier: ACCESS_KEYS_ROTATED
+        inputParameters:
+          maxAccessKeyAge: '90'
+      - name: EC2_INSTANCE_NO_PUBLIC_IP
+        identifier: EC2_INSTANCE_NO_PUBLIC_IP
+        deploymentTargets:
+          organizationalUnits:
+            - Production
+      - name: RDS_INSTANCE_PUBLIC_ACCESS_CHECK
+        identifier: RDS_INSTANCE_PUBLIC_ACCESS_CHECK
+      - name: S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED
+        identifier: S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED
+      - name: ENCRYPTED_VOLUMES
+        identifier: ENCRYPTED_VOLUMES
+        deploymentTargets:
+          organizationalUnits:
+            - Production
+      - name: IAM_PASSWORD_POLICY
+        identifier: IAM_PASSWORD_POLICY
+        inputParameters:
+          RequireUppercaseCharacters: 'true'
+          RequireLowercaseCharacters: 'true'
+          RequireNumbers: 'true'
+          RequireSymbols: 'true'
+          MinimumPasswordLength: '14'
+          PasswordReusePrevention: '24'
+          MaxPasswordAge: '90'
+      - name: APPROVED_AMIS_BY_TAG
+        identifier: APPROVED_AMIS_BY_TAG
+        deploymentTargets:
+          organizationalUnits:
+            - Production
+        inputParameters:
+          amisByTagKeyAndValue: 'CIS-Hardened:true'
+
+  accessAnalyzer:
     enable: true
 
-macie:
-  enable: true
-  deploymentTargets:
-    organizationalUnits:
-      - Security
-      - Infrastructure
-      - Workloads
-  policyFindingsPublishingFrequency: FIFTEEN_MINUTES
-
-awsConfig:
-  enableConfigurationRecorder: true
-  enableDeliveryChannel: true
-
-cloudtrail:
-  enable: true
-  organizationTrail: true
-  s3BucketName: aws-accelerator-logs
+  iamPasswordPolicy:
+    allowUsersToChangePassword: true
+    hardExpiry: false
+    requireUppercaseCharacters: true
+    requireLowercaseCharacters: true
+    requireSymbols: true
+    requireNumbers: true
+    minimumPasswordLength: 14
+    passwordReusePrevention: 24
+    maxPasswordAge: 90

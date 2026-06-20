@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { kindBackground, kindBorderColor } from '../../icons/awsIconStyles'
+import { useHighlight } from '../canvas/HighlightContext'
 
 export interface GroupNodeData {
   label: string
@@ -13,10 +14,12 @@ export interface GroupNodeData {
   [key: string]: unknown
 }
 
-export function GroupNode({ data, selected }: NodeProps) {
+export function GroupNode({ id, data, selected }: NodeProps) {
   const d = data as GroupNodeData
   const border = kindBorderColor(d.kind)
   const bg = kindBackground(d.kind)
+  const { dimmedNodeIds } = useHighlight()
+  const dimmed = dimmedNodeIds.has(id)
 
   const isSubnet = d.kind.startsWith('subnet')
   const isDashed =
@@ -46,6 +49,7 @@ export function GroupNode({ data, selected }: NodeProps) {
         height: '100%',
         border: `2px ${borderStyle} ${border}`,
         borderRadius: 8,
+        opacity: dimmed ? 0.2 : 1,
         background: selected
           ? `linear-gradient(${bg.replace(/0\.\d+\)/, '0.15)')}, ${bg.replace(/0\.\d+\)/, '0.15)')}), #ffffff`
           : `linear-gradient(${bg}, ${bg}), #ffffff`,
@@ -54,7 +58,7 @@ export function GroupNode({ data, selected }: NodeProps) {
         boxShadow: selected
           ? `0 0 0 3px ${border}44`
           : '0 1px 4px rgba(0,0,0,0.06)',
-        transition: 'box-shadow 0.15s',
+        transition: 'box-shadow 0.15s, opacity 0.2s',
       }}
     >
       {isSubnet ? (
