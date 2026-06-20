@@ -79,6 +79,8 @@ const FIELD_LABEL: Record<string, string> = {
   cidr:             'CIDR Block',
   az:               'Availability Zone',
   routeTable:       'Route Table',
+  email:            'Email Address',
+  scps:             'Service Control Policies (SCPs)',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)

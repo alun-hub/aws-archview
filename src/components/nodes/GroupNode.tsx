@@ -34,8 +34,7 @@ export function GroupNode({ data, selected }: NodeProps) {
       return `${d.label}${firstCidr ? ` (${firstCidr})` : ''}`
     }
     if (d.kind === 'account' || d.kind === 'management-account') {
-      const email = typeof d.email === 'string' ? d.email : ''
-      return `${d.label}${email ? ` (${email})` : ''}`
+      return d.label
     }
     return d.label
   }
