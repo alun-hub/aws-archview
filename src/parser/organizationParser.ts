@@ -11,7 +11,7 @@ function collectOUs(
     const id = `ou:${ou.name}`
     const attachedScps = scps
       .filter((s) => s.deploymentTargets?.organizationalUnits?.includes(ou.name))
-      .map((s) => s.name)
+      .map((s) => `${s.name}${s.description ? ` - ${s.description}` : ''}`)
 
     nodes.push({
       id,
@@ -65,7 +65,7 @@ export function parseOrganization(
 
     const attachedScps = scps
       .filter((s) => s.deploymentTargets?.accounts?.includes(account.name))
-      .map((s) => s.name)
+      .map((s) => `${s.name}${s.description ? ` - ${s.description}` : ''}`)
 
     nodes.push({
       id,
@@ -88,7 +88,9 @@ export function parseOrganization(
           id: `guardduty:${account.name}`,
           kind: 'guardduty',
           label: 'GuardDuty',
-          data: {},
+          data: {
+            s3Protection: securityConfig.guardduty.s3Protection?.enable !== false,
+          },
           parentId: id,
         })
       }
@@ -97,7 +99,9 @@ export function parseOrganization(
           id: `security-hub:${account.name}`,
           kind: 'security-hub',
           label: 'Security Hub',
-          data: {},
+          data: {
+            standards: securityConfig.securityHub.standards,
+          },
           parentId: id,
         })
       }
@@ -106,7 +110,9 @@ export function parseOrganization(
           id: `macie:${account.name}`,
           kind: 'macie',
           label: 'Macie',
-          data: {},
+          data: {
+            publishingFrequency: securityConfig.macie.policyFindingsPublishingFrequency,
+          },
           parentId: id,
         })
       }
@@ -115,7 +121,10 @@ export function parseOrganization(
           id: `config:${account.name}`,
           kind: 'config',
           label: 'AWS Config',
-          data: {},
+          data: {
+            recorderEnabled: securityConfig.awsConfig.enableConfigurationRecorder,
+            deliveryChannel: securityConfig.awsConfig.enableDeliveryChannel,
+          },
           parentId: id,
         })
       }
@@ -127,19 +136,26 @@ export function parseOrganization(
           id: `cloudtrail:${account.name}`,
           kind: 'cloudtrail',
           label: 'CloudTrail',
-          data: {},
+          data: {
+            trailEnabled: securityConfig.cloudtrail.enable,
+          },
           parentId: id,
         })
       }
     }
 
     if (account.name === 'Management' && iamConfig) {
-      if (iamConfig.identityCenter?.enable) {
+      if (iamConfig.identityCenter && iamConfig.identityCenter.enable !== false) {
+        const pSets = iamConfig.permissionSets?.map((p) => {
+          return `${p.name}${p.sessionDuration ? ` (Duration: ${p.sessionDuration})` : ''}${p.description ? ` - ${p.description}` : ''}`
+        }) ?? []
         nodes.push({
           id: `iam:${account.name}`,
           kind: 'iam',
           label: 'IAM Identity Center',
-          data: {},
+          data: {
+            permissionSets: pSets.length > 0 ? pSets : undefined,
+          },
           parentId: id,
         })
       }

@@ -117,7 +117,7 @@ export interface SecurityConfig {
   enableDlpChecks?: boolean
   macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
   guardduty?: { enable: boolean; s3Protection?: { enable: boolean } }
-  securityHub?: { enable: boolean }
+  securityHub?: { enable: boolean; standards?: string[] }
   awsConfig?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
   cloudwatch?: { enable?: boolean }
   cloudtrail?: { enable: boolean }
@@ -134,7 +134,12 @@ export interface IamPermissionSet {
 
 export interface IamConfig {
   permissionSets?: IamPermissionSet[]
-  identityCenter?: { enable: boolean }
+  identityCenter?: {
+    enable?: boolean
+    name?: string
+    delegatedAdminAccount?: string
+    [key: string]: unknown
+  }
 }
 
 // ── Parsed graph model ────────────────────────────────────────────────────────

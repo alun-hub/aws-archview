@@ -121,6 +121,28 @@ export function GroupNode({ data, selected }: NodeProps) {
         >
           <AwsIcon kind={d.kind as IconKind} size={14} style={{ filter: 'brightness(0) invert(1)' }} />
           <span>{getHeaderText()}</span>
+          {Array.isArray(d.scps) && d.scps.length > 0 && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                background: '#232F3E',
+                color: '#fff',
+                padding: '1px 6px',
+                borderRadius: 10,
+                fontSize: 9,
+                fontWeight: 800,
+                marginLeft: 6,
+                border: '1px solid rgba(255,255,255,0.25)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+              }}
+              title={`${d.scps.length} SCP active`}
+            >
+              <AwsIcon kind="scp" size={10} style={{ filter: 'brightness(0) invert(1)' }} />
+              <span>{d.scps.length} SCP</span>
+            </div>
+          )}
         </div>
       )}
 

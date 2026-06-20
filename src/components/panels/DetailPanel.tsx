@@ -81,6 +81,13 @@ const FIELD_LABEL: Record<string, string> = {
   routeTable:       'Route Table',
   email:            'Email Address',
   scps:             'Service Control Policies (SCPs)',
+  s3Protection:      'S3 Protection',
+  standards:         'Enabled Standards',
+  publishingFrequency: 'Macie Findings Frequency',
+  recorderEnabled:   'Configuration Recorder',
+  deliveryChannel:   'Delivery Channel',
+  permissionSets:    'IAM Permission Sets',
+  trailEnabled:      'CloudTrail Active',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)
