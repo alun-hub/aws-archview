@@ -1,3 +1,14 @@
+import { useState, useMemo } from 'react'
+import Modal from '@cloudscape-design/components/modal'
+import Table from '@cloudscape-design/components/table'
+import type { TableProps } from '@cloudscape-design/components/table'
+import Box from '@cloudscape-design/components/box'
+import Button from '@cloudscape-design/components/button'
+import Input from '@cloudscape-design/components/input'
+import Header from '@cloudscape-design/components/header'
+import SpaceBetween from '@cloudscape-design/components/space-between'
+import { useConfig } from '../../store/configStore'
+import type { PermissionSetConfig, IdentityCenterAssignmentConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
 
 const KIND_LABEL: Record<string, string> = {
@@ -136,6 +147,129 @@ function Row({ label, value }: { label: string; value: unknown }) {
 }
 
 export function DetailPanel({ node }: Props) {
+  const config = useConfig()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [filteringText, setFilteringText] = useState('')
+  const [sortingColumn, setSortingColumn] = useState<'principal' | 'role' | null>(null)
+  const [sortingDescending, setSortingDescending] = useState<boolean>(false)
+
+  const iamConfig = config.configs.iam
+
+  const matchingAssignments = useMemo(() => {
+    if (!node || !iamConfig?.identityCenterAssignments) return []
+
+    const nodeKind = node.kind
+    const nodeLabel = node.label
+
+    // Resolve all OUs in the account's path
+    const ouNames: string[] = ['Root']
+    if (nodeKind === 'account') {
+      const accountNode = config.configs.accounts?.mandatoryAccounts?.find(a => a.name === nodeLabel)
+        || config.configs.accounts?.workloadAccounts?.find(a => a.name === nodeLabel)
+      if (accountNode?.organizationalUnit) {
+        ouNames.push(accountNode.organizationalUnit)
+        const parts = accountNode.organizationalUnit.split('/')
+        for (const p of parts) {
+          if (p && !ouNames.includes(p)) ouNames.push(p)
+        }
+      }
+    }
+
+    return iamConfig.identityCenterAssignments.filter(assignment => {
+      const targets = assignment.deploymentTargets
+      if (nodeKind === 'account') {
+        const directMatch = targets.accounts?.includes(nodeLabel)
+        const inheritedMatch = targets.organizationalUnits?.some(ou => ouNames.includes(ou))
+        return directMatch || inheritedMatch
+      } else if (nodeKind === 'ou') {
+        return targets.organizationalUnits?.includes(nodeLabel)
+      }
+      return false
+    })
+  }, [node, iamConfig, config.configs])
+
+  const permissionSetsMap = useMemo(() => {
+    const map = new Map<string, PermissionSetConfig>()
+    for (const ps of iamConfig?.permissionSets ?? []) {
+      map.set(ps.name, ps)
+    }
+    return map
+  }, [iamConfig])
+
+  const columns: TableProps<IdentityCenterAssignmentConfig>['columnDefinitions'] = useMemo(() => [
+    {
+      id: 'principal',
+      header: 'SSO-grupp (Principal)',
+      cell: item => item.principalId,
+      sortingField: 'principal'
+    },
+    {
+      id: 'role',
+      header: 'Behörighet (Permission Set)',
+      cell: item => item.permissionSetName,
+      sortingField: 'role'
+    },
+    {
+      id: 'description',
+      header: 'Beskrivning',
+      cell: item => {
+        const ps = permissionSetsMap.get(item.permissionSetName)
+        return ps?.description ?? '-'
+      }
+    },
+    {
+      id: 'duration',
+      header: 'Sessionslängd',
+      cell: item => {
+        const ps = permissionSetsMap.get(item.permissionSetName)
+        return ps?.sessionDuration ?? '-'
+      }
+    },
+    {
+      id: 'policies',
+      header: 'Policys',
+      cell: item => {
+        const ps = permissionSetsMap.get(item.permissionSetName)
+        if (!ps) return '-'
+        const aws = ps.awsManagedPolicies?.map(arn => arn.split('/').pop()) ?? []
+        const cust = ps.customerManagedPolicies?.map(p => p.name) ?? []
+        return [...aws, ...cust].join(', ') || 'Inga bifogade'
+      }
+    }
+  ], [permissionSetsMap])
+
+  const activeSortingColumn = columns.find(c => c.id === sortingColumn)
+
+  const sortedAndFilteredAssignments = useMemo(() => {
+    let result = matchingAssignments
+
+    if (filteringText.trim()) {
+      const query = filteringText.toLowerCase()
+      result = result.filter(a =>
+        a.principalId.toLowerCase().includes(query) ||
+        a.permissionSetName.toLowerCase().includes(query)
+      )
+    }
+
+    if (sortingColumn) {
+      result = [...result].sort((a, b) => {
+        let valA = ''
+        let valB = ''
+        if (sortingColumn === 'principal') {
+          valA = a.principalId
+          valB = b.principalId
+        } else if (sortingColumn === 'role') {
+          valA = a.permissionSetName
+          valB = b.permissionSetName
+        }
+        const cmp = valA.localeCompare(valB)
+        return sortingDescending ? -cmp : cmp
+      })
+    }
+
+    return result
+  }, [matchingAssignments, filteringText, sortingColumn, sortingDescending])
+
   if (!node) {
     return (
       <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'sans-serif', padding: '8px 0' }}>
@@ -175,6 +309,51 @@ export function DetailPanel({ node }: Props) {
       {node.parentId && (
         <Row label="Parent" value={node.parentId.substring(node.parentId.indexOf(':') + 1)} />
       )}
+
+      {matchingAssignments.length > 0 && (
+        <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
+          <Header variant="h3">SSO-tilldelningar</Header>
+          <div style={{ height: 8 }} />
+          <SpaceBetween size="s">
+            <Box variant="p">
+              Det finns <strong>{matchingAssignments.length}</strong> aktiva SSO-rolltilldelningar för detta objekt.
+            </Box>
+            <Button onClick={() => setModalOpen(true)}>Visa SSO-tilldelningar</Button>
+          </SpaceBetween>
+        </div>
+      )}
+
+      <Modal
+        onDismiss={() => setModalOpen(false)}
+        visible={modalOpen}
+        header={`SSO-tilldelningar för ${node?.label}`}
+        size="large"
+        closeAriaLabel="Stäng modal"
+      >
+        <SpaceBetween size="m">
+          <Input
+            value={filteringText}
+            onChange={({ detail }) => setFilteringText(detail.value)}
+            placeholder="Sök grupp eller roll..."
+            clearAriaLabel="Rensa sökning"
+          />
+          <Table
+            columnDefinitions={columns}
+            items={sortedAndFilteredAssignments}
+            sortingColumn={activeSortingColumn}
+            sortingDescending={sortingDescending}
+            onSortingChange={({ detail }) => {
+              setSortingColumn(detail.sortingColumn.sortingField as 'principal' | 'role' | null)
+              setSortingDescending(detail.isDescending ?? false)
+            }}
+            empty={
+              <Box textAlign="center" color="inherit">
+                Inga SSO-tilldelningar hittades
+              </Box>
+            }
+          />
+        </SpaceBetween>
+      </Modal>
     </div>
   )
 }
