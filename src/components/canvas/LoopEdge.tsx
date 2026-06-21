@@ -10,7 +10,6 @@ export function LoopEdge({
   targetHandleId,
   style,
   markerEnd,
-  animated,
 }: EdgeProps) {
   const ctx = useContext(EdgeRoutingContext)
   if (!ctx) return null
@@ -83,7 +82,7 @@ export function LoopEdge({
       <path
         id={id}
         d={pathD}
-        className={`react-flow__edge-path${animated ? ' animated' : ''}`}
+        className="react-flow__edge-path"
         style={{ ...style, strokeWidth: Math.max((style?.strokeWidth as number ?? 2), 2.5) }}
         markerEnd={markerEnd}
         fill="none"
