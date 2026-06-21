@@ -632,6 +632,27 @@ function FlowController({ fitViewTrigger }: { fitViewTrigger: number }) {
   return null
 }
 
+interface SemanticZoomControllerProps {
+  enableSemanticZoom: boolean
+}
+
+function SemanticZoomController({ enableSemanticZoom }: SemanticZoomControllerProps) {
+  const { zoom } = useViewport()
+
+  useEffect(() => {
+    const el = document.querySelector('.diagram-canvas-wrapper')
+    if (!el) return
+    const isOut = enableSemanticZoom && zoom < 0.5
+    if (isOut) {
+      el.classList.add('rf-zoom-out')
+    } else {
+      el.classList.remove('rf-zoom-out')
+    }
+  }, [zoom, enableSemanticZoom])
+
+  return null
+}
+
 // ── Main canvas ──────────────────────────────────────────────────────────────
 
 interface Props {
@@ -646,7 +667,7 @@ export function DiagramCanvas({ model }: Props) {
   const dispatch = useDispatch()
   const { collapsedNodes } = config
 
-  const [zoomLevel, setZoomLevel] = useState(1)
+
 
 
 
@@ -831,12 +852,10 @@ export function DiagramCanvas({ model }: Props) {
     )
   }
 
-  const isZoomedOut = config.enableSemanticZoom && zoomLevel < 0.5
-
   return (
     <HighlightContext.Provider value={{ dimmedNodeIds }}>
       <EdgeRoutingContext.Provider value={routingContextValue}>
-        <div className={`diagram-canvas-wrapper${isZoomedOut ? ' rf-zoom-out' : ''}`} style={{ width: '100%', height: '100%' }}>
+        <div className="diagram-canvas-wrapper" style={{ width: '100%', height: '100%' }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -854,16 +873,8 @@ export function DiagramCanvas({ model }: Props) {
             zoomOnScroll={false}
             style={{ background: '#f8f8f8' }}
             elevateEdgesOnSelect
-            onMove={(_, viewport) => {
-              if (config.enableSemanticZoom) {
-                const isOut = viewport.zoom < 0.5
-                const wasOut = zoomLevel < 0.5
-                if (isOut !== wasOut) {
-                  setZoomLevel(viewport.zoom)
-                }
-              }
-            }}
           >
+            <SemanticZoomController enableSemanticZoom={config.enableSemanticZoom} />
             <Background color="#d0d0d0" gap={20} size={1} />
             <Controls style={{ borderRadius: 6 }} />
             <SearchBar />
