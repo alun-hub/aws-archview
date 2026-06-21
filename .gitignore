@@ -28,3 +28,4 @@ dist-ssr
 CLAUDE.md
 docs/superpowers/
 .claude/
+.agents/
