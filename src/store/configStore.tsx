@@ -13,6 +13,8 @@ interface State {
   showInternetFlows: boolean
   collapsedNodes: Set<string>
   aggregateStacks: boolean
+  enableFocusMode: boolean
+  enableSemanticZoom: boolean
 }
 
 type Action =
@@ -24,6 +26,8 @@ type Action =
   | { type: 'COLLAPSE_ALL'; ids: string[] }
   | { type: 'EXPAND_ALL' }
   | { type: 'TOGGLE_AGGREGATE_STACKS' }
+  | { type: 'TOGGLE_FOCUS_MODE' }
+  | { type: 'TOGGLE_SEMANTIC_ZOOM' }
 
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
@@ -66,6 +70,8 @@ const getInitialState = (): State => {
     showInternetFlows: true,
     collapsedNodes: new Set<string>(),
     aggregateStacks: true,
+    enableFocusMode: true,
+    enableSemanticZoom: false,
   }
 }
 
@@ -111,6 +117,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, collapsedNodes: new Set() }
     case 'TOGGLE_AGGREGATE_STACKS':
       return { ...state, aggregateStacks: !state.aggregateStacks }
+    case 'TOGGLE_FOCUS_MODE':
+      return { ...state, enableFocusMode: !state.enableFocusMode }
+    case 'TOGGLE_SEMANTIC_ZOOM':
+      return { ...state, enableSemanticZoom: !state.enableSemanticZoom }
     default:
       return state
   }

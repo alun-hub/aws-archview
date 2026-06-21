@@ -646,6 +646,10 @@ export function DiagramCanvas({ model }: Props) {
   const dispatch = useDispatch()
   const { collapsedNodes } = config
 
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+
+
   // Which nodeIds have children in the full (unfiltered) model
   const nodeParentIds = useMemo(() => {
     if (!model) return new Set<string>()
@@ -674,6 +678,7 @@ export function DiagramCanvas({ model }: Props) {
 
   // Compute which node ids should be dimmed based on current selection
   const dimmedNodeIds = useMemo(() => {
+    if (!config.enableFocusMode) return new Set<string>()
     if (!config.selectedNodeId) return new Set<string>()
     const visible = new Set<string>([config.selectedNodeId])
     for (const e of edges) {
@@ -691,7 +696,7 @@ export function DiagramCanvas({ model }: Props) {
       }
     }
     return new Set(nodes.map(n => n.id).filter(id => !withAncestors.has(id)))
-  }, [config.selectedNodeId, edges, nodes])
+  }, [config.selectedNodeId, edges, nodes, config.enableFocusMode])
 
   const routingContextValue = useMemo(() => {
     if (nodes.length === 0) return null
@@ -762,7 +767,7 @@ export function DiagramCanvas({ model }: Props) {
         ...e,
         style: {
           ...e.style,
-          opacity: config.selectedNodeId && !connectedEdgeIds.has(e.id) ? 0.1 : 1,
+          opacity: config.enableFocusMode && config.selectedNodeId && !connectedEdgeIds.has(e.id) ? 0.1 : 1,
         },
       }))
     )
@@ -774,6 +779,7 @@ export function DiagramCanvas({ model }: Props) {
     config.showVpnConnections,
     config.showInternetFlows,
     config.selectedNodeId,
+    config.enableFocusMode,
   ])
 
   const onNodeClick = useCallback(
@@ -825,54 +831,67 @@ export function DiagramCanvas({ model }: Props) {
     )
   }
 
+  const isZoomedOut = config.enableSemanticZoom && zoomLevel < 0.5
+
   return (
     <HighlightContext.Provider value={{ dimmedNodeIds }}>
       <EdgeRoutingContext.Provider value={routingContextValue}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.15 }}
-          attributionPosition="bottom-right"
-          minZoom={0.1}
-          maxZoom={3}
-          zoomOnScroll={false}
-          style={{ background: '#f8f8f8' }}
-          elevateEdgesOnSelect
-        >
-          <Background color="#d0d0d0" gap={20} size={1} />
-          <Controls style={{ borderRadius: 6 }} />
-          <SearchBar />
-          <BreadcrumbNav />
-          <ZoomIndicator />
-          {config.activeView === 'network' && <Legend />}
-          <ExportMenu />
-          <FlowController fitViewTrigger={fitViewTrigger} />
-          <MiniMap
-            nodeColor={(n) => {
-              const kind = (n.data as { kind?: string })?.kind ?? ''
-              if (kind === 'on-premises')                             return '#5A5A5A'
-              if (['root', 'ou', 'account'].includes(kind))          return '#E7157B'
-              if (kind === 'vpc')                                     return '#8C4FFF'
-              if (kind === 'subnet-public')                           return '#248814'
-              if (kind === 'subnet-private')                          return '#1A6CAE'
-              if (kind === 'subnet-firewall')                         return '#CC3300'
-              if (kind === 'subnet-tgw')                             return '#6B3FA0'
-              if (['tgw', 'vpn', 'cgw', 'dx'].includes(kind))        return '#6B3FA0'
-              if (['security-hub', 'guardduty', 'macie', 'inspector'].includes(kind)) return '#DD3B25'
-              return '#888'
+        <div className={`diagram-canvas-wrapper${isZoomedOut ? ' rf-zoom-out' : ''}`} style={{ width: '100%', height: '100%' }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            attributionPosition="bottom-right"
+            minZoom={0.1}
+            maxZoom={3}
+            zoomOnScroll={false}
+            style={{ background: '#f8f8f8' }}
+            elevateEdgesOnSelect
+            onMove={(_, viewport) => {
+              if (config.enableSemanticZoom) {
+                const isOut = viewport.zoom < 0.5
+                const wasOut = zoomLevel < 0.5
+                if (isOut !== wasOut) {
+                  setZoomLevel(viewport.zoom)
+                }
+              }
             }}
-            pannable
-            zoomable
-            style={{ borderRadius: 6 }}
-          />
-        </ReactFlow>
+          >
+            <Background color="#d0d0d0" gap={20} size={1} />
+            <Controls style={{ borderRadius: 6 }} />
+            <SearchBar />
+            <BreadcrumbNav />
+            <ZoomIndicator />
+            {config.activeView === 'network' && <Legend />}
+            <ExportMenu />
+            <FlowController fitViewTrigger={fitViewTrigger} />
+            <MiniMap
+              nodeColor={(n) => {
+                const kind = (n.data as { kind?: string })?.kind ?? ''
+                if (kind === 'on-premises')                             return '#5A5A5A'
+                if (['root', 'ou', 'account'].includes(kind))          return '#E7157B'
+                if (kind === 'vpc')                                     return '#8C4FFF'
+                if (kind === 'subnet-public')                           return '#248814'
+                if (kind === 'subnet-private')                          return '#1A6CAE'
+                if (kind === 'subnet-firewall')                         return '#CC3300'
+                if (kind === 'subnet-tgw')                             return '#6B3FA0'
+                if (['tgw', 'vpn', 'cgw', 'dx'].includes(kind))        return '#6B3FA0'
+                if (['security-hub', 'guardduty', 'macie', 'inspector'].includes(kind)) return '#DD3B25'
+                return '#888'
+              }}
+              pannable
+              zoomable
+              style={{ borderRadius: 6 }}
+            />
+          </ReactFlow>
+        </div>
       </EdgeRoutingContext.Provider>
     </HighlightContext.Provider>
   )

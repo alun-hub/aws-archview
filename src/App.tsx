@@ -136,6 +136,20 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   </Checkbox>
                 </div>
               )}
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #eaeded', paddingTop: 8 }}>
+                <Checkbox
+                  checked={config.enableFocusMode}
+                  onChange={() => dispatch({ type: 'TOGGLE_FOCUS_MODE' })}
+                >
+                  Focus Selection (Solo Mode)
+                </Checkbox>
+                <Checkbox
+                  checked={config.enableSemanticZoom}
+                  onChange={() => dispatch({ type: 'TOGGLE_SEMANTIC_ZOOM' })}
+                >
+                  Semantic Zoom (LOD)
+                </Checkbox>
+              </div>
             </div>
           </ExpandableSection>
         )}
