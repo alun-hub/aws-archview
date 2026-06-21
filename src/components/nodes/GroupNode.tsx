@@ -47,6 +47,79 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     return d.label
   }
 
+  if (isCollapsed) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          border: `2px solid ${border}`,
+          borderRadius: 6,
+          opacity: dimmed ? 0.2 : 1,
+          background: selected
+            ? `linear-gradient(${bg.replace(/0\.\d+\)/, '0.15)')}, ${bg.replace(/0\.\d+\)/, '0.15)')}), #ffffff`
+            : `linear-gradient(${bg}, ${bg}), #ffffff`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 10px',
+          boxSizing: 'border-box',
+          boxShadow: selected ? `0 0 0 3px ${border}44` : '0 1px 4px rgba(0,0,0,0.06)',
+          fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          transition: 'box-shadow 0.15s, opacity 0.2s',
+          position: 'relative',
+        }}
+      >
+        <AwsIcon kind={d.kind as IconKind} size={18} style={{ flexShrink: 0 }} />
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#1a1a1a',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+          }}
+          title={d.label}
+        >
+          {getHeaderText()}
+        </div>
+        <button
+          className="nodrag"
+          onClick={(e) => {
+            e.stopPropagation()
+            dispatch({ type: 'TOGGLE_COLLAPSE', id })
+          }}
+          title="Expand"
+          style={{
+            background: '#fff',
+            border: '1px solid #ccc',
+            borderRadius: 3,
+            cursor: 'pointer',
+            padding: '0 4px',
+            fontSize: 9,
+            color: '#555',
+            lineHeight: '14px',
+            height: 16,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          ▶
+        </button>
+        <Handle type="source" position={Position.Top}    id="top-s"    style={{ opacity: 0 }} />
+        <Handle type="target" position={Position.Top}    id="top-t"    style={{ opacity: 0 }} />
+        <Handle type="source" position={Position.Bottom} id="bottom-s" style={{ opacity: 0 }} />
+        <Handle type="target" position={Position.Bottom} id="bottom-t" style={{ opacity: 0 }} />
+        <Handle type="source" position={Position.Left}   id="left-s"   style={{ opacity: 0 }} />
+        <Handle type="target" position={Position.Left}   id="left-t"   style={{ opacity: 0 }} />
+        <Handle type="source" position={Position.Right}  id="right-s"  style={{ opacity: 0 }} />
+        <Handle type="target" position={Position.Right}  id="right-t"  style={{ opacity: 0 }} />
+      </div>
+    )
+  }
+
   return (
     <div
       style={{

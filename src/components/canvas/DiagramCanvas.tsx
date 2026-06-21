@@ -138,9 +138,10 @@ const GROUP_MIN: Record<string, { w: number; h: number }> = {
   'subnet-tgw':      { w: 190, h:  76 },
 }
 
-function toFlowNodes(model: GraphModel): Node[] {
+function toFlowNodes(model: GraphModel, collapsedNodes: Set<string>): Node[] {
   return model.nodes.map((n) => {
     const isLeaf = LEAF_SIZE.has(n.kind)
+    const isCollapsed = collapsedNodes.has(n.id)
     const group = GROUP_MIN[n.kind]
     const override = LEAF_SIZE_OVERRIDE[n.kind]
     return {
@@ -151,7 +152,9 @@ function toFlowNodes(model: GraphModel): Node[] {
       parentId: n.parentId,
       ...(isLeaf
         ? { width: override?.w ?? LEAF_W, height: override?.h ?? LEAF_H }
-        : { width: group?.w ?? 220, height: group?.h ?? 100 }),
+        : isCollapsed
+          ? { width: 150, height: 46 }
+          : { width: group?.w ?? 220, height: group?.h ?? 100 }),
       ...(n.parentId ? { extent: 'parent' as const } : {}),
     }
   })
@@ -462,14 +465,16 @@ function ZoomIndicator() {
   return (
     <Panel position="bottom-right" style={{ margin: '0 10px 52px' }}>
       <div style={{
-        background: 'rgba(255,255,255,0.9)',
-        border: '1px solid #ddd',
-        borderRadius: 4,
-        padding: '2px 8px',
-        fontSize: 10,
-        color: '#666',
-        fontFamily: 'monospace',
+        background: 'rgba(255, 255, 255, 0.95)',
+        border: '1.5px solid #e0e0e0',
+        borderRadius: 6,
+        padding: '3px 8px',
+        fontSize: 11,
+        fontWeight: 700,
+        color: '#444',
+        fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
         userSelect: 'none',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       }}>
         {Math.round(zoom * 100)}%
       </div>
@@ -720,7 +725,7 @@ export function DiagramCanvas({ model }: Props) {
   // 1. Re-calculate layout when model or collapse state changes
   useEffect(() => {
     if (!filteredModel) return
-    const rawNodes = toFlowNodes(filteredModel).map(n => ({
+    const rawNodes = toFlowNodes(filteredModel, collapsedNodes).map(n => ({
       ...n,
       data: { ...n.data, hasChildren: nodeParentIds.has(n.id) },
     }))
@@ -729,7 +734,7 @@ export function DiagramCanvas({ model }: Props) {
       setNodes(sortParentsFirst(laid))
       setFitViewTrigger(k => k + 1)
     })
-  }, [filteredModel, nodeParentIds, setNodes])
+  }, [filteredModel, nodeParentIds, setNodes, collapsedNodes])
 
   // 2. Filter edges by toggle state + dim based on selection
   useEffect(() => {

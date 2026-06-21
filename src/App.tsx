@@ -5,6 +5,7 @@ import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import Checkbox from '@cloudscape-design/components/checkbox'
 import ExpandableSection from '@cloudscape-design/components/expandable-section'
+import Button from '@cloudscape-design/components/button'
 
 import { ConfigProvider, useConfig, useDispatch } from './store/configStore'
 import {
@@ -32,9 +33,15 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
-function LeftPanel() {
+function LeftPanel({ activeGraph }: { activeGraph: any }) {
   const config   = useConfig()
   const dispatch = useDispatch()
+
+  const parentIds = useMemo<string[]>(() => {
+    if (!activeGraph) return []
+    const pIds = new Set<string>(activeGraph.nodes.filter((n: any) => n.parentId).map((n: any) => String(n.parentId)))
+    return Array.from(pIds)
+  }, [activeGraph])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -100,6 +107,28 @@ function LeftPanel() {
             <ConfigLoader loadedFiles={config.loadedFiles} />
           </div>
         </ExpandableSection>
+
+        {/* Diagramverktyg */}
+        {parentIds.length > 0 && (
+          <ExpandableSection header="Diagramverktyg" defaultExpanded variant="navigation">
+            <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Button
+                variant="normal"
+                onClick={() => dispatch({ type: 'COLLAPSE_ALL', ids: parentIds })}
+                disabled={config.collapsedNodes.size === parentIds.length}
+              >
+                Kollapsa alla containrar
+              </Button>
+              <Button
+                variant="normal"
+                onClick={() => dispatch({ type: 'EXPAND_ALL' })}
+                disabled={config.collapsedNodes.size === 0}
+              >
+                Expandera alla containrar
+              </Button>
+            </div>
+          </ExpandableSection>
+        )}
 
         {/* Show / Hide connections — only in network view */}
         {config.activeView === 'network' && (
@@ -193,7 +222,7 @@ function AppContent() {
       onToolsChange={({ detail }) => setToolsOpen(detail.open)}
       navigationWidth={300}
       toolsWidth={280}
-      navigation={<LeftPanel />}
+      navigation={<LeftPanel activeGraph={activeGraph} />}
       tools={
         <Container header={<Header variant="h3">Details</Header>}>
           <DetailPanel node={selectedNode} />

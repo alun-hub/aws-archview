@@ -20,6 +20,8 @@ type Action =
   | { type: 'SELECT_NODE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
   | { type: 'TOGGLE_COLLAPSE'; id: string }
+  | { type: 'COLLAPSE_ALL'; ids: string[] }
+  | { type: 'EXPAND_ALL' }
 
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
@@ -100,6 +102,10 @@ function reducer(state: State, action: Action): State {
       else next.add(action.id)
       return { ...state, collapsedNodes: next }
     }
+    case 'COLLAPSE_ALL':
+      return { ...state, collapsedNodes: new Set(action.ids) }
+    case 'EXPAND_ALL':
+      return { ...state, collapsedNodes: new Set() }
     default:
       return state
   }
