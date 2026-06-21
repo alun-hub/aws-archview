@@ -287,11 +287,24 @@ function Row({ label, value }: { label: string; value: unknown }) {
           {label}
         </div>
         <ul style={{ margin: 0, paddingLeft: 16 }}>
-          {(value as unknown[]).map((item, i) => (
-            <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
-              {String(item)}
-            </li>
-          ))}
+          {(value as unknown[]).map((item, i) => {
+            if (item && typeof item === 'object' && 'name' in item && 'value' in item) {
+              const p = item as { name: string; value: unknown }
+              const valStr = typeof p.value === 'object' && p.value !== null
+                ? JSON.stringify(p.value)
+                : String(p.value ?? '')
+              return (
+                <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+                  <strong>{p.name}</strong>: {valStr}
+                </li>
+              )
+            }
+            return (
+              <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+                {String(item)}
+              </li>
+            )
+          })}
         </ul>
       </div>
     )
@@ -547,14 +560,20 @@ export function DetailPanel({ node }: Props) {
       id: 'parameters',
       header: 'Parameters',
       cell: item => {
-        if (!item.parameters || item.parameters.length === 0) return '-'
+        if (!Array.isArray(item.parameters) || item.parameters.length === 0) return '-'
         return (
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
-            {item.parameters.map((p, i) => (
-              <li key={i} style={{ marginBottom: 2 }}>
-                <strong>{p.name}</strong>: {p.value}
-              </li>
-            ))}
+            {item.parameters.map((p, i) => {
+              if (!p || !p.name) return null
+              const valStr = typeof p.value === 'object' && p.value !== null
+                ? JSON.stringify(p.value)
+                : String(p.value ?? '')
+              return (
+                <li key={i} style={{ marginBottom: 2 }}>
+                  <strong>{p.name}</strong>: {valStr}
+                </li>
+              )
+            })}
           </ul>
         )
       }
@@ -564,12 +583,16 @@ export function DetailPanel({ node }: Props) {
   const filteredStacks = useMemo(() => {
     if (!stacksFilteringText.trim()) return stacks
     const q = stacksFilteringText.toLowerCase()
-    return stacks.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      (s.description && s.description.toLowerCase().includes(q)) ||
-      (s.regions && s.regions.some(r => r.toLowerCase().includes(q))) ||
-      (s.parameters && s.parameters.some(p => p.name.toLowerCase().includes(q) || p.value.toLowerCase().includes(q)))
-    )
+    return stacks.filter(s => {
+      const nameMatch = typeof s.name === 'string' && s.name.toLowerCase().includes(q)
+      const descMatch = typeof s.description === 'string' && s.description.toLowerCase().includes(q)
+      const regionMatch = Array.isArray(s.regions) && s.regions.some(r => typeof r === 'string' && r.toLowerCase().includes(q))
+      const paramMatch = Array.isArray(s.parameters) && s.parameters.some(p =>
+        (typeof p.name === 'string' && p.name.toLowerCase().includes(q)) ||
+        (p.value !== undefined && p.value !== null && String(p.value).toLowerCase().includes(q))
+      )
+      return nameMatch || descMatch || regionMatch || paramMatch
+    })
   }, [stacks, stacksFilteringText])
 
   if (!node) {
