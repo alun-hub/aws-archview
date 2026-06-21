@@ -34,11 +34,13 @@ jobs:
       - name: Package Desktop Application
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            npx electron-builder build --linux
+            npx electron-builder build --linux --publish never
           else
-            npx electron-builder build --win
+            npx electron-builder build --win --publish never
           fi
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
