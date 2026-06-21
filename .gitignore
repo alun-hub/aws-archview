@@ -23,3 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AI files and folders
+CLAUDE.md
+docs/superpowers/
+.claude/
