@@ -12,6 +12,8 @@ import {
   buildOrganizationGraph,
   buildGlobalGraph,
   buildCustomizationsGraph,
+  buildSecurityGraph,
+  buildIamGraph,
   type ViewKind,
 } from './parser'
 import { ConfigLoader } from './components/panels/ConfigLoader'
@@ -22,10 +24,12 @@ import type { GraphNode } from './parser'
 // ── Left navigation panel ────────────────────────────────────────────────────
 
 const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
-  { id: 'organization',   label: 'Organization',  requiredConfig: 'organization-config.yaml' },
-  { id: 'network',        label: 'Network',        requiredConfig: 'network-config.yaml'       },
-  { id: 'global',         label: 'Global',         requiredConfig: 'global-config.yaml'        },
-  { id: 'customizations', label: 'Customizations',   requiredConfig: 'customizations-config.yaml'},
+  { id: 'organization',   label: 'Organization',   requiredConfig: 'organization-config.yaml'  },
+  { id: 'network',        label: 'Network',        requiredConfig: 'network-config.yaml'        },
+  { id: 'security',       label: 'Security',       requiredConfig: 'security-config.yaml'       },
+  { id: 'iam',            label: 'IAM',            requiredConfig: 'iam-config.yaml'            },
+  { id: 'global',         label: 'Global',         requiredConfig: 'global-config.yaml'         },
+  { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
 function LeftPanel() {
@@ -142,6 +146,8 @@ const VIEW_LABELS: Record<ViewKind, string> = {
   network:        'Network',
   global:         'Global',
   customizations: 'Customizations',
+  security:       'Security',
+  iam:            'IAM',
 }
 
 function AppContent() {
@@ -149,10 +155,12 @@ function AppContent() {
   const [navOpen,   setNavOpen]   = useState(true)
   const [toolsOpen, setToolsOpen] = useState(false)
 
-  const orgGraph     = useMemo(() => buildOrganizationGraph(config.configs),   [config.configs])
-  const netGraph     = useMemo(() => buildNetworkGraph(config.configs),         [config.configs])
-  const globalGraph  = useMemo(() => buildGlobalGraph(config.configs),          [config.configs])
-  const customGraph  = useMemo(() => buildCustomizationsGraph(config.configs),  [config.configs])
+  const orgGraph      = useMemo(() => buildOrganizationGraph(config.configs),   [config.configs])
+  const netGraph      = useMemo(() => buildNetworkGraph(config.configs),         [config.configs])
+  const globalGraph   = useMemo(() => buildGlobalGraph(config.configs),          [config.configs])
+  const customGraph   = useMemo(() => buildCustomizationsGraph(config.configs),  [config.configs])
+  const securityGraph = useMemo(() => buildSecurityGraph(config.configs),        [config.configs])
+  const iamGraph      = useMemo(() => buildIamGraph(config.configs),             [config.configs])
 
   const activeGraph = (() => {
     switch (config.activeView) {
@@ -160,6 +168,8 @@ function AppContent() {
       case 'network':        return netGraph
       case 'global':         return globalGraph
       case 'customizations': return customGraph
+      case 'security':       return securityGraph
+      case 'iam':            return iamGraph
     }
   })()
 

@@ -11,6 +11,7 @@ interface State {
   showTgwAttachments: boolean
   showVpnConnections: boolean
   showInternetFlows: boolean
+  collapsedNodes: Set<string>
 }
 
 type Action =
@@ -18,6 +19,7 @@ type Action =
   | { type: 'SET_VIEW'; view: ViewKind }
   | { type: 'SELECT_NODE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
+  | { type: 'TOGGLE_COLLAPSE'; id: string }
 
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
@@ -43,8 +45,9 @@ const getInitialState = (): State => {
   let activeView: ViewKind = 'organization'
   if (typeof window !== 'undefined') {
     const savedView = localStorage.getItem('aws-archview:activeView')
-    if (savedView === 'organization' || savedView === 'network' || savedView === 'global' || savedView === 'customizations') {
-      activeView = savedView
+    const validViews: ViewKind[] = ['organization', 'network', 'global', 'customizations', 'security', 'iam']
+    if (validViews.includes(savedView as ViewKind)) {
+      activeView = savedView as ViewKind
     }
   }
 
@@ -53,10 +56,11 @@ const getInitialState = (): State => {
     activeView,
     selectedNodeId: null,
     loadedFiles,
-    showPropagations: false, // Default false to keep diagram clean
+    showPropagations: false,
     showTgwAttachments: true,
     showVpnConnections: true,
     showInternetFlows: true,
+    collapsedNodes: new Set<string>(),
   }
 }
 
@@ -79,7 +83,7 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>() }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'TOGGLE_LAYER':
@@ -90,6 +94,12 @@ function reducer(state: State, action: Action): State {
         showVpnConnections: action.layer === 'vpnConnections' ? !state.showVpnConnections : state.showVpnConnections,
         showInternetFlows: action.layer === 'internetFlows' ? !state.showInternetFlows : state.showInternetFlows,
       }
+    case 'TOGGLE_COLLAPSE': {
+      const next = new Set(state.collapsedNodes)
+      if (next.has(action.id)) next.delete(action.id)
+      else next.add(action.id)
+      return { ...state, collapsedNodes: next }
+    }
     default:
       return state
   }

@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { kindBackground, kindBorderColor } from '../../icons/awsIconStyles'
 import { useHighlight } from '../canvas/HighlightContext'
+import { useConfig, useDispatch } from '../../store/configStore'
 
 export interface GroupNodeData {
   label: string
@@ -11,6 +12,7 @@ export interface GroupNodeData {
   sublabel?: string
   cidrs?: string[]
   email?: string
+  hasChildren?: boolean
   [key: string]: unknown
 }
 
@@ -20,6 +22,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const bg = kindBackground(d.kind)
   const { dimmedNodeIds } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
+  const dispatch = useDispatch()
+  const { collapsedNodes } = useConfig()
+  const isCollapsed = collapsedNodes.has(id)
 
   const isSubnet = d.kind.startsWith('subnet')
   const isDashed =
@@ -130,6 +135,31 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               zIndex: 2,
             }}
           >
+            {d.hasChildren && (
+              <button
+                className="nodrag"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  dispatch({ type: 'TOGGLE_COLLAPSE', id })
+                }}
+                title={isCollapsed ? 'Expand' : 'Collapse'}
+                style={{
+                  background: '#fff',
+                  border: '1px solid #ccc',
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  fontSize: 9,
+                  color: '#555',
+                  lineHeight: '14px',
+                  height: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {isCollapsed ? '▶' : '▼'}
+              </button>
+            )}
             <div
               style={{
                 background: '#fff',

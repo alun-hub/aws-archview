@@ -8,6 +8,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useViewport,
   type Edge,
   type Node,
 } from '@xyflow/react'
@@ -454,6 +455,90 @@ function Legend() {
   )
 }
 
+// ── Zoom indicator ───────────────────────────────────────────────────────────
+
+function ZoomIndicator() {
+  const { zoom } = useViewport()
+  return (
+    <Panel position="bottom-right" style={{ margin: '0 10px 52px' }}>
+      <div style={{
+        background: 'rgba(255,255,255,0.9)',
+        border: '1px solid #ddd',
+        borderRadius: 4,
+        padding: '2px 8px',
+        fontSize: 10,
+        color: '#666',
+        fontFamily: 'monospace',
+        userSelect: 'none',
+      }}>
+        {Math.round(zoom * 100)}%
+      </div>
+    </Panel>
+  )
+}
+
+// ── Breadcrumb navigation ─────────────────────────────────────────────────────
+
+function BreadcrumbNav() {
+  const { fitView, getNodes } = useReactFlow()
+  const config = useConfig()
+
+  if (!config.selectedNodeId) return null
+
+  const allNodes = getNodes()
+  const nodeMap = new Map(allNodes.map(n => [n.id, n]))
+
+  const path: Node[] = []
+  let cur = nodeMap.get(config.selectedNodeId)
+  while (cur) {
+    path.unshift(cur)
+    cur = cur.parentId ? nodeMap.get(cur.parentId) : undefined
+  }
+
+  if (path.length <= 1) return null
+
+  return (
+    <Panel position="top-center" style={{ margin: '8px 0 0' }}>
+      <div style={{
+        background: 'rgba(255,255,255,0.95)',
+        border: '1px solid #ddd',
+        borderRadius: 6,
+        padding: '4px 10px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+        fontSize: 11,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+      }}>
+        {path.map((n, i) => (
+          <span key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {i > 0 && <span style={{ color: '#bbb', margin: '0 2px' }}>›</span>}
+            <button
+              onMouseDown={() => fitView({ nodes: [{ id: n.id }], duration: 500, padding: 0.3 })}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '1px 5px',
+                borderRadius: 3,
+                fontSize: 11,
+                color: i === path.length - 1 ? '#0073bb' : '#444',
+                fontWeight: i === path.length - 1 ? 700 : 400,
+                fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              {String(n.data?.label ?? n.id)}
+            </button>
+          </span>
+        ))}
+      </div>
+    </Panel>
+  )
+}
+
 // ── Combined flow controller: keyboard + zoom + auto-fitView ─────────────────
 
 function FlowController({ fitViewTrigger }: { fitViewTrigger: number }) {
@@ -554,6 +639,33 @@ export function DiagramCanvas({ model }: Props) {
   const [fitViewTrigger, setFitViewTrigger] = useState(0)
   const config   = useConfig()
   const dispatch = useDispatch()
+  const { collapsedNodes } = config
+
+  // Which nodeIds have children in the full (unfiltered) model
+  const nodeParentIds = useMemo(() => {
+    if (!model) return new Set<string>()
+    return new Set(model.nodes.filter(n => n.parentId).map(n => n.parentId!))
+  }, [model])
+
+  // Filter out descendants of collapsed nodes
+  const filteredModel = useMemo(() => {
+    if (!model) return null
+    const nodeMap = new Map(model.nodes.map(n => [n.id, n]))
+    const visibleIds = new Set<string>()
+    for (const n of model.nodes) {
+      let visible = true
+      let pid = n.parentId
+      while (pid) {
+        if (collapsedNodes.has(pid)) { visible = false; break }
+        pid = nodeMap.get(pid)?.parentId
+      }
+      if (visible) visibleIds.add(n.id)
+    }
+    return {
+      nodes: model.nodes.filter(n => visibleIds.has(n.id)),
+      edges: model.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target)),
+    }
+  }, [model, collapsedNodes])
 
   // Compute which node ids should be dimmed based on current selection
   const dimmedNodeIds = useMemo(() => {
@@ -605,31 +717,34 @@ export function DiagramCanvas({ model }: Props) {
     return { nodeMap, absPosMap, otherVerticals }
   }, [nodes, edges])
 
-  // 1. Re-calculate layout ONLY when model changes
+  // 1. Re-calculate layout when model or collapse state changes
   useEffect(() => {
-    if (!model) return
-    const rawNodes = toFlowNodes(model)
-    const rawEdges = toFlowEdges(model)
+    if (!filteredModel) return
+    const rawNodes = toFlowNodes(filteredModel).map(n => ({
+      ...n,
+      data: { ...n.data, hasChildren: nodeParentIds.has(n.id) },
+    }))
+    const rawEdges = toFlowEdges(filteredModel)
     applyElkLayout(rawNodes, rawEdges).then((laid) => {
       setNodes(sortParentsFirst(laid))
       setFitViewTrigger(k => k + 1)
     })
-  }, [model, setNodes])
+  }, [filteredModel, nodeParentIds, setNodes])
 
   // 2. Filter edges by toggle state + dim based on selection
   useEffect(() => {
-    if (!model) return
+    if (!filteredModel) return
 
     const connectedEdgeIds = new Set<string>()
     if (config.selectedNodeId) {
-      for (const e of model.edges) {
+      for (const e of filteredModel.edges) {
         if (e.source === config.selectedNodeId || e.target === config.selectedNodeId) {
           connectedEdgeIds.add(e.id)
         }
       }
     }
 
-    const filteredEdges = model.edges.filter((e) => {
+    const filteredEdges = filteredModel.edges.filter((e) => {
       if (e.kind === 'propagation') return config.showPropagations
       if (e.kind === 'vpn')         return config.showVpnConnections
       if (e.kind === 'flow')        return config.showInternetFlows
@@ -638,7 +753,7 @@ export function DiagramCanvas({ model }: Props) {
     })
 
     setEdges(
-      toFlowEdges({ ...model, edges: filteredEdges }).map((e) => ({
+      toFlowEdges({ ...filteredModel, edges: filteredEdges }).map((e) => ({
         ...e,
         style: {
           ...e.style,
@@ -647,7 +762,7 @@ export function DiagramCanvas({ model }: Props) {
       }))
     )
   }, [
-    model,
+    filteredModel,
     setEdges,
     config.showPropagations,
     config.showTgwAttachments,
@@ -694,10 +809,12 @@ export function DiagramCanvas({ model }: Props) {
           Ladda LZA-konfigurationsfiler
         </div>
         <div style={{ fontSize: 12, color: '#aaa', textAlign: 'center', lineHeight: 1.6 }}>
-          {config.activeView === 'organization' && <><b>organization-config.yaml</b><br/>accounts-config.yaml</>}
-          {config.activeView === 'network'      && <><b>network-config.yaml</b></>}
-          {config.activeView === 'global'       && <><b>global-config.yaml</b></>}
+          {config.activeView === 'organization'   && <><b>organization-config.yaml</b><br/>accounts-config.yaml</>}
+          {config.activeView === 'network'        && <><b>network-config.yaml</b></>}
+          {config.activeView === 'global'         && <><b>global-config.yaml</b></>}
           {config.activeView === 'customizations' && <><b>customizations-config.yaml</b></>}
+          {config.activeView === 'security'       && <><b>security-config.yaml</b></>}
+          {config.activeView === 'iam'            && <><b>iam-config.yaml</b></>}
         </div>
       </div>
     )
@@ -727,6 +844,8 @@ export function DiagramCanvas({ model }: Props) {
           <Background color="#d0d0d0" gap={20} size={1} />
           <Controls style={{ borderRadius: 6 }} />
           <SearchBar />
+          <BreadcrumbNav />
+          <ZoomIndicator />
           {config.activeView === 'network' && <Legend />}
           <ExportMenu />
           <FlowController fitViewTrigger={fitViewTrigger} />

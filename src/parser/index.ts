@@ -4,6 +4,8 @@ import { parseNetwork } from './networkParser'
 import { parseOrganization } from './organizationParser'
 import { parseGlobal } from './globalParser'
 import { parseCustomizations } from './customizationsParser'
+import { parseSecurity } from './securityParser'
+import { parseIam } from './iamParser'
 
 export type { GraphEdge, GraphModel, GraphNode } from './types'
 export type { GlobalConfig, CustomizationsConfig } from './types'
@@ -18,7 +20,7 @@ export interface LzaConfigs {
   customizations?: CustomizationsConfig
 }
 
-export type ViewKind = 'organization' | 'network' | 'global' | 'customizations'
+export type ViewKind = 'organization' | 'network' | 'global' | 'customizations' | 'security' | 'iam'
 
 export const FILE_MAP: Record<string, keyof LzaConfigs> = {
   'organization-config.yaml':  'organization',
@@ -69,4 +71,14 @@ export function buildGlobalGraph(configs: LzaConfigs) {
 export function buildCustomizationsGraph(configs: LzaConfigs) {
   if (!configs.customizations) return null
   return parseCustomizations(configs.customizations)
+}
+
+export function buildSecurityGraph(configs: LzaConfigs) {
+  if (!configs.security) return null
+  return parseSecurity(configs.security)
+}
+
+export function buildIamGraph(configs: LzaConfigs) {
+  if (!configs.iam) return null
+  return parseIam(configs.iam, configs.accounts)
 }
