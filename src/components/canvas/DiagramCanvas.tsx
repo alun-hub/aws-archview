@@ -13,6 +13,7 @@ import {
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import './diagram.css'
 
 import { GroupNode } from '../nodes/GroupNode'
 import { ServiceNode } from '../nodes/ServiceNode'
