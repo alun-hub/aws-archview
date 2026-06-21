@@ -396,7 +396,7 @@ function Legend() {
   const [open, setOpen] = useState(false)
 
   return (
-    <Panel position="bottom-left" style={{ margin: 10 }}>
+    <Panel position="bottom-left" style={{ margin: '0 10px 146px' }}>
       <div style={{
         background: 'rgba(255,255,255,0.96)',
         border: '1.5px solid #ddd',
