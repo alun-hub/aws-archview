@@ -48,7 +48,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         width: '100%',
         height: '100%',
         border: `2px ${borderStyle} ${border}`,
-        borderRadius: 8,
+        borderRadius: 0,
         opacity: dimmed ? 0.2 : 1,
         background: selected
           ? `linear-gradient(${bg.replace(/0\.\d+\)/, '0.15)')}, ${bg.replace(/0\.\d+\)/, '0.15)')}), #ffffff`
@@ -64,92 +64,113 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       {isSubnet ? (
         <div
           style={{
-            padding: '8px 10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-          }}
-        >
-          <AwsIcon kind={d.kind as IconKind} size={22} />
-          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: border,
-                lineHeight: 1.25,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {d.label}
-            </div>
-            <div
-              style={{
-                fontSize: 10,
-                color: '#666',
-                lineHeight: 1.25,
-                marginTop: 1,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {d.cidr || d.sublabel} {d.az ? `[AZ: ${d.az.toUpperCase()}]` : ''}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div
-          style={{
             position: 'absolute',
-            top: -2,
-            left: -2,
-            background: border,
-            color: '#fff',
-            padding: '4px 10px',
-            borderTopLeftRadius: 8,
-            borderTopRightRadius: 0,
-            borderBottomRightRadius: 8,
-            borderBottomLeftRadius: 0,
+            top: -9,
+            left: '50%',
+            transform: 'translateX(-50%)',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: 6,
-            fontSize: 11,
-            fontWeight: 700,
-            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-            whiteSpace: 'nowrap',
             zIndex: 2,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
           }}
         >
-          <AwsIcon kind={d.kind as IconKind} size={14} style={{ filter: 'brightness(0) invert(1)' }} />
-          <span>{getHeaderText()}</span>
-          {Array.isArray(d.scps) && d.scps.length > 0 && (
+          <div
+            style={{
+              background: '#fff',
+              padding: '0 6px',
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#1a1a1a',
+              fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {d.label}
+          </div>
+          {(d.cidr || d.sublabel || d.az) && (
             <div
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-                background: '#232F3E',
-                color: '#fff',
-                padding: '1px 6px',
-                borderRadius: 10,
                 fontSize: 9,
-                fontWeight: 800,
-                marginLeft: 6,
-                border: '1px solid rgba(255,255,255,0.25)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                color: '#666',
+                marginTop: 1,
+                background: '#fff',
+                padding: '0 4px',
+                whiteSpace: 'nowrap',
+                fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
               }}
-              title={`${d.scps.length} SCP active`}
             >
-              <AwsIcon kind="scp" size={10} style={{ filter: 'brightness(0) invert(1)' }} />
-              <span>{d.scps.length} SCP</span>
+              {d.cidr || d.sublabel} {d.az ? `[${d.az.toUpperCase()}]` : ''}
             </div>
           )}
         </div>
+      ) : (
+        <>
+          {/* Top-left square badge containing the white icon */}
+          <div
+            style={{
+              position: 'absolute',
+              top: -2,
+              left: -2,
+              width: 24,
+              height: 24,
+              background: border,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            }}
+          >
+            <AwsIcon kind={d.kind as IconKind} size={16} style={{ filter: 'brightness(0) invert(1)' }} />
+          </div>
+
+          {/* Top-right text sitting on the border with a white background to mask it */}
+          <div
+            style={{
+              position: 'absolute',
+              top: -9,
+              right: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              zIndex: 2,
+            }}
+          >
+            <div
+              style={{
+                background: '#fff',
+                padding: '0 6px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#1a1a1a',
+                fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {getHeaderText()}
+            </div>
+            {Array.isArray(d.scps) && d.scps.length > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  background: '#232F3E',
+                  color: '#fff',
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  fontSize: 9,
+                  fontWeight: 800,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                }}
+                title={`${d.scps.length} SCP active`}
+              >
+                <AwsIcon kind="scp" size={10} style={{ filter: 'brightness(0) invert(1)' }} />
+                <span>{d.scps.length} SCP</span>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <Handle type="source" position={Position.Top}    id="top-s"    style={{ opacity: 0 }} />
