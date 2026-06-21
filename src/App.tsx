@@ -176,6 +176,7 @@ function AppContent() {
 
   return (
     <AppLayout
+      maxContentWidth={Number.MAX_VALUE}
       navigationOpen={navOpen}
       onNavigationChange={({ detail }) => setNavOpen(detail.open)}
       toolsOpen={toolsOpen}
