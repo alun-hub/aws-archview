@@ -105,23 +105,18 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         </div>
       ) : (
         <>
-          {/* Top-left square badge containing the white icon */}
-          <div
+          {/* Top-left square badge */}
+          <AwsIcon
+            kind={d.kind as IconKind}
+            size={24}
             style={{
               position: 'absolute',
               top: -2,
               left: -2,
-              width: 24,
-              height: 24,
-              background: border,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               zIndex: 2,
+              borderRadius: 0,
             }}
-          >
-            <AwsIcon kind={d.kind as IconKind} size={16} style={{ filter: 'brightness(0) invert(1)' }} />
-          </div>
+          />
 
           {/* Top-right text sitting on the border with a white background to mask it */}
           <div
