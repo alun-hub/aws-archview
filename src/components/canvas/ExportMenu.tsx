@@ -10,10 +10,10 @@ interface ExportItem {
 }
 
 const ITEMS: ExportItem[] = [
-  { id: 'png',    label: 'PNG',     sub: 'Rasterbild · dela enkelt',    icon: '🖼' },
-  { id: 'svg',    label: 'SVG',     sub: 'Vektorgrafik · redigerbar',   icon: '✏️' },
-  { id: 'pdf',    label: 'PDF',     sub: 'A3 Liggande · utskrift',       icon: '📄' },
-  { id: 'drawio', label: 'draw.io', sub: '.drawio · AWS-stenciler',      icon: '📐' },
+  { id: 'png',    label: 'PNG',     sub: 'Raster image · share easily', icon: '🖼' },
+  { id: 'svg',    label: 'SVG',     sub: 'Vector graphics · editable',  icon: '✏️' },
+  { id: 'pdf',    label: 'PDF',     sub: 'A3 Landscape · print',        icon: '📄' },
+  { id: 'drawio', label: 'draw.io', sub: '.drawio · AWS stencils',      icon: '📐' },
 ]
 
 export function ExportMenu() {
@@ -61,18 +61,18 @@ export function ExportMenu() {
           onClick={() => setOpen((v) => !v)}
           disabled={!!loading}
           style={btnStyle}
-          title="Exportera diagram"
+          title="Export diagram"
         >
           {loading ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Spinner /> Exporterar…
+              <Spinner /> Exporting...
             </span>
           ) : (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 1a.75.75 0 0 1 .75.75v7.19l2.47-2.47a.75.75 0 1 1 1.06 1.06L8.53 11.28a.75.75 0 0 1-1.06 0L3.72 7.53a.75.75 0 1 1 1.06-1.06L7.25 8.94V1.75A.75.75 0 0 1 8 1zM2.5 13.25a.75.75 0 0 0 0 1.5h11a.75.75 0 0 0 0-1.5h-11z"/>
               </svg>
-              Exportera
+              Export
               <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style={{ opacity: 0.7 }}>
                 <path d="M2 3.5 5 6.5 8 3.5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round"/>
               </svg>
