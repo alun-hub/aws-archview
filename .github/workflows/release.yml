@@ -1,4 +1,4 @@
-name: Release Standalone AppImage
+name: Release Standalone Application
 
 on:
   push:
@@ -25,12 +25,14 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build and Package AppImage
+      - name: Build and Package Application
         run: npm run electron:build
 
-      - name: Create Release and Upload AppImage
+      - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist-desktop/AWS ArchView-*.AppImage
+          files: |
+            dist-desktop/*.AppImage
+            dist-desktop/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

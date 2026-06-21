@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "electron:start": "electron .",
-    "electron:build": "npm run build && electron-builder build --linux"
+    "electron:build": "npm run build && electron-builder build --linux --win"
   },
   "dependencies": {
     "@cloudscape-design/components": "^3.0.1314",
@@ -62,6 +62,12 @@
         "AppImage"
       ],
       "category": "Development"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
     }
   }
 }
