@@ -80,7 +80,7 @@ export function parseCustomizations(cfg: CustomizationsConfig): GraphModel {
     nodes.push({
       id: groupId,
       kind: 'ou',
-      label: ouName === '__all__' ? 'Alla OUs' : ouName,
+      label: ouName === '__all__' ? 'All OUs' : ouName,
       data: { kind: 'ou' },
     })
     addStacks(groupId, stacks)

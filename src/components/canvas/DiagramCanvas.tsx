@@ -811,7 +811,7 @@ export function DiagramCanvas({ model }: Props) {
           <rect x="48" y="26" width="18" height="18" rx="3" fill="#8C4FFF" opacity="0.3"/>
         </svg>
         <div style={{ fontWeight: 700, fontSize: 15, color: '#232F3E' }}>
-          Ladda LZA-konfigurationsfiler
+          Load LZA configuration files
         </div>
         <div style={{ fontSize: 12, color: '#aaa', textAlign: 'center', lineHeight: 1.6 }}>
           {config.activeView === 'organization'   && <><b>organization-config.yaml</b><br/>accounts-config.yaml</>}

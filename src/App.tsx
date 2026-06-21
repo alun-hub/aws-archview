@@ -62,8 +62,8 @@ function LeftPanel({ activeGraph }: { activeGraph: any }) {
       {/* Scrollable sections */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
 
-        {/* Vyer */}
-        <ExpandableSection header="Vyer" defaultExpanded variant="navigation">
+        {/* Views */}
+        <ExpandableSection header="Views" defaultExpanded variant="navigation">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0' }}>
             {VIEWS.map(({ id, label, requiredConfig }) => {
               const active  = config.activeView === id
@@ -101,30 +101,30 @@ function LeftPanel({ activeGraph }: { activeGraph: any }) {
           </div>
         </ExpandableSection>
 
-        {/* Konfiguration */}
-        <ExpandableSection header="Konfiguration" defaultExpanded variant="navigation">
+        {/* Configuration */}
+        <ExpandableSection header="Configuration" defaultExpanded variant="navigation">
           <div style={{ padding: '4px 0 8px' }}>
             <ConfigLoader loadedFiles={config.loadedFiles} />
           </div>
         </ExpandableSection>
 
-        {/* Diagramverktyg */}
+        {/* Diagram Tools */}
         {parentIds.length > 0 && (
-          <ExpandableSection header="Diagramverktyg" defaultExpanded variant="navigation">
+          <ExpandableSection header="Diagram Tools" defaultExpanded variant="navigation">
             <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Button
                 variant="normal"
                 onClick={() => dispatch({ type: 'COLLAPSE_ALL', ids: parentIds })}
                 disabled={config.collapsedNodes.size === parentIds.length}
               >
-                Kollapsa alla containrar
+                Collapse All
               </Button>
               <Button
                 variant="normal"
                 onClick={() => dispatch({ type: 'EXPAND_ALL' })}
                 disabled={config.collapsedNodes.size === 0}
               >
-                Expandera alla containrar
+                Expand All
               </Button>
             </div>
           </ExpandableSection>

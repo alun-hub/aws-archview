@@ -30,7 +30,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       data: {
         kind: 'control-tower',
         enabled: cfg.controlTower.enable,
-        sublabel: cfg.controlTower.enable ? 'Aktiverad' : 'Inaktiverad',
+        sublabel: cfg.controlTower.enable ? 'Enabled' : 'Disabled',
       },
       parentId: rootId,
     })
@@ -46,7 +46,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       data: {
         kind: 'cloudtrail',
         organizationTrail: ct?.organizationTrail,
-        sublabel: ct?.organizationTrail ? 'Org Trail' : ct?.enable === false ? 'Inaktiverad' : undefined,
+        sublabel: ct?.organizationTrail ? 'Org Trail' : ct?.enable === false ? 'Disabled' : undefined,
       },
       parentId: rootId,
     })
@@ -76,7 +76,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       data: {
         kind: 'backup',
         vaults: cfg.backup.vaults.map(v => v.name),
-        sublabel: `${cfg.backup.vaults.length} valv`,
+        sublabel: `${cfg.backup.vaults.length} vault${cfg.backup.vaults.length !== 1 ? 's' : ''}`,
       },
       parentId: rootId,
     })
@@ -87,11 +87,11 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
     nodes.push({
       id: 'global:tags',
       kind: 'config',
-      label: 'Obligatoriska taggar',
+      label: 'Mandatory Tags',
       data: {
         kind: 'config',
         tags: cfg.tags.map(t => `${t.key}: ${t.value}`),
-        sublabel: `${cfg.tags.length} taggar`,
+        sublabel: `${cfg.tags.length} tag${cfg.tags.length !== 1 ? 's' : ''}`,
       },
       parentId: rootId,
     })
@@ -107,7 +107,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       data: {
         kind: 'cloudwatch',
         budgets: budgets.map(b => `${b.name}: ${b.amount} ${b.unit}`),
-        sublabel: `${budgets.length} budget${budgets.length > 1 ? 'ar' : ''}`,
+        sublabel: `${budgets.length} budget${budgets.length !== 1 ? 's' : ''}`,
       },
       parentId: rootId,
     })
