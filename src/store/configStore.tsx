@@ -12,6 +12,7 @@ interface State {
   showVpnConnections: boolean
   showInternetFlows: boolean
   collapsedNodes: Set<string>
+  aggregateStacks: boolean
 }
 
 type Action =
@@ -22,6 +23,7 @@ type Action =
   | { type: 'TOGGLE_COLLAPSE'; id: string }
   | { type: 'COLLAPSE_ALL'; ids: string[] }
   | { type: 'EXPAND_ALL' }
+  | { type: 'TOGGLE_AGGREGATE_STACKS' }
 
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
@@ -63,6 +65,7 @@ const getInitialState = (): State => {
     showVpnConnections: true,
     showInternetFlows: true,
     collapsedNodes: new Set<string>(),
+    aggregateStacks: true,
   }
 }
 
@@ -106,6 +109,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, collapsedNodes: new Set(action.ids) }
     case 'EXPAND_ALL':
       return { ...state, collapsedNodes: new Set() }
+    case 'TOGGLE_AGGREGATE_STACKS':
+      return { ...state, aggregateStacks: !state.aggregateStacks }
     default:
       return state
   }

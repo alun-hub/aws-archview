@@ -227,7 +227,7 @@ function toFlowEdges(model: GraphModel): Edge[] {
         ...(style.dash ? { strokeDasharray: style.dash } : {}),
       },
       markerEnd: { type: 'arrowclosed' as const, color: style.color, width: 14, height: 14 },
-      animated: false,
+      animated: e.kind === 'flow' || e.kind === 'vpn' || e.kind === 'peering',
       ...(e.label
         ? {
             label: e.label,

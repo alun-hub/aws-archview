@@ -68,9 +68,9 @@ export function buildGlobalGraph(configs: LzaConfigs) {
   return parseGlobal(configs.global)
 }
 
-export function buildCustomizationsGraph(configs: LzaConfigs) {
+export function buildCustomizationsGraph(configs: LzaConfigs, aggregateStacks: boolean = true) {
   if (!configs.customizations) return null
-  return parseCustomizations(configs.customizations)
+  return parseCustomizations(configs.customizations, aggregateStacks)
 }
 
 export function buildSecurityGraph(configs: LzaConfigs) {

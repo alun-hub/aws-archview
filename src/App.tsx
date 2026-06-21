@@ -20,7 +20,7 @@ import {
 import { ConfigLoader } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
-import type { GraphNode } from './parser'
+import type { GraphNode, GraphModel } from './parser'
 
 // ── Left navigation panel ────────────────────────────────────────────────────
 
@@ -33,13 +33,13 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
-function LeftPanel({ activeGraph }: { activeGraph: any }) {
+function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
   const config   = useConfig()
   const dispatch = useDispatch()
 
   const parentIds = useMemo<string[]>(() => {
     if (!activeGraph) return []
-    const pIds = new Set<string>(activeGraph.nodes.filter((n: any) => n.parentId).map((n: any) => String(n.parentId)))
+    const pIds = new Set<string>(activeGraph.nodes.filter((n) => n.parentId).map((n) => String(n.parentId)))
     return Array.from(pIds)
   }, [activeGraph])
 
@@ -126,6 +126,16 @@ function LeftPanel({ activeGraph }: { activeGraph: any }) {
               >
                 Expand All
               </Button>
+              {config.activeView === 'customizations' && (
+                <div style={{ marginTop: 8 }}>
+                  <Checkbox
+                    checked={config.aggregateStacks}
+                    onChange={() => dispatch({ type: 'TOGGLE_AGGREGATE_STACKS' })}
+                  >
+                    Aggregate Redundant Stacks
+                  </Checkbox>
+                </div>
+              )}
             </div>
           </ExpandableSection>
         )}
@@ -187,7 +197,7 @@ function AppContent() {
   const orgGraph      = useMemo(() => buildOrganizationGraph(config.configs),   [config.configs])
   const netGraph      = useMemo(() => buildNetworkGraph(config.configs),         [config.configs])
   const globalGraph   = useMemo(() => buildGlobalGraph(config.configs),          [config.configs])
-  const customGraph   = useMemo(() => buildCustomizationsGraph(config.configs),  [config.configs])
+  const customGraph   = useMemo(() => buildCustomizationsGraph(config.configs, config.aggregateStacks),  [config.configs, config.aggregateStacks])
   const securityGraph = useMemo(() => buildSecurityGraph(config.configs),        [config.configs])
   const iamGraph      = useMemo(() => buildIamGraph(config.configs),             [config.configs])
 
