@@ -293,11 +293,12 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       }
 
       if (hasFw) {
+        const rules = networkConfig.centralNetworkServices?.networkFirewall?.rules ?? []
         nodes.push({
           id: `fw:${vpcId}:${subnet.name}`,
           kind: 'network-firewall',
           label: 'Network Firewall',
-          data: { kind: 'network-firewall' },
+          data: { kind: 'network-firewall', rules },
           parentId: subnetNodeId,
         })
       }

@@ -368,3 +368,75 @@ transitGatewayRouteTables:
     transitGateway:
       name: Main-TGW
       account: Network
+
+# ─── Central Network Services ──────────────────────────────────────────────────
+centralNetworkServices:
+  networkFirewall:
+    firewalls:
+      - name: Core-Firewall
+        vpc: Inspection-VPC
+        subnets:
+          - Firewall-Subnet-A
+          - Firewall-Subnet-B
+    rules:
+      - name: LZA-Stateless-Rules
+        type: STATELESS
+        capacity: 100
+        ruleGroup:
+          rulesSource:
+            statelessRulesAndCustomActions:
+              statelessRules:
+                - priority: 10
+                  ruleDefinition:
+                    actions:
+                      - aws:forward_to_sfe
+                    matchAttributes:
+                      sources:
+                        - addressDefinition: 0.0.0.0/0
+                      destinations:
+                        - addressDefinition: 0.0.0.0/0
+      - name: LZA-Stateful-Rules
+        type: STATEFUL
+        capacity: 200
+        ruleGroup:
+          rulesSource:
+            statefulRules:
+              - action: PASS
+                header:
+                  protocol: TCP
+                  source: 10.0.0.0/8
+                  sourcePort: Any
+                  direction: FORWARD
+                  destination: 0.0.0.0/0
+                  destinationPort: '80'
+                ruleOptions:
+                  - keyword: msg
+                    settings: ["Allow outbound HTTP web traffic"]
+                  - keyword: sid
+                    settings: ["10001"]
+              - action: PASS
+                header:
+                  protocol: TCP
+                  source: 10.0.0.0/8
+                  sourcePort: Any
+                  direction: FORWARD
+                  destination: 0.0.0.0/0
+                  destinationPort: '443'
+                ruleOptions:
+                  - keyword: msg
+                    settings: ["Allow outbound HTTPS web traffic"]
+                  - keyword: sid
+                    settings: ["10002"]
+              - action: DROP
+                header:
+                  protocol: TCP
+                  source: Any
+                  sourcePort: Any
+                  direction: FORWARD
+                  destination: 10.0.0.0/8
+                  destinationPort: '22'
+                ruleOptions:
+                  - keyword: msg
+                    settings: ["Block SSH access from untrusted sources"]
+                  - keyword: sid
+                    settings: ["10003"]

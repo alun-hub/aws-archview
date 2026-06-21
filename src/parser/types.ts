@@ -123,6 +123,49 @@ export interface PermissionSetConfig {
   customerManagedPolicies?: { name: string }[]
 }
 
+export interface StatefulRule {
+  action: string
+  header: {
+    destination: string
+    destinationPort: string
+    direction: string
+    protocol: string
+    source: string
+    sourcePort: string
+  }
+  ruleOptions?: { keyword: string; settings?: string[] }[]
+}
+
+export interface StatelessRule {
+  priority: number
+  ruleDefinition: {
+    actions: string[]
+    matchAttributes: {
+      sources: { addressDefinition: string }[]
+      destinations: { addressDefinition: string }[]
+      sourcePorts?: { fromPort: number; toPort: number }[]
+      destinationPorts?: { fromPort: number; toPort: number }[]
+      protocols?: number[]
+    }
+  }
+}
+
+export interface FirewallRuleGroupConfig {
+  name: string
+  regions?: string[]
+  capacity?: number
+  type: string
+  ruleGroup?: {
+    rulesSource: {
+      statefulRules?: StatefulRule[]
+      statelessRulesAndCustomActions?: {
+        statelessRules: StatelessRule[]
+      }
+      rulesFile?: string
+    }
+  }
+}
+
 export interface IdentityCenterAssignmentConfig {
   name: string
   permissionSetName: string
@@ -144,6 +187,7 @@ export interface NetworkConfig {
   centralNetworkServices?: {
     networkFirewall?: {
       firewalls?: { name: string; vpc: string; subnets: string[] }[]
+      rules?: FirewallRuleGroupConfig[]
     }
   }
 }

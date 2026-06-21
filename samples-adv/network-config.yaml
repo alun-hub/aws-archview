@@ -787,3 +787,76 @@ vpcs:
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
+
+# ─── Central Network Services ──────────────────────────────────────────────────
+centralNetworkServices:
+  networkFirewall:
+    firewalls:
+      - name: Core-Firewall-North
+        vpc: Network-VPC-North
+        subnets:
+          - Firewall-Subnet-A
+          - Firewall-Subnet-B
+      - name: Core-Firewall-US
+        vpc: Network-VPC-US
+        subnets:
+          - Firewall-Subnet-A
+    rules:
+      - name: LZA-Stateless-Rules
+        type: STATELESS
+        capacity: 100
+        ruleGroup:
+          rulesSource:
+            statelessRulesAndCustomActions:
+              statelessRules:
+                - priority: 10
+                  ruleDefinition:
+                    actions:
+                      - aws:forward_to_sfe
+                    matchAttributes:
+                      sources:
+                        - addressDefinition: 0.0.0.0/0
+                      destinations:
+                        - addressDefinition: 0.0.0.0/0
+      - name: LZA-Stateful-Rules-North
+        type: STATEFUL
+        capacity: 200
+        regions:
+          - eu-north-1
+        ruleGroup:
+          rulesSource:
+            statefulRules:
+              - action: PASS
+                header:
+                  protocol: TCP
+                  source: 10.110.0.0/16
+                  sourcePort: Any
+                  direction: FORWARD
+                  destination: 0.0.0.0/0
+                  destinationPort: '443'
+                ruleOptions:
+                  - keyword: msg
+                    settings: ["Allow outbound HTTPS from North VPC"]
+                  - keyword: sid
+                    settings: ["20001"]
+      - name: LZA-Stateful-Rules-US
+        type: STATEFUL
+        capacity: 200
+        regions:
+          - us-east-1
+        ruleGroup:
+          rulesSource:
+            statefulRules:
+              - action: PASS
+                header:
+                  protocol: TCP
+                  source: 10.210.0.0/16
+                  sourcePort: Any
+                  direction: FORWARD
+                  destination: 0.0.0.0/0
+                  destinationPort: '443'
+                ruleOptions:
+                  - keyword: msg
+                    settings: ["Allow outbound HTTPS from US VPC"]
+                  - keyword: sid
+                    settings: ["20002"]

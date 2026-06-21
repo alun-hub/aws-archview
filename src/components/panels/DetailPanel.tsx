@@ -8,7 +8,7 @@ import Input from '@cloudscape-design/components/input'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import { useConfig } from '../../store/configStore'
-import type { PermissionSetConfig, IdentityCenterAssignmentConfig } from '../../parser/types'
+import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
 
 const KIND_LABEL: Record<string, string> = {
@@ -133,7 +133,141 @@ const FIELD_LABEL: Record<string, string> = {
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)
-const SKIP_KEYS = new Set(['kind', 'sublabel'])
+const SKIP_KEYS = new Set(['kind', 'sublabel', 'rules'])
+
+interface FlattenedRule {
+  type: string
+  groupName: string
+  action: string
+  protocol: string
+  source: string
+  destination: string
+  direction: string
+  description?: string
+}
+
+function getFlattenedRules(rulesConfig: unknown): FlattenedRule[] {
+  if (!Array.isArray(rulesConfig) || rulesConfig.length === 0) {
+    return []
+  }
+
+  const groups = rulesConfig as FirewallRuleGroupConfig[]
+  const flattened: FlattenedRule[] = []
+
+  for (const group of groups) {
+    const groupName = group.name || 'Unnamed Group'
+    const type = group.type || 'STATEFUL'
+    const rulesSource = group.ruleGroup?.rulesSource
+
+    if (!rulesSource) continue
+
+    // Stateful Rules
+    if (Array.isArray(rulesSource.statefulRules)) {
+      for (const r of rulesSource.statefulRules) {
+        flattened.push({
+          type: 'STATEFUL',
+          groupName,
+          action: r.action || 'PASS',
+          protocol: r.header?.protocol || 'ANY',
+          source: `${r.header?.source || 'ANY'}:${r.header?.sourcePort || 'ANY'}`,
+          destination: `${r.header?.destination || 'ANY'}:${r.header?.destinationPort || 'ANY'}`,
+          direction: r.header?.direction || 'FORWARD',
+          description: r.ruleOptions?.find(o => o.keyword === 'msg')?.settings?.[0] || ''
+        })
+      }
+    }
+
+    // Stateless Rules
+    if (rulesSource.statelessRulesAndCustomActions?.statelessRules) {
+      const stateless = rulesSource.statelessRulesAndCustomActions.statelessRules
+      if (Array.isArray(stateless)) {
+        for (const r of stateless) {
+          const action = r.ruleDefinition?.actions?.join(', ') || 'PASS'
+          const sources = r.ruleDefinition?.matchAttributes?.sources?.map(s => s.addressDefinition).join(', ') || 'ANY'
+          const destinations = r.ruleDefinition?.matchAttributes?.destinations?.map(d => d.addressDefinition).join(', ') || 'ANY'
+          
+          const protocolsMap: Record<number, string> = { 6: 'TCP', 17: 'UDP', 1: 'ICMP', 58: 'ICMPv6' }
+          const rawProtos = r.ruleDefinition?.matchAttributes?.protocols
+          const protocol = Array.isArray(rawProtos) ? rawProtos.map((p: number) => protocolsMap[p] || String(p)).join(', ') : 'ALL'
+
+          const sourcePorts = r.ruleDefinition?.matchAttributes?.sourcePorts?.map(p => `${p.fromPort}-${p.toPort}`).join(', ') || 'ANY'
+          const destPorts = r.ruleDefinition?.matchAttributes?.destinationPorts?.map(p => `${p.fromPort}-${p.toPort}`).join(', ') || 'ANY'
+
+          flattened.push({
+            type: 'STATELESS',
+            groupName,
+            action,
+            protocol,
+            source: `${sources}:${sourcePorts}`,
+            destination: `${destinations}:${destPorts}`,
+            direction: 'ANY',
+            description: `Priority: ${r.priority}`
+          })
+        }
+      }
+    }
+
+    // External rule file
+    if (rulesSource.rulesFile) {
+      flattened.push({
+        type: type,
+        groupName,
+        action: 'REFERENCED',
+        protocol: '-',
+        source: '-',
+        destination: '-',
+        direction: '-',
+        description: `External rules file: ${rulesSource.rulesFile}`
+      })
+    }
+  }
+
+  return flattened
+}
+
+const MOCK_FIREWALL_RULES: FlattenedRule[] = [
+  {
+    type: 'STATEFUL',
+    groupName: 'LZA-Core-Stateful-Rules',
+    action: 'PASS',
+    protocol: 'TCP',
+    source: '10.0.0.0/8:Any',
+    destination: '0.0.0.0/0:80,443',
+    direction: 'FORWARD',
+    description: 'Allow HTTP/HTTPS traffic from local network to internet'
+  },
+  {
+    type: 'STATEFUL',
+    groupName: 'LZA-Core-Stateful-Rules',
+    action: 'DROP',
+    protocol: 'TCP',
+    source: '0.0.0.0/0:Any',
+    destination: '10.0.0.0/8:22,3389',
+    direction: 'FORWARD',
+    description: 'Block inbound SSH and RDP from external networks'
+  },
+  {
+    type: 'STATEFUL',
+    groupName: 'LZA-Core-Stateful-Rules',
+    action: 'PASS',
+    protocol: 'UDP',
+    source: '10.0.0.0/8:Any',
+    destination: '8.8.8.8/32:53',
+    direction: 'FORWARD',
+    description: 'Allow DNS queries to Google Public DNS'
+  },
+  {
+    type: 'STATELESS',
+    groupName: 'LZA-Stateless-Default',
+    action: 'aws:forward_to_sfe',
+    protocol: 'ALL',
+    source: '0.0.0.0/0:Any',
+    destination: '0.0.0.0/0:Any',
+    direction: 'BIDIRECTIONAL',
+    description: 'Forward all default traffic to stateful inspection engine'
+  }
+]
+
 
 interface Props {
   node: GraphNode | null
@@ -178,6 +312,87 @@ export function DetailPanel({ node }: Props) {
   const [filteringText, setFilteringText] = useState('')
   const [sortingColumn, setSortingColumn] = useState<'principal' | 'role' | null>(null)
   const [sortingDescending, setSortingDescending] = useState<boolean>(false)
+
+  const [fwModalOpen, setFwModalOpen] = useState(false)
+  const [fwFilteringText, setFwFilteringText] = useState('')
+
+  const isFirewall = node?.kind === 'network-firewall'
+  const parsedFwRules = useMemo(() => {
+    if (!isFirewall || !node) return { isSample: false, rules: [] }
+    const rawRules = node.data.rules
+    const flattened = getFlattenedRules(rawRules)
+    return flattened.length > 0 ? { isSample: false, rules: flattened } : { isSample: true, rules: MOCK_FIREWALL_RULES }
+  }, [node, isFirewall])
+
+  const fwColumns: TableProps<FlattenedRule>['columnDefinitions'] = useMemo(() => [
+    {
+      id: 'type',
+      header: 'Type',
+      cell: item => (
+        <Box variant="span" color={item.type === 'STATEFUL' ? 'text-status-info' : 'text-status-warning'}>
+          {item.type}
+        </Box>
+      ),
+    },
+    {
+      id: 'group',
+      header: 'Rule Group',
+      cell: item => item.groupName,
+    },
+    {
+      id: 'action',
+      header: 'Action',
+      cell: item => (
+        <Box variant="span" fontWeight="bold" color={
+          item.action === 'PASS' || item.action.includes('forward') ? 'text-status-success' :
+          item.action === 'DROP' ? 'text-status-error' : 'text-label'
+        }>
+          {item.action}
+        </Box>
+      ),
+    },
+    {
+      id: 'protocol',
+      header: 'Protocol',
+      cell: item => item.protocol,
+    },
+    {
+      id: 'source',
+      header: 'Source',
+      cell: item => item.source,
+    },
+    {
+      id: 'destination',
+      header: 'Destination',
+      cell: item => item.destination,
+    },
+    {
+      id: 'direction',
+      header: 'Direction',
+      cell: item => item.direction,
+    },
+    {
+      id: 'description',
+      header: 'Description / Options',
+      cell: item => item.description || '-',
+    }
+  ], [])
+
+  const filteredFwRules = useMemo(() => {
+    const result = parsedFwRules.rules || []
+    if (fwFilteringText.trim()) {
+      const q = fwFilteringText.toLowerCase()
+      return result.filter(r =>
+        r.groupName.toLowerCase().includes(q) ||
+        r.action.toLowerCase().includes(q) ||
+        r.protocol.toLowerCase().includes(q) ||
+        r.source.toLowerCase().includes(q) ||
+        r.destination.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q))
+      )
+    }
+    return result
+  }, [parsedFwRules, fwFilteringText])
 
   const iamConfig = config.configs.iam
 
@@ -336,6 +551,23 @@ export function DetailPanel({ node }: Props) {
         <Row label="Parent" value={node.parentId.substring(node.parentId.indexOf(':') + 1)} />
       )}
 
+      {isFirewall && (
+        <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
+          <Header
+            variant="h3"
+            description={
+              parsedFwRules.isSample
+                ? "Showing default sample rules (no rules parsed from YAML)."
+                : `Parsed ${parsedFwRules.rules.length} rules from configuration.`
+            }
+          >
+            Firewall Rules
+          </Header>
+          <div style={{ height: 8 }} />
+          <Button onClick={() => setFwModalOpen(true)}>View Firewall Rules</Button>
+        </div>
+      )}
+
       {matchingAssignments.length > 0 && (
         <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
           <Header variant="h3">SSO Assignments</Header>
@@ -375,6 +607,37 @@ export function DetailPanel({ node }: Props) {
             empty={
               <Box textAlign="center" color="inherit">
                 No SSO assignments found
+              </Box>
+            }
+          />
+        </SpaceBetween>
+      </Modal>
+
+      <Modal
+        onDismiss={() => setFwModalOpen(false)}
+        visible={fwModalOpen}
+        header={`AWS Network Firewall Rules for ${node?.label}`}
+        size="max"
+        closeAriaLabel="Close modal"
+      >
+        <SpaceBetween size="m">
+          {parsedFwRules.isSample && (
+            <Box variant="p" color="text-status-info">
+              💡 <strong>Note:</strong> These are sample rules displayed for demonstration. To define your own, configure <code>centralNetworkServices.networkFirewall.rules</code> in your <code>network-config.yaml</code>.
+            </Box>
+          )}
+          <Input
+            value={fwFilteringText}
+            onChange={({ detail }) => setFwFilteringText(detail.value)}
+            placeholder="Filter rules by group, action, protocol, IP..."
+            clearAriaLabel="Clear search"
+          />
+          <Table
+            columnDefinitions={fwColumns}
+            items={filteredFwRules}
+            empty={
+              <Box textAlign="center" color="inherit">
+                No matching firewall rules found
               </Box>
             }
           />
