@@ -81,6 +81,8 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
     return missing
   }, [loadedFiles])
 
+  const hasFiles = Object.keys(loadedFiles).length > 0
+
   const expectedFiles  = Object.keys(FILE_MAP)
   const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => !(f in FILE_MAP))
 
@@ -135,6 +137,29 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
         />
       </div>
+
+      {/* Clear button */}
+      {hasFiles && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button
+            onClick={() => dispatch({ type: 'CLEAR_FILES' })}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 11,
+              color: '#c0392b',
+              padding: '2px 4px',
+              borderRadius: 3,
+              fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#fdf0ee')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* Unresolved include warnings */}
       {unresolvedIncludes.length > 0 && (

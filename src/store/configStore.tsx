@@ -28,6 +28,7 @@ type Action =
   | { type: 'TOGGLE_AGGREGATE_STACKS' }
   | { type: 'TOGGLE_FOCUS_MODE' }
   | { type: 'TOGGLE_SEMANTIC_ZOOM' }
+  | { type: 'CLEAR_FILES' }
 
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
@@ -122,6 +123,11 @@ function reducer(state: State, action: Action): State {
       return { ...state, enableFocusMode: !state.enableFocusMode }
     case 'TOGGLE_SEMANTIC_ZOOM':
       return { ...state, enableSemanticZoom: !state.enableSemanticZoom }
+    case 'CLEAR_FILES':
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('aws-archview:loadedFiles')
+      }
+      return { ...state, loadedFiles: {}, configs: {} }
     default:
       return state
   }
