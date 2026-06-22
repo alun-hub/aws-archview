@@ -18,7 +18,7 @@ interface State {
 }
 
 type Action =
-  | { type: 'SET_FILE'; filename: string; content: string; parsed: Partial<LzaConfigs> }
+  | { type: 'SET_FILE'; filename: string; content: string }
   | { type: 'SET_VIEW'; view: ViewKind }
   | { type: 'SELECT_NODE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
@@ -41,7 +41,7 @@ const getInitialState = (): State => {
         for (const [filename, content] of Object.entries(loadedFiles)) {
           const key = resolveConfigKey(filename)
           if (key) {
-            Object.assign(configs, parsedForKey(key, content))
+            Object.assign(configs, parsedForKey(key, content, loadedFiles))
           }
         }
       }
@@ -84,11 +84,12 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:loadedFiles', JSON.stringify(nextLoaded))
       }
-      return {
-        ...state,
-        loadedFiles: nextLoaded,
-        configs: { ...state.configs, ...action.parsed },
+      const configs: LzaConfigs = {}
+      for (const [filename, content] of Object.entries(nextLoaded)) {
+        const key = resolveConfigKey(filename)
+        if (key) Object.assign(configs, parsedForKey(key, content, nextLoaded))
       }
+      return { ...state, loadedFiles: nextLoaded, configs }
     }
     case 'SET_VIEW':
       if (typeof window !== 'undefined') {
