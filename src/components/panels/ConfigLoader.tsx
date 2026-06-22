@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useDispatch } from '../../store/configStore'
 import { FILE_MAP, findIncludes } from '../../parser'
 
@@ -27,13 +27,7 @@ async function readEntry(entry: FileSystemEntry): Promise<File[]> {
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch    = useDispatch()
-  const fileInputRef   = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
-
-  // webkitdirectory is not in React's typings — set via ref
-  useEffect(() => {
-    folderInputRef.current?.setAttribute('webkitdirectory', '')
-  }, [])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -48,6 +42,19 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
       }
     },
     [dispatch],
+  )
+
+  const handleFolderSelect = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.multiple = true
+      input.setAttribute('webkitdirectory', '')
+      input.onchange = () => processFiles(Array.from(input.files ?? []))
+      input.click()
+    },
+    [processFiles],
   )
 
   const onDrop = useCallback(
@@ -115,7 +122,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           </span>
           <span>·</span>
           <span
-            onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click() }}
+            onClick={handleFolderSelect}
             style={{ textDecoration: 'underline', cursor: 'pointer' }}
           >
             Select folder
@@ -125,13 +132,6 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           ref={fileInputRef}
           type="file"
           accept=".yaml,.yml"
-          multiple
-          style={{ display: 'none' }}
-          onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
           multiple
           style={{ display: 'none' }}
           onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
