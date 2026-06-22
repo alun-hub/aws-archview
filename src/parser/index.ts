@@ -82,7 +82,7 @@ function buildIncludeSchema(
   loadedFiles: Record<string, string>,
   replacementsMap: Map<string, string>,
 ): yaml.Schema {
-  // schema is referenced by the construct closure — assigned after Type creation
+  // eslint-disable-next-line prefer-const
   let schema: yaml.Schema
   const includeType = new yaml.Type('!include', {
     kind: 'scalar',

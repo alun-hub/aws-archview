@@ -48,6 +48,7 @@ const KIND_LABEL: Record<string, string> = {
   'service-catalog': 'Service Catalog Portfolio',
   'control-tower':   'Control Tower',
   backup:            'AWS Backup',
+  'access-analyzer': 'Access Analyzer',
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -82,6 +83,7 @@ const KIND_COLOR: Record<string, string> = {
   'service-catalog': '#E7157B',
   'control-tower':   '#232F3E',
   backup:            '#007DB8',
+  'access-analyzer': '#CD2264',
 }
 
 // Human-readable labels for known data keys
@@ -134,6 +136,9 @@ const FIELD_LABEL: Record<string, string> = {
   regions:           'Regions',
   parameters:        'Parameters',
   provider:          'Provider',
+  enableScanTypes:   'Inspector Scan Types',
+  snsTopics:         'SNS Topics',
+  products:          'Service Catalog Products',
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)

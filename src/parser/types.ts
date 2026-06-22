@@ -196,6 +196,18 @@ export interface NetworkConfig {
 
 export interface SecurityConfig {
   enableDlpChecks?: boolean
+  centralSecurityServices?: {
+    delegatedAdminAccount?: string
+    macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
+    guardDuty?: { enable: boolean; s3Protection?: { enable: boolean } }
+    securityHub?: { enable: boolean; standards?: (string | { name: string })[] }
+    config?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
+    inspector?: { enable: boolean; enableScanTypes?: string[] }
+    detective?: { enable: boolean }
+    auditManager?: { enable: boolean }
+    accessAnalyzer?: { enable: boolean }
+    cloudtrail?: { enable: boolean; organizationTrail?: boolean; s3BucketName?: string }
+  }
   macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
   guardduty?: { enable: boolean; s3Protection?: { enable: boolean } }
   securityHub?: { enable: boolean; standards?: (string | { name: string })[] }
@@ -259,7 +271,7 @@ export interface GlobalConfig {
     budgets?: { name: string; amount: number; type: string; unit: string }[]
   }
   backup?: { vaults?: { name: string; deploymentTargets?: unknown }[] }
-  snsTopics?: unknown
+  snsTopics?: { name: string; emailAddresses?: string[] }[]
   tags?: { key: string; value: string }[]
 }
 
@@ -293,7 +305,7 @@ export interface CustomizationsConfig {
     provider?: string
     regions?: string[]
     deploymentTargets?: CfnDeploymentTargets
-    products?: unknown[]
+    products?: { name: string; version: string; description?: string }[]
   }[]
 }
 
@@ -306,7 +318,7 @@ export type NodeKind =
   | 'nlb' | 'alb' | 'network-firewall' | 'nat-gateway' | 'igw'
   | 'route53' | 'cloudwatch' | 'cloudtrail' | 'config' | 'organizations' | 'control-tower'
   | 'security-hub' | 'guardduty' | 'inspector' | 'macie' | 'iam' | 'acm' | 'kms'
-  | 'detective' | 'audit-manager' | 'firewall-manager' | 's3' | 'backup' | 'lambda' | 'service'
+  | 'detective' | 'audit-manager' | 'access-analyzer' | 'firewall-manager' | 's3' | 'backup' | 'lambda' | 'service'
   | 'cloud' | 'cloudformation' | 'service-catalog'
 
 export interface GraphNode {

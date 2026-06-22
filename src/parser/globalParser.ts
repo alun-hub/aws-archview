@@ -18,6 +18,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       logRetentionDays: cfg.cloudwatchLogRetentionInDays,
       managementRole: cfg.managementAccountAccessRole,
       mandatoryTags: cfg.tags?.map(t => `${t.key}: ${t.value}`),
+      snsTopics: cfg.snsTopics?.map(t => `${t.name}: ${t.emailAddresses?.join(', ') || ''}`),
     },
   })
 

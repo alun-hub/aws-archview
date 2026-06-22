@@ -17,7 +17,7 @@ export type IconKind =
   | 'systems-manager' | 'service-catalog' | 'cloudwatch' | 'backup'
   // ── Security & Identity ───────────────────────────────────────────────────
   | 'security-hub' | 'guardduty' | 'inspector' | 'macie' | 'iam' | 'iam-core'
-  | 'detective' | 'audit-manager' | 'acm' | 'kms' | 'firewall-manager'
+  | 'detective' | 'audit-manager' | 'access-analyzer' | 'acm' | 'kms' | 'firewall-manager'
   | 'directory-service' | 'security-lake' | 'scp'
   // ── Storage ───────────────────────────────────────────────────────────────
   | 's3'
@@ -72,6 +72,7 @@ const SVG_MAP: Partial<Record<IconKind, string>> = {
   'iam-core':           'iam-core.svg',
   detective:            'detective.svg',
   'audit-manager':      'audit-manager.svg',
+  'access-analyzer':    'iam.svg',
   acm:                  'acm.svg',
   kms:                  'kms.svg',
   'firewall-manager':   'firewall-manager.svg',

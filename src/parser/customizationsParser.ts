@@ -127,6 +127,7 @@ export function parseCustomizations(cfg: CustomizationsConfig, aggregateStacks: 
         provider: portfolio.provider,
         regions: portfolio.regions,
         sublabel: portfolio.provider ?? '',
+        products: portfolio.products?.map((p) => `${p.name} [Version: ${p.version}]${p.description ? ` - ${p.description}` : ''}`),
       },
     })
   }

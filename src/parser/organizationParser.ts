@@ -1,4 +1,5 @@
 import type { AccountsConfig, GraphEdge, GraphModel, GraphNode, OUConfig, OrganizationConfig, SecurityConfig, IamConfig, SCP } from './types'
+import { getNormalizedSecurityConfig } from './securityParser'
 
 function collectOUs(
   ous: OUConfig[],
@@ -42,6 +43,9 @@ export function parseOrganization(
   securityConfig?: SecurityConfig,
   iamConfig?: IamConfig,
 ): GraphModel {
+  const normSecurity = securityConfig ? getNormalizedSecurityConfig(securityConfig) : null
+  const delegatedAdmin = securityConfig?.centralSecurityServices?.delegatedAdminAccount ?? 'Audit'
+
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
 
@@ -93,20 +97,20 @@ export function parseOrganization(
     })
 
     // Inject security services under the respective central accounts
-    if (account.name === 'Audit' && securityConfig) {
-      if (securityConfig.guardduty?.enable) {
+    if (account.name === delegatedAdmin && normSecurity) {
+      if (normSecurity.guardDuty?.enable) {
         nodes.push({
           id: `guardduty:${account.name}`,
           kind: 'guardduty',
           label: 'GuardDuty',
           data: {
-            s3Protection: securityConfig.guardduty.s3Protection?.enable !== false,
+            s3Protection: normSecurity.guardDuty.s3Protection?.enable !== false,
           },
           parentId: id,
         })
       }
-      if (securityConfig.securityHub?.enable) {
-        const stds = securityConfig.securityHub.standards?.map((s) => {
+      if (normSecurity.securityHub?.enable) {
+        const stds = normSecurity.securityHub.standards?.map((s) => {
           if (typeof s === 'string') return s
           if (s && typeof s === 'object' && 'name' in s) return String(s.name)
           return String(s)
@@ -121,41 +125,79 @@ export function parseOrganization(
           parentId: id,
         })
       }
-      if (securityConfig.macie?.enable) {
+      if (normSecurity.macie?.enable) {
         nodes.push({
           id: `macie:${account.name}`,
           kind: 'macie',
           label: 'Macie',
           data: {
-            publishingFrequency: securityConfig.macie.policyFindingsPublishingFrequency,
+            publishingFrequency: normSecurity.macie.policyFindingsPublishingFrequency,
           },
           parentId: id,
         })
       }
-      if (securityConfig.awsConfig?.enableConfigurationRecorder) {
+      if (normSecurity.config?.enableConfigurationRecorder) {
         nodes.push({
           id: `config:${account.name}`,
           kind: 'config',
           label: 'AWS Config',
           data: {
-            recorderEnabled: securityConfig.awsConfig.enableConfigurationRecorder,
-            deliveryChannel: securityConfig.awsConfig.enableDeliveryChannel,
+            recorderEnabled: normSecurity.config.enableConfigurationRecorder,
+            deliveryChannel: normSecurity.config.enableDeliveryChannel,
           },
+          parentId: id,
+        })
+      }
+      if (normSecurity.inspector?.enable) {
+        nodes.push({
+          id: `inspector:${account.name}`,
+          kind: 'inspector',
+          label: 'Inspector',
+          data: {
+            enableScanTypes: normSecurity.inspector.enableScanTypes,
+          },
+          parentId: id,
+        })
+      }
+      if (normSecurity.detective?.enable) {
+        nodes.push({
+          id: `detective:${account.name}`,
+          kind: 'detective',
+          label: 'Detective',
+          data: {},
+          parentId: id,
+        })
+      }
+      if (normSecurity.auditManager?.enable) {
+        nodes.push({
+          id: `audit-manager:${account.name}`,
+          kind: 'audit-manager',
+          label: 'Audit Manager',
+          data: {},
+          parentId: id,
+        })
+      }
+      if (normSecurity.accessAnalyzer?.enable) {
+        nodes.push({
+          id: `access-analyzer:${account.name}`,
+          kind: 'access-analyzer',
+          label: 'Access Analyzer',
+          data: {},
           parentId: id,
         })
       }
     }
 
-    if (account.name === 'LogArchive' && securityConfig) {
-      if (securityConfig.cloudtrail?.enable) {
+    if (account.name === 'LogArchive' && normSecurity) {
+      if (normSecurity.cloudtrail?.enable) {
         nodes.push({
           id: `cloudtrail:${account.name}`,
           kind: 'cloudtrail',
           label: 'CloudTrail',
           data: {
-            trailEnabled: securityConfig.cloudtrail.enable,
-            organizationTrail: securityConfig.cloudtrail.organizationTrail,
-            s3BucketName: securityConfig.cloudtrail.s3BucketName,
+            trailEnabled: normSecurity.cloudtrail.enable,
+            organizationTrail: normSecurity.cloudtrail.organizationTrail,
+            s3BucketName: normSecurity.cloudtrail.s3BucketName,
           },
           parentId: id,
         })

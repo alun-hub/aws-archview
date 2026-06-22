@@ -79,6 +79,7 @@ const nodeTypes = {
   'iam-core':        ServiceNode,
   detective:         ServiceNode,
   'audit-manager':   ServiceNode,
+  'access-analyzer': ServiceNode,
   acm:               ServiceNode,
   kms:               ServiceNode,
   'firewall-manager': ServiceNode,
@@ -117,7 +118,7 @@ const LEAF_SIZE_OVERRIDE: Record<string, { w: number; h: number }> = {
 const LEAF_SIZE = new Set([
   'tgw', 'tgw-rt', 'vpn', 'cgw', 'client-vpn', 'dx', 'route53', 'nlb', 'alb', 'igw',
   'network-firewall', 'nat-gateway', 'security-hub', 'guardduty',
-  'inspector', 'macie', 'iam', 'iam-core', 'detective', 'audit-manager',
+  'inspector', 'macie', 'iam', 'iam-core', 'detective', 'audit-manager', 'access-analyzer',
   'acm', 'kms', 'firewall-manager', 's3', 'backup', 'lambda', 'ec2',
   'cloudwatch', 'cloudtrail', 'config', 'control-tower', 'organizations',
   'cloudformation', 'systems-manager', 'service-catalog', 'service', 'subnet',

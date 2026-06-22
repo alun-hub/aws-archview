@@ -204,4 +204,78 @@ describe('organizationParser', () => {
     // 6. IAM assignments on OUs
     expect(workloadsOu?.data.iamAssignments).toEqual(['Group: viewers-group → ReadOnlyAccess'])
   })
+
+  it('should parse nested centralSecurityServices and inject advanced services under dynamically resolved delegated admin account', () => {
+    const org: OrganizationConfig = {
+      enable: true,
+      organizationalUnits: [{ name: 'Security' }]
+    }
+    const accounts: AccountsConfig = {
+      mandatoryAccounts: [
+        { name: 'SecOps', email: 'secops@test.com', organizationalUnit: 'Security' },
+        { name: 'LogArchive', email: 'logs@test.com', organizationalUnit: 'Security' }
+      ]
+    }
+    // Using cast to any to simulate what YAML parser produces
+    const security = {
+      centralSecurityServices: {
+        delegatedAdminAccount: 'SecOps',
+        guardDuty: {
+          enable: true,
+          s3Protection: { enable: true }
+        },
+        securityHub: {
+          enable: true,
+          standards: [{ name: 'PCI DSS v3.2.1' }]
+        },
+        config: {
+          enableConfigurationRecorder: true,
+          enableDeliveryChannel: true
+        },
+        inspector: {
+          enable: true,
+          enableScanTypes: ['EC2', 'LAMBDA']
+        },
+        detective: {
+          enable: true
+        },
+        auditManager: {
+          enable: true
+        },
+        accessAnalyzer: {
+          enable: true
+        },
+        cloudtrail: {
+          enable: true,
+          organizationTrail: true,
+          s3BucketName: 'enterprise-ct-logs'
+        }
+      }
+    }
+
+    const model = parseOrganization(org, accounts, security as unknown as SecurityConfig)
+
+    // Check SecOps account contains the delegated security services
+    const secOpsChildren = model.nodes.filter(n => n.parentId === 'account:SecOps')
+    const secOpsKinds = secOpsChildren.map(c => c.kind)
+
+    expect(secOpsKinds).toContain('guardduty')
+    expect(secOpsKinds).toContain('security-hub')
+    expect(secOpsKinds).toContain('config')
+    expect(secOpsKinds).toContain('inspector')
+    expect(secOpsKinds).toContain('detective')
+    expect(secOpsKinds).toContain('audit-manager')
+    expect(secOpsKinds).toContain('access-analyzer')
+
+    // Verify Inspector properties
+    const inspectorNode = secOpsChildren.find(c => c.kind === 'inspector')
+    expect(inspectorNode?.data.enableScanTypes).toEqual(['EC2', 'LAMBDA'])
+
+    // Check LogArchive account contains CloudTrail
+    const logChildren = model.nodes.filter(n => n.parentId === 'account:LogArchive')
+    expect(logChildren.map(c => c.kind)).toContain('cloudtrail')
+    const ctNode = logChildren.find(c => c.kind === 'cloudtrail')
+    expect(ctNode?.data.trailEnabled).toBe(true)
+    expect(ctNode?.data.s3BucketName).toBe('enterprise-ct-logs')
+  })
 })
