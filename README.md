@@ -116,8 +116,9 @@ npm run build
 ### Options for Deployment
 
 #### A. AWS Static Hosting (S3 + CloudFront)
-1. Upload the files in `dist/` to an Amazon S3 bucket configured for static website hosting.
-2. Front the bucket with an Amazon CloudFront distribution to serve it securely over HTTPS.
+1. Run `npm run build` to generate the production assets locally (note that the compiled `dist/` directory is git-ignored and will not be present in the repository until you build it).
+2. Upload all the files inside the newly generated `dist/` folder to an Amazon S3 bucket configured for static website hosting.
+3. Front the S3 bucket with an Amazon CloudFront distribution to serve it securely over HTTPS.
 
 #### B. Cloud Static Providers
 Connect your Git repository directly to modern hosting providers such as:
