@@ -37,6 +37,10 @@ export function resolveConfigKey(filename: string): keyof LzaConfigs | null {
   return FILE_MAP[base] ?? null
 }
 
+export function findIncludes(content: string): string[] {
+  return [...content.matchAll(/!include\s+(\S+)/g)].map((m) => m[1])
+}
+
 // ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
 
 function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, string> {

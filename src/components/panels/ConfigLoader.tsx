@@ -1,44 +1,96 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useDispatch } from '../../store/configStore'
-import { FILE_MAP } from '../../parser'
+import { FILE_MAP, findIncludes } from '../../parser'
+
+// Read all files from a FileSystemEntry recursively (handles folders with >100 entries)
+async function readEntry(entry: FileSystemEntry): Promise<File[]> {
+  if (entry.isFile) {
+    return new Promise((resolve, reject) => {
+      ;(entry as FileSystemFileEntry).file((f) => resolve([f]), reject)
+    })
+  }
+  if (entry.isDirectory) {
+    const reader = (entry as FileSystemDirectoryEntry).createReader()
+    const entries: FileSystemEntry[] = []
+    await new Promise<void>((resolve, reject) => {
+      const readBatch = () =>
+        reader.readEntries((batch) => {
+          if (batch.length === 0) resolve()
+          else { entries.push(...batch); readBatch() }
+        }, reject)
+      readBatch()
+    })
+    return (await Promise.all(entries.map(readEntry))).flat()
+  }
+  return []
+}
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
-  const dispatch = useDispatch()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const dispatch    = useDispatch()
+  const fileInputRef   = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files) return
-      Array.from(files).forEach((file) => {
-        if (!file.name.match(/\.(yaml|yml)$/i)) return
+  // webkitdirectory is not in React's typings — set via ref
+  useEffect(() => {
+    folderInputRef.current?.setAttribute('webkitdirectory', '')
+  }, [])
+
+  const processFiles = useCallback(
+    (files: File[]) => {
+      for (const file of files) {
+        if (!file.name.match(/\.(yaml|yml)$/i)) continue
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
           dispatch({ type: 'SET_FILE', filename: file.name, content })
         }
         reader.readAsText(file)
-      })
+      }
     },
     [dispatch],
   )
 
   const onDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault()
-      handleFiles(e.dataTransfer.files)
+      if (e.dataTransfer.items) {
+        const entries = Array.from(e.dataTransfer.items)
+          .map((item) => item.webkitGetAsEntry())
+          .filter((entry): entry is FileSystemEntry => entry != null)
+        const allFiles = (await Promise.all(entries.map(readEntry))).flat()
+        processFiles(allFiles)
+      } else {
+        processFiles(Array.from(e.dataTransfer.files))
+      }
     },
-    [handleFiles],
+    [processFiles],
   )
 
-  const expectedFiles = Object.keys(FILE_MAP)
+  // Detect !include references that aren't yet loaded
+  const unresolvedIncludes = useMemo(() => {
+    const missing: string[] = []
+    for (const content of Object.values(loadedFiles)) {
+      for (const path of findIncludes(content)) {
+        const basename = path.split('/').pop()!
+        const found = Object.keys(loadedFiles).some(
+          (k) => k === path || k === basename || k.split('/').pop() === basename,
+        )
+        if (!found && !missing.includes(basename)) missing.push(basename)
+      }
+    }
+    return missing
+  }, [loadedFiles])
+
+  const expectedFiles  = Object.keys(FILE_MAP)
   const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => !(f in FILE_MAP))
 
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '16px 0' }}>
+      {/* Drop zone */}
       <div
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => fileInputRef.current?.click()}
         style={{
           border: '2px dashed #ccc',
           borderRadius: 8,
@@ -51,18 +103,58 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           marginBottom: 16,
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Drag and drop YAML files here</div>
-        <div style={{ color: '#aaa', fontSize: 11 }}>or click to select</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Drop YAML files or folder here</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, fontSize: 11, color: '#aaa' }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Select files
+          </span>
+          <span>·</span>
+          <span
+            onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click() }}
+            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Select folder
+          </span>
+        </div>
         <input
-          ref={inputRef}
+          ref={fileInputRef}
           type="file"
           accept=".yaml,.yml"
           multiple
           style={{ display: 'none' }}
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
         />
       </div>
 
+      {/* Unresolved include warnings */}
+      {unresolvedIncludes.length > 0 && (
+        <div style={{
+          background: '#fffbe6',
+          border: '1px solid #ffe58f',
+          borderRadius: 6,
+          padding: '8px 10px',
+          marginBottom: 12,
+          fontSize: 11,
+          color: '#7c5c00',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Missing included files:</div>
+          {unresolvedIncludes.map((f) => (
+            <div key={f} style={{ fontFamily: 'monospace', opacity: 0.85 }}>↳ {f}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Expected config files */}
       <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>
         Expected files
       </div>
@@ -87,6 +179,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         )
       })}
 
+      {/* Auxiliary / included files */}
       {auxiliaryFiles.length > 0 && (
         <>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6, marginTop: 14 }}>

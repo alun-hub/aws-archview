@@ -1,0 +1,26 @@
+globalReplacements:
+  - key: HOME_REGION
+    type: String
+    value: eu-west-1
+
+  - key: EMAIL_DOMAIN
+    type: String
+    value: example.com
+
+  - key: ORG_ASN
+    type: String
+    value: "65521"
+
+  - key: ONPREM_IP
+    type: String
+    value: 203.0.113.10
+
+  - key: ONPREM_ASN
+    type: String
+    value: "65000"
+
+  - key: SHARED_OUS
+    type: StringList
+    value:
+      - Infrastructure
+      - Workloads

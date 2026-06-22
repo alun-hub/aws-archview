@@ -1,0 +1,46 @@
+defaultVpc:
+  delete: true
+
+transitGateways:
+  - name: Main-TGW
+    account: Network
+    region: {{HOME_REGION}}
+    asn: {{ORG_ASN}}
+    defaultRouteTableAssociation: disable
+    defaultRouteTablePropagation: disable
+    autoAcceptSharingAttachments: enable
+    shareTargets:
+      organizationalUnits:
+        - Infrastructure
+        - Workloads
+    tags:
+      - key: Environment
+        value: Hub
+
+customerGateways:
+  - name: OnPrem-CGW
+    account: Network
+    region: {{HOME_REGION}}
+    ipAddress: {{ONPREM_IP}}
+    asn: {{ONPREM_ASN}}
+    vpnConnections:
+      - name: OnPrem-VPN
+        transitGateway: Main-TGW
+        routeTableAssociations:
+          - routeTableName: VPN-RT
+        routeTablePropagations:
+          - routeTableName: Spoke-RT
+        staticRoutesOnly: false
+        tunnelSpecifications:
+          - tunnelInsideCidr: 169.254.100.0/30
+          - tunnelInsideCidr: 169.254.100.4/30
+
+transitGatewayRouteTables:
+  - name: Hub-RT
+    transitGateway: Main-TGW
+  - name: Spoke-RT
+    transitGateway: Main-TGW
+  - name: VPN-RT
+    transitGateway: Main-TGW
+
+vpcs: !include include/vpcs.yaml

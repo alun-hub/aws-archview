@@ -1,0 +1,151 @@
+# Ingress VPC — inbound internet traffic via NLB
+- name: Ingress-VPC
+  account: Network
+  region: {{HOME_REGION}}
+  cidrs:
+    - 10.0.0.0/23
+  internetGateway: true
+  enableDnsHostnames: true
+  enableDnsSupport: true
+  subnets:
+    - name: Public-Subnet-A
+      availabilityZone: a
+      routeTable: Public-RT
+      ipv4CidrBlock: 10.0.0.0/26
+    - name: Public-Subnet-B
+      availabilityZone: b
+      routeTable: Public-RT
+      ipv4CidrBlock: 10.0.0.64/26
+    - name: TGW-Attach-Subnet-A
+      availabilityZone: a
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.1.0/28
+    - name: TGW-Attach-Subnet-B
+      availabilityZone: b
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.1.16/28
+  transitGatewayAttachments:
+    - name: Ingress-TGW-Attach
+      transitGateway: Main-TGW
+      routeTableAssociations:
+        - routeTableName: Hub-RT
+      routeTablePropagations:
+        - routeTableName: Spoke-RT
+      subnets:
+        - TGW-Attach-Subnet-A
+        - TGW-Attach-Subnet-B
+
+# Inspection VPC — east-west + egress inspection via AWS Network Firewall
+- name: Inspection-VPC
+  account: Network
+  region: {{HOME_REGION}}
+  cidrs:
+    - 10.0.2.0/23
+  enableDnsHostnames: true
+  enableDnsSupport: true
+  subnets:
+    - name: Firewall-Subnet-A
+      availabilityZone: a
+      routeTable: Firewall-RT
+      ipv4CidrBlock: 10.0.2.0/26
+    - name: Firewall-Subnet-B
+      availabilityZone: b
+      routeTable: Firewall-RT
+      ipv4CidrBlock: 10.0.2.64/26
+    - name: NAT-Public-Subnet-A
+      availabilityZone: a
+      routeTable: NAT-Public-RT
+      ipv4CidrBlock: 10.0.2.128/26
+    - name: NAT-Public-Subnet-B
+      availabilityZone: b
+      routeTable: NAT-Public-RT
+      ipv4CidrBlock: 10.0.2.192/26
+    - name: TGW-Attach-Subnet-A
+      availabilityZone: a
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.3.0/28
+    - name: TGW-Attach-Subnet-B
+      availabilityZone: b
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.3.16/28
+  transitGatewayAttachments:
+    - name: Inspection-TGW-Attach
+      transitGateway: Main-TGW
+      routeTableAssociations:
+        - routeTableName: Hub-RT
+      routeTablePropagations:
+        - routeTableName: Spoke-RT
+      subnets:
+        - TGW-Attach-Subnet-A
+        - TGW-Attach-Subnet-B
+
+# Spoke VPC — workload accounts
+- name: Dev-VPC
+  account: Dev-Application
+  region: {{HOME_REGION}}
+  cidrs:
+    - 10.10.0.0/22
+  enableDnsHostnames: true
+  enableDnsSupport: true
+  subnets:
+    - name: Private-Subnet-A
+      availabilityZone: a
+      routeTable: Private-RT
+      ipv4CidrBlock: 10.10.0.0/24
+    - name: Private-Subnet-B
+      availabilityZone: b
+      routeTable: Private-RT
+      ipv4CidrBlock: 10.10.1.0/24
+    - name: TGW-Subnet-A
+      availabilityZone: a
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.10.2.0/28
+    - name: TGW-Subnet-B
+      availabilityZone: b
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.10.2.16/28
+  transitGatewayAttachments:
+    - name: Dev-TGW-Attach
+      transitGateway: Main-TGW
+      routeTableAssociations:
+        - routeTableName: Spoke-RT
+      routeTablePropagations:
+        - routeTableName: Hub-RT
+      subnets:
+        - TGW-Subnet-A
+        - TGW-Subnet-B
+
+- name: Prod-VPC
+  account: Prod-Application
+  region: {{HOME_REGION}}
+  cidrs:
+    - 10.20.0.0/22
+  enableDnsHostnames: true
+  enableDnsSupport: true
+  subnets:
+    - name: Private-Subnet-A
+      availabilityZone: a
+      routeTable: Private-RT
+      ipv4CidrBlock: 10.20.0.0/24
+    - name: Private-Subnet-B
+      availabilityZone: b
+      routeTable: Private-RT
+      ipv4CidrBlock: 10.20.1.0/24
+    - name: TGW-Subnet-A
+      availabilityZone: a
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.20.2.0/28
+    - name: TGW-Subnet-B
+      availabilityZone: b
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.20.2.16/28
+  transitGatewayAttachments:
+    - name: Prod-TGW-Attach
+      transitGateway: Main-TGW
+      routeTableAssociations:
+        - routeTableName: Spoke-RT
+      routeTablePropagations:
+        - routeTableName: Hub-RT
+      subnets:
+        - TGW-Subnet-A
+        - TGW-Subnet-B

@@ -1,0 +1,17 @@
+mandatoryAccounts:
+  - name: Management
+    description: Organization management account
+    email: management@{{EMAIL_DOMAIN}}
+    organizationalUnit: Root
+
+  - name: LogArchive
+    description: Centralized logging account
+    email: log-archive@{{EMAIL_DOMAIN}}
+    organizationalUnit: Security
+
+  - name: Audit
+    description: Security audit account
+    email: audit@{{EMAIL_DOMAIN}}
+    organizationalUnit: Security
+
+workloadAccounts: !include include/workload-accounts.yaml

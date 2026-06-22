@@ -1,0 +1,29 @@
+- name: Network
+  description: Shared network hub account
+  email: network@{{EMAIL_DOMAIN}}
+  organizationalUnit: Infrastructure/Network
+
+- name: SharedServices
+  description: Shared services (AD, DNS, etc.)
+  email: shared-services@{{EMAIL_DOMAIN}}
+  organizationalUnit: Infrastructure/SharedServices
+
+- name: Dev-Application
+  description: Application development environment
+  email: dev-app@{{EMAIL_DOMAIN}}
+  organizationalUnit: Workloads/Dev
+
+- name: Test-Application
+  description: Application test environment
+  email: test-app@{{EMAIL_DOMAIN}}
+  organizationalUnit: Workloads/Test
+
+- name: Prod-Application
+  description: Application production environment
+  email: prod-app@{{EMAIL_DOMAIN}}
+  organizationalUnit: Workloads/Prod
+
+- name: Sandbox
+  description: Developer sandbox account
+  email: sandbox@{{EMAIL_DOMAIN}}
+  organizationalUnit: Sandbox

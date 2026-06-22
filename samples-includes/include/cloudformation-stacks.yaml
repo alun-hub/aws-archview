@@ -1,0 +1,33 @@
+- name: SC-Logging-Baseline
+  description: Logging baseline resources for all accounts
+  regions:
+    - {{HOME_REGION}}
+  deploymentTargets:
+    organizationalUnits:
+      - Root
+  template: cfn-templates/logging-baseline.yaml
+  runOrder: 1
+  terminationProtection: true
+
+- name: SC-Network-Firewall-Policy
+  description: Shared Network Firewall policy for Inspection VPC
+  regions:
+    - {{HOME_REGION}}
+  deploymentTargets:
+    accounts:
+      - Network
+  template: cfn-templates/network-firewall-policy.yaml
+  runOrder: 2
+  terminationProtection: true
+
+- name: SC-Sandbox-Guardrails
+  description: Budget and tagging guardrails for sandbox accounts
+  regions:
+    - {{HOME_REGION}}
+    - eu-north-1
+  deploymentTargets:
+    organizationalUnits:
+      - Sandbox
+  template: cfn-templates/sandbox-guardrails.yaml
+  runOrder: 3
+  terminationProtection: false

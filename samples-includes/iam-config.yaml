@@ -1,0 +1,16 @@
+# AWS Landing Zone Accelerator IAM Configuration
+#
+identityCenter:
+  name: AWS-Identity-Center
+  delegatedAdminAccount: Audit
+
+permissionSets:
+  - name: AdministratorAccess
+    description: Full administrative access to AWS services and resources.
+    sessionDuration: PT12H
+  - name: Billing
+    description: Access to billing, cost management, and payment methods.
+    sessionDuration: PT4H
+  - name: SecurityAudit
+    description: Read-only access for security audits and log analysis.
+    sessionDuration: PT8H

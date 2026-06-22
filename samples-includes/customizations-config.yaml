@@ -1,0 +1,1 @@
+cloudFormationStacks: !include include/cloudformation-stacks.yaml
