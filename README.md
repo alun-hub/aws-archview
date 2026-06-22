@@ -8,13 +8,25 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ## Key Features
 
-- **Interactive Diagrams** — Pan, zoom, search, select, and filter nodes dynamically.
-- **Organization View** — Renders your AWS Organization structure: Root, Organizational Units (OUs), Accounts, Service Control Policies (SCPs), security configurations (Macie, GuardDuty, Config, Security Hub, CloudTrail), and AWS IAM Identity Center SSO assignments.
-- **VPC Peering Visualization** — Automatically parses `vpcPeering` configurations from `network-config.yaml` and visualizes peering connections as blue dashed lines between VPC side handles.
-- **SSO Assignments details Modal** — View detailed AWS IAM Identity Center group permissions inside a searchable and sortable Cloudscape Modal Table for any Account or OU, resolving both direct and inherited assignments dynamically.
-- **Network View** — Renders network topology: VPCs, subnets classified by function (public, private, TGW, firewall), Transit Gateways (TGWs), NAT Gateways, Load Balancers, Network Firewalls, and VPN connections.
-- **Dynamic Connection Filters** — Toggle layers in the sidebar to show or hide TGW attachments, TGW route table propagations, VPN connections, and internet flows.
-- **Legend & Shortcuts** — Easily identify edge types and navigate using keybindings (e.g. `⌘K` / `Ctrl+K` to search nodes, `F` to auto-fit view, `Esc` to deselect).
+### 1. Multi-View Architecture Visualization
+- **Organization View** — Maps out your AWS Organization structure from the Root level, through Organizational Units (OUs), down to individual Accounts.
+- **Network View** — Visualizes your global networking layout, including Transit Gateways (TGWs), VPCs, subnet boundaries classified by function (public, private, TGW, firewall), NAT Gateways, Internet Gateways (IGWs), Load Balancers, Network Firewalls, and Customer Gateways (CGWs).
+- **Security, IAM, and Global Views** — Renders service logging and protections (Macie, GuardDuty, Security Hub, Config, CloudTrail) and IAM components.
+
+### 2. Advanced Layout & Interactivity
+- **VPC Peering Connections** — Automatically parses `vpcPeering` configurations from `network-config.yaml` and draws peering links as blue dashed lines between VPC side handles.
+- **Smart Resource Aggregation (CloudFormation Stacks)** — Groups duplicate or redundant customizations/stacks into a single `CloudFormation Stacks (N)` node. Clicking the node opens a searchable modal panel containing regions, types (Stack vs. StackSet), descriptions, and full parameter listings (safely serializing complex configurations).
+- **SSO Assignment Details Modal** — Displays comprehensive AWS IAM Identity Center group permissions inside a searchable and sortable table for any selected Account or OU, resolving both direct and inherited assignments dynamically.
+- **Focus Selection (Solo Mode)** — Selecting a node automatically highlights its direct connections and dims the rest of the canvas. This behavior can be toggled on/off in the **Diagram Tools** sidebar.
+- **Semantic Zoom (LOD)** — Smoothly fades out subnets, service nodes, and connection lines when zooming out below 50% scale, leaving only high-level boundary boxes (OUs, Accounts, VPCs) visible to prevent screen clutter.
+
+### 3. High-Fidelity Exports
+- **Vector Images (SVG/PDF)** — Export high-resolution vector representations of your diagram for documentation and printing (configured for A3 landscape).
+- **Draw.io Vector Exporting** — Generates `.drawio` XML files with fully matching AWS 4 stencils:
+  - Resource labels are placed below stencils to prevent text boxes from masking the icons.
+  - Subnet containers are mapped to correct stencil boundaries (`group_subnet_public` and `group_subnet_private`).
+  - Containers (VPCs, OUs, Accounts, Subnets) place headers in the top-left corner using official AWS spacing parameters.
+  - Route tables are mapped to official AWS Route Table stencils.
 
 ---
 
@@ -26,7 +38,7 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ### Install & Run Locally
 
-To run the application locally on your machine:
+To run the application locally on your machine in development mode:
 
 ```bash
 # 1. Clone the repository
@@ -44,17 +56,17 @@ Open [http://localhost:5173](http://localhost:5173) in your web browser.
 
 ### Build & Run Standalone Desktop App (Linux)
 
-You can also run AWS ArchView as a standalone desktop application packaged as an `AppImage`:
+You can package and run AWS ArchView as a standalone desktop application using Electron:
 
 ```bash
 # 1. Package the AppImage
 npm run electron:build
 
 # 2. Make it executable
-chmod +x dist-desktop/AWS\ ArchView-0.0.0.AppImage
+chmod +x dist-desktop/AWS\ ArchView-0.1.12.AppImage
 
 # 3. Run the application standalone
-./dist-desktop/AWS\ ArchView-0.0.0.AppImage
+./dist-desktop/AWS\ ArchView-0.1.12.AppImage
 ```
 
 ---
@@ -62,7 +74,7 @@ chmod +x dist-desktop/AWS\ ArchView-0.0.0.AppImage
 ## Using the Application
 
 ### 1. Load Configurations
-Drag and drop your LZA YAML configuration files directly onto the **Configuration** panel on the left. The application auto-detects and loads them by name:
+Drag and drop your LZA YAML configuration files directly onto the **Configuration** panel in the left sidebar. The application auto-detects and loads them by name:
 
 | Filename | Purpose |
 |---|---|
@@ -72,7 +84,7 @@ Drag and drop your LZA YAML configuration files directly onto the **Configuratio
 | `security-config.yaml` | Maps central security logging and protection policies. |
 | `iam-config.yaml` | Defines permission sets and Identity Center assignments. |
 | `global-config.yaml` | Defines global parameters, regions, and baseline setups. |
-| `customizations-config.yaml` | Defines custom CloudFormation templates, landing zone policies, and customizations. |
+| `customizations-config.yaml` | Defines custom CloudFormation templates and customizations. |
 
 ### 2. Try the Samples
 The repository includes test configs you can drag-and-drop to try out the visualizer:
