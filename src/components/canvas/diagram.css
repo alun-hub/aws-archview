@@ -1,0 +1,17 @@
+/* Semantic Zoom Styles */
+.diagram-canvas-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+.diagram-canvas-wrapper.rf-zoom-out .react-flow__node:not(.react-flow__node-root):not(.react-flow__node-ou):not(.react-flow__node-account):not(.react-flow__node-management-account):not(.react-flow__node-region):not(.react-flow__node-vpc):not(.react-flow__node-on-premises):not(.react-flow__node-cloud) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease-in-out;
+}
+
+.diagram-canvas-wrapper.rf-zoom-out .react-flow__edge {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease-in-out;
+}

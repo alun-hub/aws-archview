@@ -10,7 +10,7 @@ interface StackEntry {
   deploymentTargets?: { accounts?: string[]; organizationalUnits?: string[] }
 }
 
-export function parseCustomizations(cfg: CustomizationsConfig): GraphModel {
+export function parseCustomizations(cfg: CustomizationsConfig, aggregateStacks: boolean = true): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
 
@@ -52,25 +52,41 @@ export function parseCustomizations(cfg: CustomizationsConfig): GraphModel {
 
   let stackIdx = 0
   const addStacks = (parentId: string, stacks: StackEntry[]) => {
-    for (const stack of stacks) {
-      const childId = `cfn-stack:${stackIdx++}:${stack.name}`
+    if (aggregateStacks && stacks.length > 1) {
+      const childId = `cfn-aggregate:${parentId}`
       nodes.push({
         id: childId,
         kind: 'cloudformation',
-        label: stack.name,
+        label: `CloudFormation Stacks (${stacks.length})`,
         data: {
           kind: 'cloudformation',
-          isStackSet: stack.isStackSet,
-          description: stack.description,
-          template: stack.template,
-          regions: stack.regions,
-          parameters: stack.parameters,
-          sublabel: stack.isStackSet
-            ? `StackSet · ${stack.regions?.join(', ') ?? ''}`
-            : stack.regions?.join(', ') ?? '',
+          isAggregate: true,
+          stacks: stacks,
+          sublabel: `${stacks.filter(s => s.isStackSet).length} StackSets · ${stacks.filter(s => !s.isStackSet).length} Stacks`,
         },
         parentId,
       })
+    } else {
+      for (const stack of stacks) {
+        const childId = `cfn-stack:${stackIdx++}:${stack.name}`
+        nodes.push({
+          id: childId,
+          kind: 'cloudformation',
+          label: stack.name,
+          data: {
+            kind: 'cloudformation',
+            isStackSet: stack.isStackSet,
+            description: stack.description,
+            template: stack.template,
+            regions: stack.regions,
+            parameters: stack.parameters,
+            sublabel: stack.isStackSet
+              ? `StackSet · ${stack.regions?.join(', ') ?? ''}`
+              : stack.regions?.join(', ') ?? '',
+          },
+          parentId,
+        })
+      }
     }
   }
 

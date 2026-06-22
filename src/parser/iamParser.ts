@@ -1,5 +1,6 @@
 import type { IamConfig, AccountsConfig, GraphEdge, GraphModel, GraphNode } from './types'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function parseIam(cfg: IamConfig, _accountsConfig?: AccountsConfig): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []

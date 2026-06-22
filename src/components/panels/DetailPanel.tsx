@@ -8,8 +8,12 @@ import Input from '@cloudscape-design/components/input'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import { useConfig } from '../../store/configStore'
-import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig } from '../../parser/types'
+import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig, CfnStackConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
+
+interface StackEntry extends CfnStackConfig {
+  isStackSet: boolean
+}
 
 const KIND_LABEL: Record<string, string> = {
   root:           'Organization Root',
@@ -133,7 +137,7 @@ const FIELD_LABEL: Record<string, string> = {
 }
 
 // Keys to skip from raw data (shown separately or irrelevant)
-const SKIP_KEYS = new Set(['kind', 'sublabel', 'rules'])
+const SKIP_KEYS = new Set(['kind', 'sublabel', 'rules', 'isAggregate', 'stacks'])
 
 interface FlattenedRule {
   type: string
@@ -283,11 +287,24 @@ function Row({ label, value }: { label: string; value: unknown }) {
           {label}
         </div>
         <ul style={{ margin: 0, paddingLeft: 16 }}>
-          {(value as unknown[]).map((item, i) => (
-            <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
-              {String(item)}
-            </li>
-          ))}
+          {(value as unknown[]).map((item, i) => {
+            if (item && typeof item === 'object' && 'name' in item && 'value' in item) {
+              const p = item as { name: string; value: unknown }
+              const valStr = typeof p.value === 'object' && p.value !== null
+                ? JSON.stringify(p.value)
+                : String(p.value ?? '')
+              return (
+                <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+                  <strong>{p.name}</strong>: {valStr}
+                </li>
+              )
+            }
+            return (
+              <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+                {String(item)}
+              </li>
+            )
+          })}
         </ul>
       </div>
     )
@@ -315,6 +332,9 @@ export function DetailPanel({ node }: Props) {
 
   const [fwModalOpen, setFwModalOpen] = useState(false)
   const [fwFilteringText, setFwFilteringText] = useState('')
+
+  const [stacksModalOpen, setStacksModalOpen] = useState(false)
+  const [stacksFilteringText, setStacksFilteringText] = useState('')
 
   const isFirewall = node?.kind === 'network-firewall'
   const parsedFwRules = useMemo(() => {
@@ -511,6 +531,70 @@ export function DetailPanel({ node }: Props) {
     return result
   }, [matchingAssignments, filteringText, sortingColumn, sortingDescending])
 
+  const stacks: StackEntry[] = useMemo(() => {
+    const dataStacks = node?.data?.stacks
+    return Array.isArray(dataStacks) ? (dataStacks as StackEntry[]) : []
+  }, [node])
+
+  const stacksColumns: TableProps<StackEntry>['columnDefinitions'] = useMemo(() => [
+    {
+      id: 'name',
+      header: 'Stack Name',
+      cell: item => (
+        <Box variant="span" fontWeight="bold">
+          {item.name} {item.isStackSet && <Box variant="span" color="text-status-info" fontSize="body-s"> (StackSet)</Box>}
+        </Box>
+      ),
+    },
+    {
+      id: 'description',
+      header: 'Description',
+      cell: item => item.description || '-',
+    },
+    {
+      id: 'regions',
+      header: 'Regions',
+      cell: item => item.regions?.join(', ') || '-',
+    },
+    {
+      id: 'parameters',
+      header: 'Parameters',
+      cell: item => {
+        if (!Array.isArray(item.parameters) || item.parameters.length === 0) return '-'
+        return (
+          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
+            {item.parameters.map((p, i) => {
+              if (!p || !p.name) return null
+              const valStr = typeof p.value === 'object' && p.value !== null
+                ? JSON.stringify(p.value)
+                : String(p.value ?? '')
+              return (
+                <li key={i} style={{ marginBottom: 2 }}>
+                  <strong>{p.name}</strong>: {valStr}
+                </li>
+              )
+            })}
+          </ul>
+        )
+      }
+    }
+  ], [])
+
+  const filteredStacks = useMemo(() => {
+    if (!stacksFilteringText.trim()) return stacks
+    const q = stacksFilteringText.toLowerCase()
+    return stacks.filter(s => {
+      const nameMatch = typeof s.name === 'string' && s.name.toLowerCase().includes(q)
+      const descMatch = typeof s.description === 'string' && s.description.toLowerCase().includes(q)
+      const regionMatch = Array.isArray(s.regions) && s.regions.some(r => typeof r === 'string' && r.toLowerCase().includes(q))
+      const paramMatch = Array.isArray(s.parameters) && s.parameters.some(p =>
+        (typeof p.name === 'string' && p.name.toLowerCase().includes(q)) ||
+        (p.value !== undefined && p.value !== null && String(p.value).toLowerCase().includes(q))
+      )
+      return nameMatch || descMatch || regionMatch || paramMatch
+    })
+  }, [stacks, stacksFilteringText])
+
   if (!node) {
     return (
       <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'sans-serif', padding: '8px 0' }}>
@@ -537,7 +621,9 @@ export function DetailPanel({ node }: Props) {
           textTransform: 'uppercase',
         }}
       >
-        {KIND_LABEL[node.kind] ?? node.kind}
+        {node.data.isAggregate
+          ? 'CloudFormation Stacks (Aggregated)'
+          : (KIND_LABEL[node.kind] ?? node.kind)}
       </div>
       <div style={{ fontSize: 16, fontWeight: 700, color: '#232F3E', marginBottom: 12 }}>
         {node.label}
@@ -581,6 +667,31 @@ export function DetailPanel({ node }: Props) {
         </div>
       )}
 
+      {!!node?.data?.isAggregate && (
+        <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
+          <Header
+            variant="h3"
+            description={`Aggregated ${stacks.length} CloudFormation stacks deployed in this container.`}
+          >
+            CloudFormation Stacks
+          </Header>
+          <div style={{ height: 8 }} />
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Stacks Summary
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 16, maxHeight: 150, overflowY: 'auto', fontSize: 12, color: '#232F3E' }}>
+              {stacks.map((s, idx) => (
+                <li key={idx} style={{ marginBottom: 2 }}>
+                  <strong>{s.name}</strong> {s.isStackSet && <span style={{ color: '#0073bb', fontSize: 10 }}>(StackSet)</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Button onClick={() => setStacksModalOpen(true)}>View Stacks Details</Button>
+        </div>
+      )}
+
       <Modal
         onDismiss={() => setModalOpen(false)}
         visible={modalOpen}
@@ -601,8 +712,8 @@ export function DetailPanel({ node }: Props) {
             sortingColumn={activeSortingColumn}
             sortingDescending={sortingDescending}
             onSortingChange={({ detail }) => {
-              setSortingColumn(detail.sortingColumn.sortingField as 'principal' | 'role' | null)
-              setSortingDescending(detail.isDescending ?? false)
+               setSortingColumn(detail.sortingColumn.sortingField as 'principal' | 'role' | null)
+               setSortingDescending(detail.isDescending ?? false)
             }}
             empty={
               <Box textAlign="center" color="inherit">
@@ -638,6 +749,32 @@ export function DetailPanel({ node }: Props) {
             empty={
               <Box textAlign="center" color="inherit">
                 No matching firewall rules found
+              </Box>
+            }
+          />
+        </SpaceBetween>
+      </Modal>
+
+      <Modal
+        onDismiss={() => setStacksModalOpen(false)}
+        visible={stacksModalOpen}
+        header={`CloudFormation Stacks Details for ${node?.label}`}
+        size="large"
+        closeAriaLabel="Close modal"
+      >
+        <SpaceBetween size="m">
+          <Input
+            value={stacksFilteringText}
+            onChange={({ detail }) => setStacksFilteringText(detail.value)}
+            placeholder="Search stacks by name, description, parameters..."
+            clearAriaLabel="Clear search"
+          />
+          <Table
+            columnDefinitions={stacksColumns}
+            items={filteredStacks}
+            empty={
+              <Box textAlign="center" color="inherit">
+                No matching CloudFormation stacks found
               </Box>
             }
           />
