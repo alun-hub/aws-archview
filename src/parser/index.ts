@@ -37,19 +37,80 @@ export function resolveConfigKey(filename: string): keyof LzaConfigs | null {
   return FILE_MAP[base] ?? null
 }
 
-export function parseYaml<T>(content: string): T {
-  return yaml.load(content, { schema: yaml.DEFAULT_SCHEMA }) as T
+// ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
+
+function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, string> {
+  const raw = loadedFiles['replacements-config.yaml']
+  if (!raw) return new Map()
+  try {
+    const config = yaml.load(raw, { schema: yaml.DEFAULT_SCHEMA }) as {
+      globalReplacements?: Array<{ key: string; type?: string; value?: string | string[] }>
+    }
+    const map = new Map<string, string>()
+    for (const r of config?.globalReplacements ?? []) {
+      if (!r.key || r.value == null) continue
+      // SSM path-based replacements are skipped in the browser
+      map.set(r.key, Array.isArray(r.value) ? r.value.join(', ') : String(r.value))
+    }
+    return map
+  } catch {
+    return new Map()
+  }
 }
 
-export function parsedForKey(key: keyof LzaConfigs, content: string): Partial<LzaConfigs> {
+function resolveReplacements(content: string, replacementsMap: Map<string, string>): string {
+  if (replacementsMap.size === 0) return content
+  return content.replace(/\{\{(\w+)\}\}/g, (_, key) => replacementsMap.get(key) ?? `{{${key}}}`)
+}
+
+// ── Includes: !include path/to/file.yaml ─────────────────────────────────────
+
+function findFile(path: string, loadedFiles: Record<string, string>): string | undefined {
+  if (loadedFiles[path] != null) return loadedFiles[path]
+  const basename = path.split('/').pop()!
+  for (const [k, v] of Object.entries(loadedFiles)) {
+    if (k === basename || k.split('/').pop() === basename) return v
+  }
+  return undefined
+}
+
+function buildIncludeSchema(
+  loadedFiles: Record<string, string>,
+  replacementsMap: Map<string, string>,
+): yaml.Schema {
+  // schema is referenced by the construct closure — assigned after Type creation
+  let schema: yaml.Schema
+  const includeType = new yaml.Type('!include', {
+    kind: 'scalar',
+    resolve: (data) => typeof data === 'string',
+    construct: (data: string) => {
+      const content = findFile(data, loadedFiles)
+      if (content == null) return null
+      return yaml.load(resolveReplacements(content, replacementsMap), { schema })
+    },
+  })
+  schema = yaml.DEFAULT_SCHEMA.extend([includeType])
+  return schema
+}
+
+// ── Public parse API ──────────────────────────────────────────────────────────
+
+export function parseYaml<T>(content: string, loadedFiles: Record<string, string> = {}): T {
+  const replacementsMap = buildReplacementsMap(loadedFiles)
+  const resolved = resolveReplacements(content, replacementsMap)
+  const schema = buildIncludeSchema(loadedFiles, replacementsMap)
+  return yaml.load(resolved, { schema }) as T
+}
+
+export function parsedForKey(key: keyof LzaConfigs, content: string, loadedFiles: Record<string, string> = {}): Partial<LzaConfigs> {
   switch (key) {
-    case 'organization':    return { organization:    parseYaml<OrganizationConfig>(content) }
-    case 'accounts':        return { accounts:        parseYaml<AccountsConfig>(content) }
-    case 'network':         return { network:         parseYaml<NetworkConfig>(content) }
-    case 'security':        return { security:        parseYaml<SecurityConfig>(content) }
-    case 'iam':             return { iam:             parseYaml<IamConfig>(content) }
-    case 'global':          return { global:          parseYaml<GlobalConfig>(content) }
-    case 'customizations':  return { customizations:  parseYaml<CustomizationsConfig>(content) }
+    case 'organization':    return { organization:    parseYaml<OrganizationConfig>(content, loadedFiles) }
+    case 'accounts':        return { accounts:        parseYaml<AccountsConfig>(content, loadedFiles) }
+    case 'network':         return { network:         parseYaml<NetworkConfig>(content, loadedFiles) }
+    case 'security':        return { security:        parseYaml<SecurityConfig>(content, loadedFiles) }
+    case 'iam':             return { iam:             parseYaml<IamConfig>(content, loadedFiles) }
+    case 'global':          return { global:          parseYaml<GlobalConfig>(content, loadedFiles) }
+    case 'customizations':  return { customizations:  parseYaml<CustomizationsConfig>(content, loadedFiles) }
   }
 }
 

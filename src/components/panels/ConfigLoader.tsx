@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useDispatch } from '../../store/configStore'
-import { resolveConfigKey, parsedForKey, FILE_MAP } from '../../parser'
+import { FILE_MAP } from '../../parser'
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch = useDispatch()
@@ -10,12 +10,11 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
     (files: FileList | null) => {
       if (!files) return
       Array.from(files).forEach((file) => {
-        const key = resolveConfigKey(file.name)
-        if (!key) return
+        if (!file.name.match(/\.(yaml|yml)$/i)) return
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
-          dispatch({ type: 'SET_FILE', filename: file.name, content, parsed: parsedForKey(key, content) })
+          dispatch({ type: 'SET_FILE', filename: file.name, content })
         }
         reader.readAsText(file)
       })
@@ -32,6 +31,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
   )
 
   const expectedFiles = Object.keys(FILE_MAP)
+  const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => !(f in FILE_MAP))
 
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '16px 0' }}>
@@ -86,6 +86,31 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           </div>
         )
       })}
+
+      {auxiliaryFiles.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6, marginTop: 14 }}>
+            Included files
+          </div>
+          {auxiliaryFiles.map((f) => (
+            <div
+              key={f}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '5px 0',
+                fontSize: 12,
+                borderBottom: '1px solid #f0f0f0',
+                color: '#1A6CAE',
+              }}
+            >
+              <span style={{ fontSize: 14 }}>↳</span>
+              <span style={{ fontFamily: 'monospace' }}>{f}</span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   )
 }
