@@ -7,6 +7,7 @@ interface State {
   activeView: ViewKind
   selectedNodeId: string | null
   loadedFiles: Record<string, string>
+  parseErrors: Record<string, string>
   showPropagations: boolean
   showTgwAttachments: boolean
   showVpnConnections: boolean
@@ -30,21 +31,47 @@ type Action =
   | { type: 'TOGGLE_SEMANTIC_ZOOM' }
   | { type: 'CLEAR_FILES' }
 
+// Parse every recognized file; a failure in one file must not take down the
+// others (or the whole app) — collect errors per file instead.
+function buildConfigs(loadedFiles: Record<string, string>): {
+  configs: LzaConfigs
+  parseErrors: Record<string, string>
+} {
+  const configs: LzaConfigs = {}
+  const parseErrors: Record<string, string> = {}
+  for (const [filename, content] of Object.entries(loadedFiles)) {
+    const key = resolveConfigKey(filename)
+    if (!key) continue
+    try {
+      Object.assign(configs, parsedForKey(key, content, loadedFiles))
+    } catch (e) {
+      parseErrors[filename] = e instanceof Error ? e.message : String(e)
+      console.error(`Failed to parse ${filename}`, e)
+    }
+  }
+  return { configs, parseErrors }
+}
+
+function persistFiles(loadedFiles: Record<string, string>) {
+  try {
+    localStorage.setItem('aws-archview:loadedFiles', JSON.stringify(loadedFiles))
+  } catch (e) {
+    // QuotaExceededError on large config sets — skip persistence, keep working in-memory
+    console.warn('Could not persist loaded files to localStorage (quota?)', e)
+  }
+}
+
 const getInitialState = (): State => {
   let loadedFiles: Record<string, string> = {}
-  const configs: LzaConfigs = {}
+  let configs: LzaConfigs = {}
+  let parseErrors: Record<string, string> = {}
 
   if (typeof window !== 'undefined') {
     try {
       const savedFilesStr = localStorage.getItem('aws-archview:loadedFiles')
       if (savedFilesStr) {
         loadedFiles = JSON.parse(savedFilesStr)
-        for (const [filename, content] of Object.entries(loadedFiles)) {
-          const key = resolveConfigKey(filename)
-          if (key) {
-            Object.assign(configs, parsedForKey(key, content, loadedFiles))
-          }
-        }
+        ;({ configs, parseErrors } = buildConfigs(loadedFiles))
       }
     } catch (e) {
       console.error('Failed to parse saved files from localStorage', e)
@@ -65,6 +92,7 @@ const getInitialState = (): State => {
     activeView,
     selectedNodeId: null,
     loadedFiles,
+    parseErrors,
     showPropagations: false,
     showTgwAttachments: true,
     showVpnConnections: true,
@@ -83,14 +111,10 @@ function reducer(state: State, action: Action): State {
     case 'SET_FILE': {
       const nextLoaded = { ...state.loadedFiles, [action.filename]: action.content }
       if (typeof window !== 'undefined') {
-        localStorage.setItem('aws-archview:loadedFiles', JSON.stringify(nextLoaded))
+        persistFiles(nextLoaded)
       }
-      const configs: LzaConfigs = {}
-      for (const [filename, content] of Object.entries(nextLoaded)) {
-        const key = resolveConfigKey(filename)
-        if (key) Object.assign(configs, parsedForKey(key, content, nextLoaded))
-      }
-      return { ...state, loadedFiles: nextLoaded, configs }
+      const { configs, parseErrors } = buildConfigs(nextLoaded)
+      return { ...state, loadedFiles: nextLoaded, configs, parseErrors }
     }
     case 'SET_VIEW':
       if (typeof window !== 'undefined') {
@@ -127,7 +151,7 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('aws-archview:loadedFiles')
       }
-      return { ...state, loadedFiles: {}, configs: {} }
+      return { ...state, loadedFiles: {}, configs: {}, parseErrors: {} }
     default:
       return state
   }

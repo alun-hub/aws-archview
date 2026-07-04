@@ -47,7 +47,7 @@ function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, 
   const raw = loadedFiles['replacements-config.yaml']
   if (!raw) return new Map()
   try {
-    const config = yaml.load(raw, { schema: yaml.DEFAULT_SCHEMA }) as {
+    const config = yaml.load(raw, { schema: yaml.DEFAULT_SCHEMA, json: true }) as {
       globalReplacements?: Array<{ key: string; type?: string; value?: string | string[] }>
     }
     const map = new Map<string, string>()
@@ -63,8 +63,17 @@ function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, 
 }
 
 function resolveReplacements(content: string, replacementsMap: Map<string, string>): string {
-  if (replacementsMap.size === 0) return content
-  return content.replace(/\{\{(\w+)\}\}/g, (_, key) => replacementsMap.get(key) ?? `{{${key}}}`)
+  // Match {{ KEY }} with optional spaces; keys may contain dashes, dots, colons
+  // (e.g. LZA lookups like "accel-lookup::..."). Unresolved placeholders are
+  // neutralized to a plain scalar so the YAML stays parseable.
+  return content.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (_, rawKey: string) => {
+    const key = rawKey.trim()
+    const value = replacementsMap.get(key)
+    if (value != null) return value
+    // Collapse whitespace so the token can't contain ": " or "# " sequences
+    // that would break an unquoted YAML scalar.
+    return key.replace(/\s+/g, '_')
+  })
 }
 
 // ── Includes: !include path/to/file.yaml ─────────────────────────────────────
@@ -90,11 +99,23 @@ function buildIncludeSchema(
     construct: (data: string) => {
       const content = findFile(data, loadedFiles)
       if (content == null) return null
-      return yaml.load(resolveReplacements(content, replacementsMap), { schema })
+      return loadTolerant(resolveReplacements(content, replacementsMap), schema)
     },
   })
   schema = yaml.DEFAULT_SCHEMA.extend([includeType])
   return schema
+}
+
+// Tolerant load: accepts duplicate keys (json: true) and multi-document files
+// (documents are shallow-merged; a single document is returned as-is).
+function loadTolerant(content: string, schema: yaml.Schema): unknown {
+  const docs = yaml.loadAll(content, undefined, { schema, json: true }).filter((d) => d != null)
+  if (docs.length === 0) return null
+  if (docs.length === 1) return docs[0]
+  return docs.reduce((acc: Record<string, unknown>, d) => {
+    if (d && typeof d === 'object' && !Array.isArray(d)) Object.assign(acc, d)
+    return acc
+  }, {})
 }
 
 // ── Public parse API ──────────────────────────────────────────────────────────
@@ -103,7 +124,7 @@ export function parseYaml<T>(content: string, loadedFiles: Record<string, string
   const replacementsMap = buildReplacementsMap(loadedFiles)
   const resolved = resolveReplacements(content, replacementsMap)
   const schema = buildIncludeSchema(loadedFiles, replacementsMap)
-  return yaml.load(resolved, { schema }) as T
+  return loadTolerant(resolved, schema) as T
 }
 
 export function parsedForKey(key: keyof LzaConfigs, content: string, loadedFiles: Record<string, string> = {}): Partial<LzaConfigs> {

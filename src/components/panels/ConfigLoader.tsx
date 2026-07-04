@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react'
-import { useDispatch } from '../../store/configStore'
+import { useConfig, useDispatch } from '../../store/configStore'
 import { FILE_MAP, findIncludes } from '../../parser'
 
 // Read all files from a FileSystemEntry recursively (handles folders with >100 entries)
@@ -27,6 +27,7 @@ async function readEntry(entry: FileSystemEntry): Promise<File[]> {
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch    = useDispatch()
+  const { parseErrors } = useConfig()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processFiles = useCallback(
@@ -158,6 +159,27 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           >
             Clear all
           </button>
+        </div>
+      )}
+
+      {/* Parse errors */}
+      {Object.keys(parseErrors).length > 0 && (
+        <div style={{
+          background: '#fdf0ee',
+          border: '1px solid #f0b5ac',
+          borderRadius: 6,
+          padding: '8px 10px',
+          marginBottom: 12,
+          fontSize: 11,
+          color: '#8b2c1e',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Files that failed to parse:</div>
+          {Object.entries(parseErrors).map(([f, msg]) => (
+            <div key={f} style={{ marginBottom: 4 }}>
+              <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>✗ {f}</div>
+              <div style={{ opacity: 0.85, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
+            </div>
+          ))}
         </div>
       )}
 
