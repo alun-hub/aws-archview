@@ -1,5 +1,21 @@
 import type { GlobalConfig, GraphEdge, GraphModel, GraphNode } from './types'
 
+// `snsTopics` exists in two valid LZA shapes: a flat array of topics, or an
+// object wrapping `{ deploymentTargets, topics }`. Normalize to the array form
+// so a structural mismatch can never throw during render.
+function normalizeSnsTopics(snsTopics: unknown): { name: string; emailAddresses?: string[] }[] {
+  if (!snsTopics) return []
+  const arr = Array.isArray(snsTopics)
+    ? snsTopics
+    : Array.isArray((snsTopics as { topics?: unknown[] }).topics)
+      ? (snsTopics as { topics: unknown[] }).topics
+      : []
+  return arr.filter(
+    (t): t is { name: string; emailAddresses?: string[] } =>
+      t != null && typeof t === 'object' && typeof (t as { name?: unknown }).name === 'string',
+  )
+}
+
 export function parseGlobal(cfg: GlobalConfig): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
@@ -18,7 +34,7 @@ export function parseGlobal(cfg: GlobalConfig): GraphModel {
       logRetentionDays: cfg.cloudwatchLogRetentionInDays,
       managementRole: cfg.managementAccountAccessRole,
       mandatoryTags: cfg.tags?.map(t => `${t.key}: ${t.value}`),
-      snsTopics: cfg.snsTopics?.map(t => `${t.name}: ${t.emailAddresses?.join(', ') || ''}`),
+      snsTopics: normalizeSnsTopics(cfg.snsTopics).map(t => `${t.name}: ${t.emailAddresses?.join(', ') || ''}`),
     },
   })
 

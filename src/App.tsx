@@ -20,6 +20,7 @@ import {
 import { ConfigLoader } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
 
 // ── Left navigation panel ────────────────────────────────────────────────────
@@ -208,23 +209,32 @@ function AppContent() {
   const [navOpen,   setNavOpen]   = useState(true)
   const [toolsOpen, setToolsOpen] = useState(false)
 
-  const orgGraph      = useMemo(() => buildOrganizationGraph(config.configs),   [config.configs])
-  const netGraph      = useMemo(() => buildNetworkGraph(config.configs),         [config.configs])
-  const globalGraph   = useMemo(() => buildGlobalGraph(config.configs),          [config.configs])
-  const customGraph   = useMemo(() => buildCustomizationsGraph(config.configs, config.aggregateStacks),  [config.configs, config.aggregateStacks])
-  const securityGraph = useMemo(() => buildSecurityGraph(config.configs),        [config.configs])
-  const iamGraph      = useMemo(() => buildIamGraph(config.configs),             [config.configs])
-
-  const activeGraph = (() => {
-    switch (config.activeView) {
-      case 'organization':   return orgGraph
-      case 'network':        return netGraph
-      case 'global':         return globalGraph
-      case 'customizations': return customGraph
-      case 'security':       return securityGraph
-      case 'iam':            return iamGraph
+  // Graph builders run during render; guard each so an unexpected config shape
+  // surfaces as a per-view error instead of a blank white page that takes down
+  // the whole app (including the file/config panel).
+  const graphs = useMemo(() => {
+    const safe = <T,>(fn: () => T | null): { graph: T | null; error: string | null } => {
+      try {
+        return { graph: fn(), error: null }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('Graph build failed', e)
+        return { graph: null, error: msg }
+      }
     }
-  })()
+    return {
+      organization:   safe(() => buildOrganizationGraph(config.configs)),
+      network:        safe(() => buildNetworkGraph(config.configs)),
+      global:         safe(() => buildGlobalGraph(config.configs)),
+      customizations: safe(() => buildCustomizationsGraph(config.configs, config.aggregateStacks)),
+      security:       safe(() => buildSecurityGraph(config.configs)),
+      iam:            safe(() => buildIamGraph(config.configs)),
+    }
+  }, [config.configs, config.aggregateStacks])
+
+  const activeEntry  = graphs[config.activeView]
+  const activeGraph  = activeEntry?.graph ?? null
+  const buildError   = activeEntry?.error ?? null
 
   const selectedNode = useMemo<GraphNode | null>(() => {
     if (!config.selectedNodeId || !activeGraph) return null
@@ -259,7 +269,25 @@ function AppContent() {
           fitHeight
         >
           <div style={{ height: 'calc(100vh - 160px)' }}>
-            <DiagramCanvas model={activeGraph} />
+            {buildError ? (
+              <div style={{ padding: 32, fontFamily: 'sans-serif', color: '#8b2c1e', maxWidth: 760 }}>
+                <h2 style={{ marginTop: 0 }}>Could not render the {VIEW_LABELS[config.activeView]} view</h2>
+                <p style={{ color: '#555' }}>
+                  One of your configuration files uses a structure this view does not yet handle.
+                  Other views are unaffected. See the browser console for the full stack trace.
+                </p>
+                <pre style={{
+                  background: '#fdf0ee', border: '1px solid #f0b5ac', borderRadius: 6,
+                  padding: 12, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                }}>
+                  {buildError}
+                </pre>
+              </div>
+            ) : (
+              <ErrorBoundary>
+                <DiagramCanvas model={activeGraph} />
+              </ErrorBoundary>
+            )}
           </div>
         </Container>
       }
