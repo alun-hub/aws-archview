@@ -38,7 +38,10 @@ export function resolveConfigKey(filename: string): keyof LzaConfigs | null {
 }
 
 export function findIncludes(content: string): string[] {
-  return [...content.matchAll(/!include\s+(\S+)/g)].map((m) => m[1])
+  // Paths may be double- or single-quoted (common when they embed a
+  // "{{ REPLACEMENT_KEY }}" token with internal spaces) or bare/unquoted.
+  const re = /!include\s+(?:"([^"]*)"|'([^']*)'|(\S+))/g
+  return [...content.matchAll(re)].map((m) => m[1] ?? m[2] ?? m[3])
 }
 
 // ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
