@@ -44,3 +44,42 @@ transitGatewayRouteTables:
     transitGateway: Main-TGW
 
 vpcs: !include include/vpcs.yaml
+
+centralNetworkServices:
+  delegatedAdminAccount: Network
+  route53Resolver:
+    endpoints:
+      - name: central-outbound-resolver
+        type: OUTBOUND
+        vpc: Endpoints-VPC
+        subnets:
+          - Endpoints-Subnet-A
+          - Endpoints-Subnet-B
+        allowedCidrs:
+          - 10.0.0.0/8
+        securityGroupNames:
+          - resolver-sg
+    rules:
+      - name: corp-rule
+        ruleType: FORWARD
+        domainName: corp.internal
+        resolverEndpoint: central-outbound-resolver
+        targetIps:
+          - ip: 192.168.1.10
+        shareTargets:
+          organizationalUnits:
+            - Workloads
+            - Infrastructure
+    firewallRuleGroups:
+      - name: Malware-Blocklist
+        regions:
+          - {{HOME_REGION}}
+        rules:
+          - name: Block-Malware
+            action: BLOCK
+            priority: 100
+            blockResponse: NXDOMAIN
+        shareTargets:
+          organizationalUnits:
+            - Workloads
+            - Infrastructure

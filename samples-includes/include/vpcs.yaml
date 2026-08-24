@@ -87,6 +87,11 @@
     - 10.10.0.0/22
   enableDnsHostnames: true
   enableDnsSupport: true
+  useCentralEndpoints: true
+  resolverRules:
+    - corp-rule
+  dnsFirewallRuleGroups:
+    - Malware-Blocklist
   subnets:
     - name: Private-Subnet-A
       availabilityZone: a
@@ -122,6 +127,11 @@
     - 10.20.0.0/22
   enableDnsHostnames: true
   enableDnsSupport: true
+  useCentralEndpoints: true
+  resolverRules:
+    - corp-rule
+  dnsFirewallRuleGroups:
+    - Malware-Blocklist
   subnets:
     - name: Private-Subnet-A
       availabilityZone: a
@@ -149,3 +159,52 @@
       subnets:
         - TGW-Subnet-A
         - TGW-Subnet-B
+
+# Central Endpoints VPC — hosts shared interface and gateway endpoints
+- name: Endpoints-VPC
+  account: Network
+  region: {{HOME_REGION}}
+  cidrs:
+    - 10.0.4.0/23
+  enableDnsHostnames: true
+  enableDnsSupport: true
+  interfaceEndpoints:
+    central: true
+    endpoints:
+      - service: ssm
+      - service: kms
+      - service: ec2
+    subnets:
+      - Endpoints-Subnet-A
+      - Endpoints-Subnet-B
+  gatewayEndpoints:
+    defaultPolicy: Default
+    endpoints:
+      - service: s3
+  subnets:
+    - name: Endpoints-Subnet-A
+      availabilityZone: a
+      routeTable: Endpoints-RT
+      ipv4CidrBlock: 10.0.4.0/26
+    - name: Endpoints-Subnet-B
+      availabilityZone: b
+      routeTable: Endpoints-RT
+      ipv4CidrBlock: 10.0.4.64/26
+    - name: TGW-Attach-Subnet-A
+      availabilityZone: a
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.5.0/28
+    - name: TGW-Attach-Subnet-B
+      availabilityZone: b
+      routeTable: TGW-RT
+      ipv4CidrBlock: 10.0.5.16/28
+  transitGatewayAttachments:
+    - name: Endpoints-TGW-Attach
+      transitGateway: Main-TGW
+      routeTableAssociations:
+        - routeTableName: Hub-RT
+      routeTablePropagations:
+        - routeTableName: Spoke-RT
+      subnets:
+        - TGW-Attach-Subnet-A
+        - TGW-Attach-Subnet-B
