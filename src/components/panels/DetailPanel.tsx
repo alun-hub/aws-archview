@@ -8,7 +8,7 @@ import Input from '@cloudscape-design/components/input'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import { useConfig } from '../../store/configStore'
-import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig, CfnStackConfig } from '../../parser/types'
+import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig, CfnStackConfig, Route53ResolverRuleConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
 
 interface StackEntry extends CfnStackConfig {
@@ -43,6 +43,7 @@ const KIND_LABEL: Record<string, string> = {
   cloudtrail:     'CloudTrail',
   iam:            'IAM Identity Center',
   service:           'AWS Service',
+  route53:           'Route 53 Resolver',
   cloud:             'AWS Global Config',
   cloudformation:    'CloudFormation Stack',
   'service-catalog': 'Service Catalog Portfolio',
@@ -78,6 +79,8 @@ const KIND_COLOR: Record<string, string> = {
   config:         '#CD2264',
   cloudtrail:     '#CD2264',
   iam:               '#CD2264',
+  service:           '#007DB8',
+  route53:           '#007DB8',
   cloud:             '#232F3E',
   cloudformation:    '#E7157B',
   'service-catalog': '#E7157B',
@@ -120,6 +123,13 @@ const FIELD_LABEL: Record<string, string> = {
   organizationTrail: 'Organization Trail',
   s3BucketName:      'S3 Log Bucket',
   iamAssignments:    'IAM Assignments',
+  allowedCidrs:      'Allowed CIDR Blocks',
+  securityGroupNames: 'Security Groups',
+  service:           'Service Endpoint',
+  central:           'Centralized Endpoint',
+  gateway:           'Gateway Routing',
+  resolverRules:     'Associated Resolver Rules',
+  dnsFirewallRuleGroups: 'Associated DNS Firewall Groups',
   // Global config fields
   homeRegion:        'Home Region',
   enabledRegions:    'Enabled Regions',
@@ -340,6 +350,88 @@ export function DetailPanel({ node }: Props) {
 
   const [stacksModalOpen, setStacksModalOpen] = useState(false)
   const [stacksFilteringText, setStacksFilteringText] = useState('')
+
+  const [dnsModalOpen, setDnsModalOpen] = useState(false)
+  const [dnsFilteringText, setDnsFilteringText] = useState('')
+
+  const isRoute53 = node?.kind === 'route53'
+  const dnsRules: Route53ResolverRuleConfig[] = useMemo(() => {
+    if (!isRoute53 || !node) return []
+    const rawRules = node.data.rules
+    return Array.isArray(rawRules) ? (rawRules as Route53ResolverRuleConfig[]) : []
+  }, [node, isRoute53])
+
+  const dnsColumns: TableProps<Route53ResolverRuleConfig>['columnDefinitions'] = useMemo(() => [
+    {
+      id: 'name',
+      header: 'Rule Name',
+      cell: item => (
+        <Box variant="span" fontWeight="bold">
+          {item.name}
+        </Box>
+      ),
+    },
+    {
+      id: 'domainName',
+      header: 'Domain Name',
+      cell: item => item.domainName || '-',
+    },
+    {
+      id: 'ruleType',
+      header: 'Rule Type',
+      cell: item => (
+        <Box variant="span" color={item.ruleType === 'FORWARD' ? 'text-status-info' : 'text-label'}>
+          {item.ruleType || 'FORWARD'}
+        </Box>
+      ),
+    },
+    {
+      id: 'targetIps',
+      header: 'Target IPs',
+      cell: item => {
+        if (!Array.isArray(item.targetIps) || item.targetIps.length === 0) return '-'
+        return item.targetIps
+          .map(t => {
+            const ip = t.ip || t.ipv4 || ''
+            const port = t.port ? `:${t.port}` : ''
+            return `${ip}${port}`
+          })
+          .filter(Boolean)
+          .join(', ') || '-'
+      },
+    },
+    {
+      id: 'shareTargets',
+      header: 'Share Targets',
+      cell: item => {
+        const accounts = item.shareTargets?.accounts ?? []
+        const ous = item.shareTargets?.organizationalUnits ?? []
+        const all = [
+          ...accounts.map(a => `Account: ${a}`),
+          ...ous.map(o => `OU: ${o}`)
+        ]
+        return all.length > 0 ? all.join(', ') : '-'
+      },
+    }
+  ], [])
+
+  const filteredDnsRules = useMemo(() => {
+    if (!dnsFilteringText.trim()) return dnsRules
+    const q = dnsFilteringText.toLowerCase()
+    return dnsRules.filter(r => {
+      const nameMatch = typeof r.name === 'string' && r.name.toLowerCase().includes(q)
+      const domainMatch = typeof r.domainName === 'string' && r.domainName.toLowerCase().includes(q)
+      const typeMatch = typeof r.ruleType === 'string' && r.ruleType.toLowerCase().includes(q)
+      const ipMatch = Array.isArray(r.targetIps) && r.targetIps.some(t => {
+        const ip = (t.ip || t.ipv4 || '').toLowerCase()
+        const port = t.port ? String(t.port) : ''
+        return ip.includes(q) || port.includes(q)
+      })
+      const targetMatch = (r.shareTargets?.accounts?.some(a => a.toLowerCase().includes(q)) ?? false) ||
+        (r.shareTargets?.organizationalUnits?.some(ou => ou.toLowerCase().includes(q)) ?? false)
+      return nameMatch || domainMatch || typeMatch || ipMatch || targetMatch
+    })
+  }, [dnsRules, dnsFilteringText])
 
   const isFirewall = node?.kind === 'network-firewall'
   const parsedFwRules = useMemo(() => {
@@ -659,6 +751,19 @@ export function DetailPanel({ node }: Props) {
         </div>
       )}
 
+      {isRoute53 && dnsRules.length > 0 && (
+        <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
+          <Header
+            variant="h3"
+            description={`Configured ${dnsRules.length} resolver forwarding rule${dnsRules.length === 1 ? '' : 's'}.`}
+          >
+            Resolver Rules
+          </Header>
+          <div style={{ height: 8 }} />
+          <Button onClick={() => setDnsModalOpen(true)}>View Resolver Rules</Button>
+        </div>
+      )}
+
       {matchingAssignments.length > 0 && (
         <div style={{ marginTop: 20, borderTop: '1px solid #eaeded', paddingTop: 15 }}>
           <Header variant="h3">SSO Assignments</Header>
@@ -696,6 +801,32 @@ export function DetailPanel({ node }: Props) {
           <Button onClick={() => setStacksModalOpen(true)}>View Stacks Details</Button>
         </div>
       )}
+
+      <Modal
+        onDismiss={() => setDnsModalOpen(false)}
+        visible={dnsModalOpen}
+        header={`Route 53 Resolver Rules for ${node?.label}`}
+        size="large"
+        closeAriaLabel="Close modal"
+      >
+        <SpaceBetween size="m">
+          <Input
+            value={dnsFilteringText}
+            onChange={({ detail }) => setDnsFilteringText(detail.value)}
+            placeholder="Search rules by name, domain, IP..."
+            clearAriaLabel="Clear search"
+          />
+          <Table
+            columnDefinitions={dnsColumns}
+            items={filteredDnsRules}
+            empty={
+              <Box textAlign="center" color="inherit">
+                No matching resolver rules found
+              </Box>
+            }
+          />
+        </SpaceBetween>
+      </Modal>
 
       <Modal
         onDismiss={() => setModalOpen(false)}

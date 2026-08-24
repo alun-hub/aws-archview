@@ -173,7 +173,7 @@ const EDGE_STYLES: Record<string, { color: string; dash?: string }> = {
 
 function toFlowEdges(model: GraphModel): Edge[] {
   return model.edges.map((e) => {
-    const style = EDGE_STYLES[e.kind ?? 'tgw']
+    const style = EDGE_STYLES[e.kind ?? 'tgw'] ?? { color: '#6B3FA0' }
 
     const isTgwHub       = e.kind === 'tgw-hub'
     const isTgwSpoke     = e.kind === 'tgw'
