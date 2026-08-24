@@ -283,7 +283,7 @@ describe('networkParser', () => {
     
     // Verify rules are combined (nested and matched sibling rules)
     expect(r53Node?.data.rules).toBeDefined()
-    const rules = r53Node?.data.rules as any[]
+    const rules = r53Node?.data.rules as Array<{ name?: string }>
     expect(rules.length).toBe(2)
     const ruleNames = rules.map(r => r.name)
     expect(ruleNames).toContain('local-nested-rule')

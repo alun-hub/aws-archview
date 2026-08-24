@@ -23,6 +23,8 @@ export type IconKind =
   | 's3'
   // ── Compute ───────────────────────────────────────────────────────────────
   | 'lambda' | 'ec2'
+  // ── Generic Service ───────────────────────────────────────────────────────
+  | 'service'
 
 // Every icon that has a downloaded SVG file
 const SVG_MAP: Partial<Record<IconKind, string>> = {
@@ -86,14 +88,31 @@ const SVG_MAP: Partial<Record<IconKind, string>> = {
   ec2:                  'ec2.svg',
 }
 
-interface Props {
+export interface AwsIconProps {
   kind: IconKind
+  service?: string
   size?: number
   style?: CSSProperties
 }
 
-export function AwsIcon({ kind, size = 32, style }: Props) {
-  const path = SVG_MAP[kind]
+export function AwsIcon({ kind, service, size = 32, style }: AwsIconProps) {
+  let path = SVG_MAP[kind]
+
+  if (kind === 'service') {
+    const s = service?.toLowerCase()
+    if (s === 's3') {
+      path = 's3.svg'
+    } else if (s === 'kms') {
+      path = 'kms.svg'
+    } else if (s === 'ec2') {
+      path = 'ec2.svg'
+    } else if (s === 'directory-service' || s === 'active-directory') {
+      path = 'directory-service.svg'
+    } else {
+      path = 'systems-manager.svg'
+    }
+  }
+
   if (path) {
     return (
       <img

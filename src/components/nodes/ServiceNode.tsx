@@ -5,6 +5,7 @@ import { useHighlight } from '../canvas/HighlightContext'
 export interface ServiceNodeData {
   label: string
   kind: string
+  service?: string
   sublabel?: string
   [key: string]: unknown
 }
@@ -48,7 +49,7 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
           flexShrink: 0,
         }}
       >
-        <AwsIcon kind={d.kind as IconKind} size={52} />
+        <AwsIcon kind={d.kind as IconKind} service={d.service as string} size={52} />
         <div
           style={{
             fontSize: 11,
