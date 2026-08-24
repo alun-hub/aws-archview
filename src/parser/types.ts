@@ -60,6 +60,11 @@ export interface VpcConfig {
   internetGateway?: boolean
   enableDnsHostnames?: boolean
   enableDnsSupport?: boolean
+  interfaceEndpoints?: { central?: boolean; endpoints?: { service: string }[]; subnets?: string[] }
+  gatewayEndpoints?: { defaultPolicy?: string; endpoints?: { service: string }[] }
+  useCentralEndpoints?: boolean
+  resolverRules?: string[]
+  dnsFirewallRuleGroups?: string[]
   subnets?: SubnetConfig[]
   transitGatewayAttachments?: TgwAttachmentConfig[]
   natGateways?: { name: string; subnet: string }[]
@@ -177,6 +182,51 @@ export interface IdentityCenterAssignmentConfig {
   }
 }
 
+export interface Route53ResolverEndpointConfig {
+  name: string
+  type: 'INBOUND' | 'OUTBOUND' | string
+  vpc: string
+  subnets: string[]
+  allowedCidrs?: string[]
+  tags?: Record<string, string>[]
+}
+
+export interface Route53ResolverRuleConfig {
+  name: string
+  domainName?: string
+  ruleType?: 'FORWARD' | 'SYSTEM' | 'RECURSIVE' | string
+  targetIps?: { ip?: string; ipv4?: string; port?: number | string }[]
+  inboundEndpointTarget?: string
+  outboundEndpointTarget?: string
+  shareTargets?: {
+    accounts?: string[]
+    organizationalUnits?: string[]
+  }
+  tags?: Record<string, string>[]
+}
+
+export interface DnsFirewallRuleConfig {
+  name: string
+  action: 'ALLOW' | 'BLOCK' | 'ALERT' | string
+  priority: number
+  firewallDomainList?: string
+  blockResponse?: 'NODATA' | 'NXDOMAIN' | 'OVERRIDE' | string
+  blockOverrideDomain?: string
+  blockOverrideDnsType?: 'CNAME' | string
+  blockOverrideTtl?: number
+}
+
+export interface DnsFirewallRuleGroupConfig {
+  name: string
+  regions?: string[]
+  rules?: DnsFirewallRuleConfig[]
+  shareTargets?: {
+    accounts?: string[]
+    organizationalUnits?: string[]
+  }
+  tags?: Record<string, string>[]
+}
+
 export interface NetworkConfig {
   defaultVpc?: { delete: boolean }
   vpcs?: VpcConfig[]
@@ -188,6 +238,12 @@ export interface NetworkConfig {
     networkFirewall?: {
       firewalls?: { name: string; vpc: string; subnets: string[] }[]
       rules?: FirewallRuleGroupConfig[]
+    }
+    route53Resolver?: {
+      endpoints?: Route53ResolverEndpointConfig[]
+      rules?: Route53ResolverRuleConfig[]
+      firewallRuleGroups?: DnsFirewallRuleGroupConfig[]
+      queryLogs?: unknown[]
     }
   }
 }
