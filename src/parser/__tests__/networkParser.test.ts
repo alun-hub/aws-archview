@@ -317,4 +317,25 @@ describe('networkParser', () => {
     expect(shareEdge?.target).toBe('vpc:Shared-VPC:Network')
     expect(shareEdge?.kind).toBe('peering')
   })
+
+  it('should parse minimal or empty network config without throwing exceptions', () => {
+    const emptyConfig: NetworkConfig = {}
+    const model = parseNetwork(emptyConfig)
+    expect(model.nodes).toEqual([])
+    expect(model.edges).toEqual([])
+
+    const partialConfig: NetworkConfig = {
+      vpcs: [
+        {
+          name: 'Minimal-VPC',
+          account: 'Network',
+          region: 'eu-west-1',
+          cidrs: ['10.0.0.0/16']
+        }
+      ]
+    }
+    const partialModel = parseNetwork(partialConfig)
+    expect(partialModel.nodes.length).toBe(3) // account, region, vpc
+    expect(partialModel.edges.length).toBe(0)
+  })
 })

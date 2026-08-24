@@ -13,6 +13,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()
+  const subnetNodeIds = new Set<string>()
 
   const ensureAccount = (account: string) => {
     if (!accountsSeen.has(account)) {
@@ -24,7 +25,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
   // ── Pre-compute Route 53 resolver rules matching ──
   const rulesByEndpointName = new Map<string, Route53ResolverRuleConfig[]>()
   for (const r of networkConfig.centralNetworkServices?.route53Resolver?.rules ?? []) {
-    const endpointName = r.resolverEndpoint ?? 'default'
+    const endpointName = r.resolverEndpoint ?? r.outboundEndpointTarget ?? r.inboundEndpointTarget ?? 'default'
     const arr = rulesByEndpointName.get(endpointName) ?? []
     arr.push(r)
     rulesByEndpointName.set(endpointName, arr)
@@ -279,6 +280,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
     for (const subnet of vpc.subnets ?? []) {
       const kind = subnetKind(subnet.name)
       const subnetNodeId = `subnet:${vpcId}:${subnet.name}`
+      subnetNodeIds.add(subnetNodeId)
       nodes.push({
         id: subnetNodeId,
         kind,
@@ -348,7 +350,7 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       for (const ep of ieConfig.endpoints ?? []) {
         for (const subName of targetSubnets) {
           const subNodeId = `subnet:${vpcId}:${subName}`
-          if (nodes.some(n => n.id === subNodeId)) {
+          if (subnetNodeIds.has(subNodeId)) {
             nodes.push({
               id: `vpce:${vpcId}:${ep.service}:${subName}`,
               kind: 'service',
@@ -421,9 +423,9 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           ...(endpoint.rules ?? []),
           ...(rulesByEndpointName.get(endpoint.name) ?? [])
         ]
-        for (const subName of endpoint.subnets) {
+        for (const subName of endpoint.subnets ?? []) {
           const subNodeId = `subnet:${targetVpcId}:${subName}`
-          if (nodes.some(n => n.id === subNodeId)) {
+          if (subnetNodeIds.has(subNodeId)) {
             nodes.push({
               id: `route53:resolver:${endpoint.name}:${subName}`,
               kind: 'route53',
