@@ -188,6 +188,8 @@ export interface Route53ResolverEndpointConfig {
   vpc: string
   subnets: string[]
   allowedCidrs?: string[]
+  securityGroupNames?: string[]
+  rules?: Route53ResolverRuleConfig[]
   tags?: Record<string, string>[]
 }
 
@@ -196,6 +198,7 @@ export interface Route53ResolverRuleConfig {
   domainName?: string
   ruleType?: 'FORWARD' | 'SYSTEM' | 'RECURSIVE' | string
   targetIps?: { ip?: string; ipv4?: string; port?: number | string }[]
+  resolverEndpoint?: string
   inboundEndpointTarget?: string
   outboundEndpointTarget?: string
   shareTargets?: {
@@ -210,6 +213,7 @@ export interface DnsFirewallRuleConfig {
   action: 'ALLOW' | 'BLOCK' | 'ALERT' | string
   priority: number
   firewallDomainList?: string
+  customDomainList?: string
   blockResponse?: 'NODATA' | 'NXDOMAIN' | 'OVERRIDE' | string
   blockOverrideDomain?: string
   blockOverrideDnsType?: 'CNAME' | string
