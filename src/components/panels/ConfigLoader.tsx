@@ -78,7 +78,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
   const unresolvedIncludes = useMemo(() => {
     const missing: string[] = []
     for (const content of Object.values(loadedFiles)) {
-      for (const path of findIncludes(content)) {
+      for (const path of findIncludes(content, loadedFiles)) {
         const basename = path.split('/').pop()!
         const found = Object.keys(loadedFiles).some(
           (k) => k === path || k === basename || k.split('/').pop() === basename,

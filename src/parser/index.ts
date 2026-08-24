@@ -37,11 +37,16 @@ export function resolveConfigKey(filename: string): keyof LzaConfigs | null {
   return FILE_MAP[base] ?? null
 }
 
-export function findIncludes(content: string): string[] {
+export function findIncludes(content: string, loadedFiles: Record<string, string> = {}): string[] {
+  // Resolve {{ KEY }} placeholders first so the extracted path matches what
+  // the real parser (parseYaml) would actually look up — otherwise every
+  // !include that embeds a replacement token reads as permanently "missing"
+  // even when replacements-config.yaml resolves it to a loaded file.
+  const resolved = resolveReplacements(content, buildReplacementsMap(loadedFiles))
   // Paths may be double- or single-quoted (common when they embed a
   // "{{ REPLACEMENT_KEY }}" token with internal spaces) or bare/unquoted.
   const re = /!include\s+(?:"([^"]*)"|'([^']*)'|(\S+))/g
-  return [...content.matchAll(re)].map((m) => m[1] ?? m[2] ?? m[3])
+  return [...resolved.matchAll(re)].map((m) => m[1] ?? m[2] ?? m[3])
 }
 
 // ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
