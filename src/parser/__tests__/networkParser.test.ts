@@ -204,4 +204,117 @@ describe('networkParser', () => {
     expect(peeringEdge?.target).toBe('vpc:Prod-VPC:Prod')
     expect(peeringEdge?.label).toBe('DevToProd')
   })
+
+  it('should parse Route 53 resolver endpoints, forwarding rules, and VPC interface/gateway endpoints', () => {
+    const config: NetworkConfig = {
+      centralNetworkServices: {
+        route53Resolver: {
+          endpoints: [
+            {
+              name: 'outbound-resolver',
+              type: 'OUTBOUND',
+              vpc: 'Shared-VPC',
+              subnets: ['Endpoints-Subnet-A'],
+              allowedCidrs: ['10.0.0.0/8'],
+              securityGroupNames: ['resolver-sg'],
+              rules: [
+                {
+                  name: 'local-nested-rule',
+                  ruleType: 'SYSTEM',
+                  domainName: 'local.internal'
+                }
+              ]
+            }
+          ],
+          rules: [
+            {
+              name: 'corp-rule',
+              ruleType: 'FORWARD',
+              domainName: 'corp.internal',
+              resolverEndpoint: 'outbound-resolver',
+              targetIps: [{ ip: '192.168.1.10' }]
+            }
+          ]
+        }
+      },
+      vpcs: [
+        {
+          name: 'Shared-VPC',
+          account: 'Network',
+          region: 'eu-west-1',
+          cidrs: ['10.0.0.0/16'],
+          dnsFirewallRuleGroups: ['block-ads'],
+          subnets: [
+            { name: 'Endpoints-Subnet-A', availabilityZone: 'a', routeTable: 'Endpoints-RT', ipv4CidrBlock: '10.0.1.0/24' }
+          ],
+          interfaceEndpoints: {
+            central: true,
+            endpoints: [{ service: 'ssm' }, { service: 'kms' }],
+            subnets: ['Endpoints-Subnet-A']
+          },
+          gatewayEndpoints: {
+            endpoints: [{ service: 's3' }]
+          }
+        },
+        {
+          name: 'Workload-VPC',
+          account: 'Workload',
+          region: 'eu-west-1',
+          cidrs: ['10.2.0.0/16'],
+          subnets: [
+            { name: 'Workload-Subnet-A', availabilityZone: 'a', routeTable: 'Workload-RT', ipv4CidrBlock: '10.2.1.0/24' }
+          ],
+          useCentralEndpoints: true,
+          resolverRules: ['corp-rule']
+        }
+      ]
+    }
+
+    const model = parseNetwork(config)
+
+    // Verify Route 53 Outbound Resolver Node
+    const r53Node = model.nodes.find(n => n.kind === 'route53')
+    expect(r53Node).toBeDefined()
+    expect(r53Node?.label).toBe('Resolver (OUTBOUND)')
+    expect(r53Node?.parentId).toBe('subnet:vpc:Shared-VPC:Network:Endpoints-Subnet-A')
+    expect(r53Node?.data.name).toBe('outbound-resolver')
+    expect(r53Node?.data.allowedCidrs).toEqual(['10.0.0.0/8'])
+    expect(r53Node?.data.securityGroupNames).toEqual(['resolver-sg'])
+    
+    // Verify rules are combined (nested and matched sibling rules)
+    expect(r53Node?.data.rules).toBeDefined()
+    const rules = r53Node?.data.rules as any[]
+    expect(rules.length).toBe(2)
+    const ruleNames = rules.map(r => r.name)
+    expect(ruleNames).toContain('local-nested-rule')
+    expect(ruleNames).toContain('corp-rule')
+
+    // Verify Central Interface Endpoints
+    const ssmEp = model.nodes.find(n => n.id.includes('vpce') && n.label.includes('ssm'))
+    expect(ssmEp).toBeDefined()
+    expect(ssmEp?.parentId).toBe('subnet:vpc:Shared-VPC:Network:Endpoints-Subnet-A')
+    expect(ssmEp?.label).toBe('Central VPCE (ssm)')
+
+    // Verify Gateway Endpoints
+    const s3Ep = model.nodes.find(n => n.id.includes('vpce-gw') && n.label.includes('s3'))
+    expect(s3Ep).toBeDefined()
+    expect(s3Ep?.parentId).toBe('subnet:vpc:Shared-VPC:Network:Endpoints-Subnet-A')
+    expect(s3Ep?.label).toBe('Gateway VPCE (s3)')
+
+    // Verify VPC metadata mappings (resolverRules, dnsFirewallRuleGroups)
+    const sharedVpcNode = model.nodes.find(n => n.id === 'vpc:Shared-VPC:Network')
+    expect(sharedVpcNode).toBeDefined()
+    expect(sharedVpcNode?.data.dnsFirewallRuleGroups).toEqual(['block-ads'])
+
+    const workloadVpcNode = model.nodes.find(n => n.id === 'vpc:Workload-VPC:Workload')
+    expect(workloadVpcNode).toBeDefined()
+    expect(workloadVpcNode?.data.resolverRules).toEqual(['corp-rule'])
+
+    // Verify logical central sharing edge
+    const shareEdge = model.edges.find(e => e.id.includes('central-vpce-sharing'))
+    expect(shareEdge).toBeDefined()
+    expect(shareEdge?.source).toBe('vpc:Workload-VPC:Workload')
+    expect(shareEdge?.target).toBe('vpc:Shared-VPC:Network')
+    expect(shareEdge?.kind).toBe('peering')
+  })
 })

@@ -1,4 +1,4 @@
-import type { GraphEdge, GraphModel, GraphNode, NetworkConfig, NodeKind } from './types'
+import type { GraphEdge, GraphModel, GraphNode, NetworkConfig, NodeKind, Route53ResolverRuleConfig } from './types'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
 function subnetKind(name: string): NodeKind {
@@ -19,6 +19,15 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       accountsSeen.add(account)
       nodes.push({ id: `account:${account}`, kind: 'account', label: account, data: { kind: 'account' } })
     }
+  }
+
+  // ── Pre-compute Route 53 resolver rules matching ──
+  const rulesByEndpointName = new Map<string, Route53ResolverRuleConfig[]>()
+  for (const r of networkConfig.centralNetworkServices?.route53Resolver?.rules ?? []) {
+    const endpointName = r.resolverEndpoint ?? 'default'
+    const arr = rulesByEndpointName.get(endpointName) ?? []
+    arr.push(r)
+    rulesByEndpointName.set(endpointName, arr)
   }
 
   // ── Pre-compute RT associations: (tgwName, accountName) → Set<rtName> ──────
@@ -214,7 +223,15 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       id:   vpcId,
       kind: 'vpc',
       label: vpc.name,
-      data: { kind: 'vpc', account: vpc.account, region: vpc.region, cidrs: vpc.cidrs, internetGateway: vpc.internetGateway },
+      data: {
+        kind: 'vpc',
+        account: vpc.account,
+        region: vpc.region,
+        cidrs: vpc.cidrs,
+        internetGateway: vpc.internetGateway,
+        resolverRules: vpc.resolverRules,
+        dnsFirewallRuleGroups: vpc.dnsFirewallRuleGroups
+      },
       parentId: regionId,
     })
 
@@ -324,6 +341,42 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
       }
     }
 
+    // Parser Interface Endpoints inside subnets
+    const ieConfig = vpc.interfaceEndpoints
+    if (ieConfig) {
+      const targetSubnets = ieConfig.subnets ?? vpc.subnets?.map(s => s.name) ?? []
+      for (const ep of ieConfig.endpoints ?? []) {
+        for (const subName of targetSubnets) {
+          const subNodeId = `subnet:${vpcId}:${subName}`
+          if (nodes.some(n => n.id === subNodeId)) {
+            nodes.push({
+              id: `vpce:${vpcId}:${ep.service}:${subName}`,
+              kind: 'service',
+              label: `${ieConfig.central ? 'Central ' : ''}VPCE (${ep.service})`,
+              data: { service: ep.service, central: ieConfig.central, kind: 'service' },
+              parentId: subNodeId
+            })
+          }
+        }
+      }
+    }
+
+    // Parser Gateway Endpoints inside subnets
+    const geConfig = vpc.gatewayEndpoints
+    if (geConfig && vpc.subnets && vpc.subnets.length > 0) {
+      const firstSubName = vpc.subnets[0].name
+      const subNodeId = `subnet:${vpcId}:${firstSubName}`
+      for (const ep of geConfig.endpoints ?? []) {
+        nodes.push({
+          id: `vpce-gw:${vpcId}:${ep.service}:${firstSubName}`,
+          kind: 'service',
+          label: `Gateway VPCE (${ep.service})`,
+          data: { service: ep.service, gateway: true, kind: 'service' },
+          parentId: subNodeId
+        })
+      }
+    }
+
     // ③ TGW attachment edges with route table label
     for (const att of vpc.transitGatewayAttachments ?? []) {
       const tgwCfg = networkConfig.transitGateways?.find((t) => t.name === att.transitGateway.name)
@@ -351,6 +404,59 @@ export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
           target: `tgw-rt:${prop.routeTableName}`,
           kind: 'propagation',
           label: 'Propagates',
+        })
+      }
+    }
+  }
+
+  // Create Route 53 Resolvers
+  const r53Resolver = networkConfig.centralNetworkServices?.route53Resolver
+  if (r53Resolver && r53Resolver.endpoints) {
+    for (const endpoint of r53Resolver.endpoints) {
+      // Find endpoint host VPC
+      const targetVpc = networkConfig.vpcs?.find(v => v.name === endpoint.vpc)
+      if (targetVpc) {
+        const targetVpcId = `vpc:${targetVpc.name}:${targetVpc.account}`
+        const combinedRules = [
+          ...(endpoint.rules ?? []),
+          ...(rulesByEndpointName.get(endpoint.name) ?? [])
+        ]
+        for (const subName of endpoint.subnets) {
+          const subNodeId = `subnet:${targetVpcId}:${subName}`
+          if (nodes.some(n => n.id === subNodeId)) {
+            nodes.push({
+              id: `route53:resolver:${endpoint.name}:${subName}`,
+              kind: 'route53',
+              label: `Resolver (${endpoint.type})`,
+              data: {
+                kind: 'route53',
+                name: endpoint.name,
+                type: endpoint.type,
+                allowedCidrs: endpoint.allowedCidrs,
+                securityGroupNames: endpoint.securityGroupNames,
+                rules: combinedRules
+              },
+              parentId: subNodeId
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // Central VPCE logical edges
+  const centralVpc = networkConfig.vpcs?.find(v => v.interfaceEndpoints?.central)
+  if (centralVpc) {
+    const centralVpcId = `vpc:${centralVpc.name}:${centralVpc.account}`
+    for (const otherVpc of networkConfig.vpcs ?? []) {
+      if (otherVpc.useCentralEndpoints && otherVpc.name !== centralVpc.name) {
+        const spokeVpcId = `vpc:${otherVpc.name}:${otherVpc.account}`
+        edges.push({
+          id: `central-vpce-sharing:${spokeVpcId}->${centralVpcId}`,
+          source: spokeVpcId,
+          target: centralVpcId,
+          kind: 'peering',
+          label: 'Uses Central VPCE'
         })
       }
     }
