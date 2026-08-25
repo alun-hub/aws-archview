@@ -338,4 +338,77 @@ describe('networkParser', () => {
     expect(partialModel.nodes.length).toBe(3) // account, region, vpc
     expect(partialModel.edges.length).toBe(0)
   })
+
+  it('should parse external rules file with Suricata rules and list entries', () => {
+    const config: NetworkConfig = {
+      centralNetworkServices: {
+        networkFirewall: {
+          firewalls: [
+            { name: 'Central-FW', vpc: 'Central-VPC', subnets: ['Firewall-Subnet-A'] }
+          ],
+          rules: [
+            {
+              name: 'Group-1',
+              type: 'STATEFUL',
+              ruleGroup: {
+                rulesSource: {
+                  rulesFile: 'config/firewall-rules/rules.txt'
+                }
+              }
+            }
+          ]
+        }
+      },
+      vpcs: [
+        {
+          name: 'Central-VPC',
+          account: 'Network',
+          region: 'eu-west-1',
+          cidrs: ['10.0.0.0/16'],
+          subnets: [
+            { name: 'Firewall-Subnet-A', availabilityZone: 'a', routeTable: 'FW-RT', ipv4CidrBlock: '10.0.1.0/24' }
+          ]
+        }
+      ]
+    }
+
+    const loadedFiles = {
+      'my-project/config/firewall-rules/rules.txt': `
+        # This is a comment
+        pass tcp 10.0.0.0/8 any -> 0.0.0.0/0 80 (msg:"Allow http"; sid:1;)
+        drop ip $HOME_NET any -> $EXTERNAL_NET any (msg:"Drop all"; sid:2;)
+        .blocked-domain.com
+        10.99.0.0/16
+      `
+    }
+
+    const model = parseNetwork(config, loadedFiles)
+
+    const fwNode = model.nodes.find(n => n.kind === 'network-firewall')
+    expect(fwNode).toBeDefined()
+    expect(fwNode?.data.rules).toBeDefined()
+
+    const rules = fwNode?.data.rules as any[]
+    const parsedRules = rules[0].ruleGroup.rulesSource.statefulRules
+    expect(parsedRules).toBeDefined()
+    expect(parsedRules.length).toBe(4) // 2 suricata rules + 2 list entries
+
+    // Check Suricata rules
+    expect(parsedRules[0].action).toBe('PASS')
+    expect(parsedRules[0].header.protocol).toBe('TCP')
+    expect(parsedRules[0].header.source).toBe('10.0.0.0/8')
+    expect(parsedRules[0].ruleOptions[0].settings[0]).toBe('Allow http')
+
+    expect(parsedRules[1].action).toBe('DROP')
+    expect(parsedRules[1].header.protocol).toBe('IP')
+    expect(parsedRules[1].ruleOptions[0].settings[0]).toBe('Drop all')
+
+    // Check list entry fallback rules
+    expect(parsedRules[2].action).toBe('LIST_ENTRY')
+    expect(parsedRules[2].header.destination).toBe('.blocked-domain.com')
+
+    expect(parsedRules[3].action).toBe('LIST_ENTRY')
+    expect(parsedRules[3].header.destination).toBe('10.99.0.0/16')
+  })
 })
+
