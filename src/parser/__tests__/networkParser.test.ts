@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseNetwork } from '../networkParser'
-import type { NetworkConfig } from '../types'
+import type { NetworkConfig, FirewallRuleGroupConfig } from '../types'
+
 
 describe('networkParser', () => {
   it('should parse individual subnets instead of grouping them', () => {
@@ -388,20 +389,22 @@ describe('networkParser', () => {
     expect(fwNode).toBeDefined()
     expect(fwNode?.data.rules).toBeDefined()
 
-    const rules = fwNode?.data.rules as any[]
-    const parsedRules = rules[0].ruleGroup.rulesSource.statefulRules
+    const rules = fwNode?.data.rules as FirewallRuleGroupConfig[]
+    const parsedRules = rules[0].ruleGroup?.rulesSource.statefulRules
     expect(parsedRules).toBeDefined()
+    if (!parsedRules) throw new Error('Rules should be defined')
+
     expect(parsedRules.length).toBe(4) // 2 suricata rules + 2 list entries
 
     // Check Suricata rules
     expect(parsedRules[0].action).toBe('PASS')
     expect(parsedRules[0].header.protocol).toBe('TCP')
     expect(parsedRules[0].header.source).toBe('10.0.0.0/8')
-    expect(parsedRules[0].ruleOptions[0].settings[0]).toBe('Allow http')
+    expect(parsedRules[0].ruleOptions?.[0]?.settings?.[0]).toBe('Allow http')
 
     expect(parsedRules[1].action).toBe('DROP')
     expect(parsedRules[1].header.protocol).toBe('IP')
-    expect(parsedRules[1].ruleOptions[0].settings[0]).toBe('Drop all')
+    expect(parsedRules[1].ruleOptions?.[0]?.settings?.[0]).toBe('Drop all')
 
     // Check list entry fallback rules
     expect(parsedRules[2].action).toBe('LIST_ENTRY')
