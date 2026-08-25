@@ -152,9 +152,9 @@ export function buildOrganizationGraph(configs: LzaConfigs) {
   return parseOrganization(configs.organization, configs.accounts, configs.security, configs.iam)
 }
 
-export function buildNetworkGraph(configs: LzaConfigs) {
+export function buildNetworkGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
   if (!configs.network) return null
-  return parseNetwork(configs.network)
+  return parseNetwork(configs.network, loadedFiles)
 }
 
 export function buildGlobalGraph(configs: LzaConfigs) {

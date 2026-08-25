@@ -9,7 +9,7 @@ function subnetKind(name: string): NodeKind {
   return 'subnet-private'
 }
 
-export function parseNetwork(networkConfig: NetworkConfig): GraphModel {
+export function parseNetwork(networkConfig: NetworkConfig, _loadedFiles?: Record<string, string>): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()

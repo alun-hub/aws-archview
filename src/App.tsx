@@ -224,13 +224,13 @@ function AppContent() {
     }
     return {
       organization:   safe(() => buildOrganizationGraph(config.configs)),
-      network:        safe(() => buildNetworkGraph(config.configs)),
+      network:        safe(() => buildNetworkGraph(config.configs, config.loadedFiles)),
       global:         safe(() => buildGlobalGraph(config.configs)),
       customizations: safe(() => buildCustomizationsGraph(config.configs, config.aggregateStacks)),
       security:       safe(() => buildSecurityGraph(config.configs)),
       iam:            safe(() => buildIamGraph(config.configs)),
     }
-  }, [config.configs, config.aggregateStacks])
+  }, [config.configs, config.aggregateStacks, config.loadedFiles])
 
   const activeEntry  = graphs[config.activeView]
   const activeGraph  = activeEntry?.graph ?? null
