@@ -227,7 +227,7 @@ function getFlattenedRules(rulesConfig: unknown): FlattenedRule[] {
     }
 
     // External rule file
-    if (rulesSource.rulesFile) {
+    if (rulesSource.rulesFile && (!rulesSource.statefulRules || rulesSource.statefulRules.length === 0)) {
       flattened.push({
         type: type,
         groupName,
@@ -462,7 +462,8 @@ export function DetailPanel({ node }: Props) {
       cell: item => (
         <Box variant="span" fontWeight="bold" color={
           item.action === 'PASS' || item.action.includes('forward') ? 'text-status-success' :
-          item.action === 'DROP' ? 'text-status-error' : 'text-label'
+          item.action === 'DROP' ? 'text-status-error' :
+          item.action === 'LIST_ENTRY' ? 'text-status-info' : 'text-label'
         }>
           {item.action}
         </Box>
