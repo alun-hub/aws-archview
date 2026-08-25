@@ -18,9 +18,9 @@ function findFileContent(path: string, loadedFiles: Record<string, string>): str
       return v
     }
   }
-  const basename = path.split('/').pop()!
+  const basename = path.split(/[\\/]/).pop()!
   for (const [k, v] of Object.entries(loadedFiles)) {
-    if (k.split('/').pop() === basename) {
+    if (k.split(/[\\/]/).pop() === basename) {
       return v
     }
   }
