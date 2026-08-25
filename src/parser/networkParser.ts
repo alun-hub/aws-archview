@@ -1,4 +1,4 @@
-import type { GraphEdge, GraphModel, GraphNode, NetworkConfig, NodeKind, Route53ResolverRuleConfig } from './types'
+import type { GraphEdge, GraphModel, GraphNode, NetworkConfig, NodeKind, Route53ResolverRuleConfig, StatefulRule } from './types'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
 function subnetKind(name: string): NodeKind {
@@ -9,7 +9,100 @@ function subnetKind(name: string): NodeKind {
   return 'subnet-private'
 }
 
-export function parseNetwork(networkConfig: NetworkConfig, _loadedFiles?: Record<string, string>): GraphModel {
+function findFileContent(path: string, loadedFiles: Record<string, string>): string | undefined {
+  if (loadedFiles[path] != null) return loadedFiles[path]
+  const pathSuffix = path.replace(/^[.\\/]+/, '')
+  for (const [k, v] of Object.entries(loadedFiles)) {
+    const keySuffix = k.replace(/^[.\\/]+/, '')
+    if (keySuffix.endsWith(pathSuffix) || pathSuffix.endsWith(keySuffix)) {
+      return v
+    }
+  }
+  const basename = path.split('/').pop()!
+  for (const [k, v] of Object.entries(loadedFiles)) {
+    if (k.split('/').pop() === basename) {
+      return v
+    }
+  }
+  return undefined
+}
+
+function parseSuricataRules(fileContent: string): StatefulRule[] {
+  const rules: StatefulRule[] = []
+  const lines = fileContent.split(/\r?\n/)
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) {
+      continue
+    }
+
+    const parenIndex = trimmed.indexOf('(')
+    let headerPart = trimmed
+    let optionsPart = ''
+
+    if (parenIndex !== -1 && trimmed.endsWith(')')) {
+      headerPart = trimmed.substring(0, parenIndex).trim()
+      optionsPart = trimmed.substring(parenIndex + 1, trimmed.length - 1).trim()
+    }
+
+    const tokens = headerPart.split(/\s+/)
+    if (tokens.length === 7 && /^(pass|drop|alert|reject|log|nodrop)$/i.test(tokens[0])) {
+      const [rawAction, rawProtocol, source, sourcePort, direction, destination, destinationPort] = tokens
+      const action = rawAction.toUpperCase()
+      const protocol = rawProtocol.toUpperCase()
+
+      const ruleOptions: { keyword: string; settings?: string[] }[] = []
+      if (optionsPart) {
+        const rawOptions = optionsPart.split(';').map(o => o.trim()).filter(Boolean)
+        for (const opt of rawOptions) {
+          const colonIdx = opt.indexOf(':')
+          if (colonIdx !== -1) {
+            const keyword = opt.substring(0, colonIdx).trim()
+            let val = opt.substring(colonIdx + 1).trim()
+            if (val.startsWith('"') && val.endsWith('"')) {
+              val = val.slice(1, -1)
+            }
+            ruleOptions.push({ keyword, settings: [val] })
+          } else {
+            ruleOptions.push({ keyword: opt })
+          }
+        }
+      }
+
+      rules.push({
+        action,
+        header: {
+          protocol,
+          source,
+          sourcePort,
+          direction,
+          destination,
+          destinationPort,
+        },
+        ...(ruleOptions.length > 0 ? { ruleOptions } : {})
+      })
+    } else {
+      // Plain list entry (e.g. domain list or IP list)
+      rules.push({
+        action: 'LIST_ENTRY',
+        header: {
+          protocol: 'ANY',
+          source: 'ANY',
+          sourcePort: 'ANY',
+          direction: 'FORWARD',
+          destination: trimmed,
+          destinationPort: 'ANY',
+        },
+        ruleOptions: [{ keyword: 'msg', settings: [`List item: ${trimmed}`] }]
+      })
+    }
+  }
+
+  return rules
+}
+
+export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<string, string>): GraphModel {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()
@@ -312,7 +405,36 @@ export function parseNetwork(networkConfig: NetworkConfig, _loadedFiles?: Record
       }
 
       if (hasFw) {
-        const rules = networkConfig.centralNetworkServices?.networkFirewall?.rules ?? []
+        const rawRules = networkConfig.centralNetworkServices?.networkFirewall?.rules ?? []
+        const rules = rawRules.map((group) => {
+          const clonedGroup = {
+            ...group,
+            ruleGroup: group.ruleGroup
+              ? {
+                  ...group.ruleGroup,
+                  rulesSource: {
+                    ...group.ruleGroup.rulesSource,
+                    statefulRules: group.ruleGroup.rulesSource.statefulRules
+                      ? [...group.ruleGroup.rulesSource.statefulRules]
+                      : undefined,
+                  },
+                }
+              : undefined,
+          }
+
+          if (clonedGroup.ruleGroup?.rulesSource.rulesFile && loadedFiles) {
+            const fileContent = findFileContent(clonedGroup.ruleGroup.rulesSource.rulesFile, loadedFiles)
+            if (fileContent) {
+              const parsedRules = parseSuricataRules(fileContent)
+              clonedGroup.ruleGroup.rulesSource.statefulRules = [
+                ...(clonedGroup.ruleGroup.rulesSource.statefulRules ?? []),
+                ...parsedRules,
+              ]
+            }
+          }
+          return clonedGroup
+        })
+
         nodes.push({
           id: `fw:${vpcId}:${subnet.name}`,
           kind: 'network-firewall',
