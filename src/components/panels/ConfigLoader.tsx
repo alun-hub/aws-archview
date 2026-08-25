@@ -33,11 +33,11 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
   const processFiles = useCallback(
     (files: File[]) => {
       for (const file of files) {
-        if (!file.name.match(/\.(yaml|yml)$/i)) continue
+        if (!file.name.match(/\.(yaml|yml|txt|rules)$/i)) continue
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
-          dispatch({ type: 'SET_FILE', filename: file.name, content })
+          dispatch({ type: 'SET_FILE', filename: file.webkitRelativePath || file.name, content })
         }
         reader.readAsText(file)
       }
@@ -132,7 +132,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         <input
           ref={fileInputRef}
           type="file"
-          accept=".yaml,.yml"
+          accept=".yaml,.yml,.txt,.rules"
           multiple
           style={{ display: 'none' }}
           onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
