@@ -63,10 +63,10 @@ You can package and run AWS ArchView as a standalone desktop application using E
 npm run electron:build
 
 # 2. Make it executable
-chmod +x dist-desktop/AWS\ ArchView-0.1.12.AppImage
+chmod +x "dist-desktop/AWS ArchView-0.1.24.AppImage"
 
 # 3. Run the application standalone
-./dist-desktop/AWS\ ArchView-0.1.12.AppImage
+./"dist-desktop/AWS ArchView-0.1.24.AppImage"
 ```
 
 ---
@@ -88,8 +88,9 @@ Drag and drop your LZA YAML configuration files directly onto the **Configuratio
 
 ### 2. Try the Samples
 The repository includes test configs you can drag-and-drop to try out the visualizer:
-- **`samples/`**: A minimal set of configurations covering all basic views.
-- **`samples-adv/`**: A richer enterprise configuration demonstrating advanced networks (Transit Gateways, route tables, VPNs, and VPC Peerings).
+- **`samples/`** — A minimal set of configurations covering all basic views.
+- **`samples-adv/`** — A richer enterprise configuration demonstrating advanced networks (Transit Gateways, route tables, VPNs, and VPC Peerings).
+- **`samples-includes/`** — An advanced configuration demonstrating split-file configurations using the `!include` tag resolver.
 
 ---
 
