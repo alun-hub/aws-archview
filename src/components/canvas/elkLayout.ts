@@ -295,14 +295,26 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
     }
   }
 
-  // Map high-level edges
-  const elkEdges = edges
-    .filter(e => elkNodesMap.has(e.source) && elkNodesMap.has(e.target))
-    .map(e => ({
+  // Map high-level edges, translating any endpoints that are inner VPC nodes to their parent VPC
+  const getElkTargetId = (nodeId: string): string => {
+    if (elkNodesMap.has(nodeId)) return nodeId
+    let curr = nodeMap.get(nodeId)
+    while (curr && curr.parentId) {
+      if (elkNodesMap.has(curr.parentId)) return curr.parentId
+      curr = nodeMap.get(curr.parentId)
+    }
+    return nodeId
+  }
+
+  const elkEdges = edges.map(e => {
+    const sId = getElkTargetId(e.source)
+    const tId = getElkTargetId(e.target)
+    return {
       id: e.id,
-      sources: [e.source],
-      targets: [e.target]
-    }))
+      sources: [sId],
+      targets: [tId]
+    }
+  }).filter(e => elkNodesMap.has(e.sources[0]) && elkNodesMap.has(e.targets[0]))
 
   const elkGraph = {
     id: 'root-graph',
