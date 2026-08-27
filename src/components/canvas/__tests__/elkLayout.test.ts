@@ -72,4 +72,28 @@ describe('elkLayout', () => {
     expect(serviceNode?.position.x).toBe(20) // relative position inside subnet (PAD_H)
     expect(serviceNode?.position.y).toBe(60) // relative position inside subnet (PAD_TOP)
   })
+
+  it('should map edges from inner VPC nodes to parent VPC nodes for ELK optimization', async () => {
+    const nodes: Node[] = [
+      { id: 'root', type: 'root', data: { label: 'Root', kind: 'root' }, position: { x: 0, y: 0 } },
+      { id: 'account:prod', type: 'account', data: { label: 'Production', kind: 'account' }, position: { x: 0, y: 0 }, parentId: 'root' },
+      { id: 'vpc:prod-vpc-1', type: 'vpc', data: { label: 'ProdVPC1', kind: 'vpc' }, position: { x: 0, y: 0 }, parentId: 'account:prod' },
+      { id: 'subnet:prod-public-1', type: 'subnet-public', data: { label: 'ProdPublicSubnet1', kind: 'subnet-public', az: 'us-east-1a' }, position: { x: 0, y: 0 }, parentId: 'vpc:prod-vpc-1' },
+      { id: 'service:web-server', type: 'service', data: { label: 'WebServer', kind: 'service' }, position: { x: 0, y: 0 }, parentId: 'subnet:prod-public-1' },
+      { id: 'vpc:prod-vpc-2', type: 'vpc', data: { label: 'ProdVPC2', kind: 'vpc' }, position: { x: 0, y: 0 }, parentId: 'account:prod' },
+      { id: 'subnet:prod-public-2', type: 'subnet-public', data: { label: 'ProdPublicSubnet2', kind: 'subnet-public', az: 'us-east-1a' }, position: { x: 0, y: 0 }, parentId: 'vpc:prod-vpc-2' },
+      { id: 'service:db-server', type: 'service', data: { label: 'DBServer', kind: 'service' }, position: { x: 0, y: 0 }, parentId: 'subnet:prod-public-2' },
+    ]
+    const edges: Edge[] = [
+      { id: 'edge-1', source: 'service:web-server', target: 'service:db-server' }
+    ]
+
+    const result = await applyElkLayout(nodes, edges)
+    expect(result).toHaveLength(8)
+
+    const webServer = result.find(n => n.id === 'service:web-server')
+    const dbServer = result.find(n => n.id === 'service:db-server')
+    expect(webServer?.position.x).toBe(20)
+    expect(dbServer?.position.x).toBe(20)
+  })
 })
