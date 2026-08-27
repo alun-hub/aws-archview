@@ -181,16 +181,37 @@ function escapeXml(s: string): string {
     .replace(/'/g, '&apos;')
 }
 
+function getAbsolutePosition(node: Node, nodesMap: Map<string, Node>): { x: number; y: number } {
+  let x = node.position.x
+  let y = node.position.y
+  let curr = node
+  while (curr.parentId) {
+    const parent = nodesMap.get(curr.parentId)
+    if (!parent) break
+    x += parent.position.x
+    y += parent.position.y
+    curr = parent
+  }
+  return { x, y }
+}
+
 export function exportToDrawio(nodes: Node[], edges: Edge[], label = 'archview'): void {
+  const nodesMap = new Map(nodes.map((n) => [n.id, n]))
+
   // Nodes are ordered parents-first so draw.io renders containers correctly
   const nodeCells = nodes.map((n) => {
     const kind      = (n.data as { kind?: string })?.kind ?? ''
     const nodeLabel = (n.data as { label?: string })?.label ?? n.id
-    const x         = Math.round(n.position.x)
-    const y         = Math.round(n.position.y)
+    
+    // Calculate absolute position to prevent overlapping in Draw.io's nested layout
+    const absPos    = getAbsolutePosition(n, nodesMap)
+    const x         = Math.round(absPos.x)
+    const y         = Math.round(absPos.y)
     const w         = Math.round((n.width  ?? 100) as number)
     const h         = Math.round((n.height ?? 60)  as number)
-    const parent    = n.parentId ?? '1'
+    
+    // Set parent to '1' (flat layout) to bypass Draw.io's buggy nested coordinate resolution
+    const parent    = '1'
 
     const containerStyle = DRAWIO_CONTAINER_STYLE[kind]
     const resourceStyle  = DRAWIO_RESOURCE_STYLE[kind]

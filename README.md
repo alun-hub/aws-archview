@@ -63,10 +63,10 @@ You can package and run AWS ArchView as a standalone desktop application using E
 npm run electron:build
 
 # 2. Make it executable
-chmod +x "dist-desktop/AWS ArchView-0.1.24.AppImage"
+chmod +x "dist-desktop/AWS ArchView-0.1.25.AppImage"
 
 # 3. Run the application standalone
-./"dist-desktop/AWS ArchView-0.1.24.AppImage"
+./"dist-desktop/AWS ArchView-0.1.25.AppImage"
 ```
 
 ---
