@@ -303,8 +303,8 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
       'elk.padding': `[top=${n.parentId ? 40 : 60},left=20,bottom=20,right=20]`
     }
 
-    // In Organization/IAM/Security/Global views (non-network), pack accounts inside OUs using rectpacking to form grid/box layouts
-    if (!isNetworkView && kind === 'ou' && n.id !== 'root') {
+    // In Organization/IAM/Security/Global/Customizations views (non-network), pack nodes inside OUs and Accounts using rectpacking to form grid/box layouts
+    if (!isNetworkView && (kind === 'ou' || kind === 'account') && n.id !== 'root') {
       layoutOpts['elk.algorithm'] = 'rectpacking'
       layoutOpts['elk.aspectRatio'] = '1.6'
     }
