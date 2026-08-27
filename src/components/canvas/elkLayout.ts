@@ -39,6 +39,30 @@ function computeBox(
   id: string,
   byParent: Map<string, Node[]>,
   nodeMap: Map<string, Node>,
+  boxCache?: Map<string, BoxResult>,
+): BoxResult {
+  if (boxCache?.has(id)) return boxCache.get(id)!
+  
+  if (!nodeMap.has(id)) {
+    const fallback = {
+      width: 120,
+      height: 160,
+      childPos: new Map(),
+    }
+    boxCache?.set(id, fallback)
+    return fallback
+  }
+
+  const result = computeBoxInternal(id, byParent, nodeMap, boxCache)
+  boxCache?.set(id, result)
+  return result
+}
+
+function computeBoxInternal(
+  id: string,
+  byParent: Map<string, Node[]>,
+  nodeMap: Map<string, Node>,
+  boxCache?: Map<string, BoxResult>,
 ): BoxResult {
   const node = nodeMap.get(id)!
   const children = byParent.get(id) ?? []
@@ -53,7 +77,7 @@ function computeBox(
 
   const childBoxes = children.map((c) => ({
     id: c.id,
-    box: computeBox(c.id, byParent, nodeMap),
+    box: computeBox(c.id, byParent, nodeMap, boxCache),
   }))
 
   const parentKind = (node.data as { kind?: string })?.kind ?? ''
@@ -199,11 +223,12 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
   }
 
   // 1. Pre-calculate size and internal layout of VPCs using original computeBox
+  const boxCache = new Map<string, BoxResult>()
   const vpcNodes = nodes.filter(n => (n.data as { kind?: string })?.kind === 'vpc')
   const vpcInternalLayouts = new Map<string, { width: number; height: number; childPos: Map<string, { x: number; y: number }> }>()
   
   for (const vpc of vpcNodes) {
-    const box = computeBox(vpc.id, byParent, nodeMap)
+    const box = computeBox(vpc.id, byParent, nodeMap, boxCache)
     vpcInternalLayouts.set(vpc.id, box)
   }
 
@@ -329,10 +354,10 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
 
     // 2. If it's an inner node (descendant of VPC) that has a parent
     if (node.parentId) {
-      const parentBox = computeBox(node.parentId, byParent, nodeMap)
+      const parentBox = computeBox(node.parentId, byParent, nodeMap, boxCache)
       const pos       = parentBox.childPos.get(node.id)
       if (pos) {
-        const childBox  = computeBox(node.id, byParent, nodeMap)
+        const childBox  = computeBox(node.id, byParent, nodeMap, boxCache)
         return {
           ...node,
           position: { x: pos.x, y: pos.y },
