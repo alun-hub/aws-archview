@@ -413,14 +413,15 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
   const elkGraph = {
     id: 'root-graph',
     layoutOptions: {
-      'elk.algorithm': 'layered',
+      'elk.algorithm': isNetworkView ? 'layered' : 'rectpacking',
       'elk.direction': 'DOWN',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.spacing.nodeNode': '60',
-      'elk.spacing.nodeNodeBetweenLayers': '80'
+      'elk.spacing.nodeNodeBetweenLayers': '80',
+      ...(!isNetworkView ? { 'elk.aspectRatio': '1.6' } : {})
     },
     children: elkRoots,
     edges: elkEdges
