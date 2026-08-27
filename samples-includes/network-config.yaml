@@ -35,6 +35,25 @@ customerGateways:
           - tunnelInsideCidr: 169.254.100.0/30
           - tunnelInsideCidr: 169.254.100.4/30
 
+directConnectGateways:
+  - name: Accelerator-DXGW
+    asn: 64512
+    virtualInterfaces:
+      - name: Accelerator-VIF
+        connectionId: dx-12345678
+        customerAsn: 64513
+        type: transit
+        region: {{HOME_REGION}}
+        vlan: 100
+    transitGatewayAssociations:
+      - name: Main-TGW
+        account: Network
+        region: {{HOME_REGION}}
+        routeTableAssociations:
+          - VPN-RT
+        allowedPrefixes:
+          - 10.0.0.0/8
+
 transitGatewayRouteTables:
   - name: Hub-RT
     transitGateway: Main-TGW
@@ -47,6 +66,39 @@ vpcs: !include include/vpcs.yaml
 
 centralNetworkServices:
   delegatedAdminAccount: Network
+  networkFirewall:
+    firewalls:
+      - name: Inspection-Firewall
+        vpc: Inspection-VPC
+        subnets:
+          - Firewall-Subnet-A
+          - Firewall-Subnet-B
+    rules:
+      - name: Inspection-Stateless-Rules
+        type: STATELESS
+        capacity: 100
+        ruleGroup:
+          rulesSource:
+            statelessRulesAndCustomActions:
+              statelessRules:
+                - priority: 10
+                  ruleDefinition:
+                    actions:
+                      - aws:forward_to_sfe
+                    matchAttributes:
+                      sources:
+                        - addressDefinition: 0.0.0.0/0
+                      destinations:
+                        - addressDefinition: 0.0.0.0/0
+      # Stateful rules are kept out of the YAML entirely and pulled from a
+      # plain-text Suricata rules file via rulesFile — see
+      # include/firewall-rules.txt for the actual rule definitions.
+      - name: Inspection-Stateful-Rules
+        type: STATEFUL
+        capacity: 200
+        ruleGroup:
+          rulesSource:
+            rulesFile: include/firewall-rules.txt
   route53Resolver:
     endpoints:
       - name: central-outbound-resolver

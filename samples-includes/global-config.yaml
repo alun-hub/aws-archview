@@ -33,6 +33,15 @@ backup:
       deploymentTargets:
         organizationalUnits:
           - Root
+snsTopics:
+  topics:
+    - name: Security-Alerts
+      emailAddresses:
+        - secops@{{EMAIL_DOMAIN}}
+    - name: Budget-Alerts
+      emailAddresses:
+        - finance@{{EMAIL_DOMAIN}}
+        - secops@{{EMAIL_DOMAIN}}
 tags:
   - key: Accelerator
     value: AWSAccelerator

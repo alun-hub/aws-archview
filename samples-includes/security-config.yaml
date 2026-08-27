@@ -1,20 +1,39 @@
 # AWS Landing Zone Accelerator Security Configuration
 #
-securityHub:
-  enable: true
-  excludeRegions: []
-  standards:
-    - aws-foundational-security-best-practices-v1.0.0
-    - cis-aws-foundational-benchmarks-v1.2.0
-guardduty:
-  enable: true
-  s3Protection:
+# Uses the newer nested centralSecurityServices shape (as opposed to the
+# flat top-level fields in samples/security-config.yaml) — the parser
+# supports both, and this exercises the full set of services it renders.
+centralSecurityServices:
+  delegatedAdminAccount: Audit
+  securityHub:
     enable: true
-macie:
-  enable: true
-  policyFindingsPublishingFrequency: FIFTEEN_MINUTES
-awsConfig:
-  enableConfigurationRecorder: true
-  enableDeliveryChannel: true
-cloudtrail:
-  enable: true
+    standards:
+      - aws-foundational-security-best-practices-v1.0.0
+      - cis-aws-foundational-benchmarks-v1.2.0
+  guardDuty:
+    enable: true
+    s3Protection:
+      enable: true
+  macie:
+    enable: true
+    policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+  config:
+    enableConfigurationRecorder: true
+    enableDeliveryChannel: true
+  cloudtrail:
+    enable: true
+    organizationTrail: true
+    s3BucketName: aws-accelerator-cloudtrail
+  inspector:
+    enable: true
+    enableScanTypes:
+      - EC2
+      - ECR
+  detective:
+    enable: true
+  auditManager:
+    enable: true
+  accessAnalyzer:
+    enable: true
+  cloudwatch:
+    enable: true

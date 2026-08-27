@@ -1,0 +1,17 @@
+# Suricata-format stateful rules for the Inspection VPC's Network Firewall.
+# Referenced from network-config.yaml via centralNetworkServices.networkFirewall
+# .rules[].ruleGroup.rulesSource.rulesFile — LZA supports pulling stateful rules
+# out of the YAML and into a plain-text file like this one so large rule sets
+# don't bloat the config. Lines that aren't valid 7-token Suricata rules (the
+# domain and CIDR block below) are still picked up as simple block-list entries.
+
+pass tcp $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Allow outbound HTTPS"; sid:20001;)
+pass tcp $HOME_NET any -> $EXTERNAL_NET 80 (msg:"Allow outbound HTTP"; sid:20002;)
+drop tcp any any -> $HOME_NET 3389 (msg:"Block inbound RDP from anywhere"; sid:20003;)
+drop udp any any -> $HOME_NET 3389 (msg:"Block inbound RDP (UDP) from anywhere"; sid:20004;)
+alert tls $HOME_NET any -> $EXTERNAL_NET 443 (msg:"Alert on TLS to known bad domain"; tls.sni; content:"malicious-c2.example"; sid:20005;)
+
+# Simple block-list entries (not full Suricata syntax) — the parser falls
+# back to treating these as destination-only LIST_ENTRY rules.
+.malicious-c2.example
+198.51.100.0/24

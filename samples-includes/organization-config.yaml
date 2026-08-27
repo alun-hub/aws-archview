@@ -18,8 +18,16 @@ organizationalUnits:
 serviceControlPolicies:
   - name: DenyRootUser
     description: Deny root user actions
+    policy: service-control-policies/deny-root-user.json
     deploymentTargets:
       organizationalUnits:
         - Security
         - Infrastructure
         - Workloads
+  - name: DenyLeavingOrganization
+    description: Prevent accounts from leaving the organization
+    policy: service-control-policies/deny-leave-org.json
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Sandbox

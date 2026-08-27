@@ -8,9 +8,40 @@ permissionSets:
   - name: AdministratorAccess
     description: Full administrative access to AWS services and resources.
     sessionDuration: PT12H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/AdministratorAccess
   - name: Billing
     description: Access to billing, cost management, and payment methods.
     sessionDuration: PT4H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/job-function/Billing
   - name: SecurityAudit
     description: Read-only access for security audits and log analysis.
     sessionDuration: PT8H
+    awsManagedPolicies:
+      - arn:aws:iam::aws:policy/SecurityAudit
+    customerManagedPolicies:
+      - name: Accelerator-LogReadOnly
+
+identityCenterAssignments:
+  - name: Admins-To-Management
+    permissionSetName: AdministratorAccess
+    principalType: GROUP
+    principalId: AWS-Accelerator-Admins
+    deploymentTargets:
+      accounts:
+        - Management
+  - name: Billing-To-Root
+    permissionSetName: Billing
+    principalType: GROUP
+    principalId: AWS-Accelerator-Billing
+    deploymentTargets:
+      organizationalUnits:
+        - Root
+  - name: SecurityAudit-To-Security
+    permissionSetName: SecurityAudit
+    principalType: GROUP
+    principalId: AWS-Accelerator-SecurityAudit
+    deploymentTargets:
+      organizationalUnits:
+        - Security

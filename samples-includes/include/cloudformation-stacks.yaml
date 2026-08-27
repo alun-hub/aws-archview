@@ -19,6 +19,9 @@
   template: cfn-templates/network-firewall-policy.yaml
   runOrder: 2
   terminationProtection: true
+  parameters:
+    - name: LoggingBucket
+      value: aws-accelerator-firewall-logs
 
 - name: SC-Sandbox-Guardrails
   description: Budget and tagging guardrails for sandbox accounts
