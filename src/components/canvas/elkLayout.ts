@@ -295,15 +295,26 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
   // 3. Build ELK Hierarchical Graph
   const elkNodesMap = new Map<string, ElkNode>()
   
+  const isNetworkView = nodes.some(x => (x.data as { kind?: string })?.kind === 'vpc' || (x.data as { kind?: string })?.kind === 'tgw')
+
   for (const n of preparedHighLevelNodes) {
+    const kind = (n.data as { kind?: string })?.kind
+    const layoutOpts: Record<string, string> = {
+      'elk.padding': `[top=${n.parentId ? 40 : 60},left=20,bottom=20,right=20]`
+    }
+
+    // In Organization/IAM/Security/Global views (non-network), pack accounts inside OUs using rectpacking to form grid/box layouts
+    if (!isNetworkView && kind === 'ou' && n.id !== 'root') {
+      layoutOpts['elk.algorithm'] = 'rectpacking'
+      layoutOpts['elk.aspectRatio'] = '1.6'
+    }
+
     elkNodesMap.set(n.id, {
       id: n.id,
       width: n.width ?? 120,
       height: n.height ?? 100,
       children: [],
-      layoutOptions: {
-        'elk.padding': `[top=${n.parentId ? 40 : 60},left=20,bottom=20,right=20]`
-      }
+      layoutOptions: layoutOpts
     })
   }
 
