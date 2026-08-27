@@ -21,7 +21,7 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
         width: '100%',
         height: '100%',
         opacity: dimmed ? 0.2 : 1,
@@ -29,44 +29,42 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
         cursor: 'pointer',
       }}
     >
-      {/* White card — icon + label only */}
+      {/* Icon Wrapper with AWS selection indicator border/glow */}
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
-          padding: '10px 8px 8px',
-          borderRadius: 10,
-          background: selected ? 'rgba(74,144,217,0.10)' : 'rgba(255,255,255,0.85)',
-          border: selected ? '2px solid #4a90d9' : '1.5px solid rgba(200,200,200,0.6)',
-          boxShadow: selected
-            ? '0 0 0 3px rgba(74,144,217,0.25), 0 2px 8px rgba(0,0,0,0.1)'
-            : '0 1px 4px rgba(0,0,0,0.08)',
-          width: '100%',
+          padding: 4,
+          borderRadius: 8,
+          border: selected ? '2px solid #4a90d9' : '2px solid transparent',
+          background: selected ? 'rgba(74,144,217,0.10)' : 'transparent',
+          boxShadow: selected ? '0 0 0 3px rgba(74,144,217,0.25)' : 'none',
+          transition: 'all 0.15s',
           boxSizing: 'border-box' as const,
           flexShrink: 0,
         }}
       >
         <AwsIcon kind={d.kind as IconKind} service={d.service as string} size={52} />
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#232F3E',
-            textAlign: 'center',
-            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-            lineHeight: 1.3,
-            maxWidth: 88,
-            wordBreak: 'break-word',
-          }}
-        >
-          {d.label}
-        </div>
       </div>
 
-      {/* Sublabel below the card — AWS-style */}
+      {/* Main Label below the icon */}
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#232F3E',
+          textAlign: 'center',
+          fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          lineHeight: 1.3,
+          maxWidth: 96,
+          wordBreak: 'break-word',
+        }}
+      >
+        {d.label}
+      </div>
+
+      {/* Sublabel below the main label */}
       {d.sublabel && (
         <div style={{
           fontSize: 9,

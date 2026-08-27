@@ -144,11 +144,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           style={{
             position: 'absolute',
             top: -9,
-            left: '50%',
-            transform: 'translateX(-50%)',
+            left: 12,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             zIndex: 2,
           }}
         >
@@ -196,12 +195,12 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             }}
           />
 
-          {/* Top-right text sitting on the border with a white background to mask it */}
+          {/* Top-left text sitting on the border with a white background to mask it */}
           <div
             style={{
               position: 'absolute',
               top: -9,
-              right: 12,
+              left: 28,
               display: 'flex',
               alignItems: 'center',
               gap: 6,
