@@ -315,7 +315,7 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
 
   // Map output
   return nodes.map(node => {
-    // If it's a high-level node laid out by ELK
+    // 1. If it's a high-level node laid out by ELK
     if (finalPositions.has(node.id)) {
       const pos = finalPositions.get(node.id)!
       return {
@@ -327,27 +327,18 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
       }
     }
 
-    // If it's an inner VPC node (subnet or service inside VPC)
-    // Find its parent VPC
-    let vpcId = ''
-    let curr = nodeMap.get(node.id)
-    while (curr?.parentId) {
-      const parent = nodeMap.get(curr.parentId)
-      if (parent && (parent.data as { kind?: string })?.kind === 'vpc') {
-        vpcId = parent.id
-        break
-      }
-      curr = parent
-    }
-
-    if (vpcId) {
-      const internal = vpcInternalLayouts.get(vpcId)
-      const relPos = internal?.childPos.get(node.id)
-      if (relPos) {
+    // 2. If it's an inner node (descendant of VPC) that has a parent
+    if (node.parentId) {
+      const parentBox = computeBox(node.parentId, byParent, nodeMap)
+      const pos       = parentBox.childPos.get(node.id)
+      if (pos) {
+        const childBox  = computeBox(node.id, byParent, nodeMap)
         return {
           ...node,
-          position: { x: relPos.x, y: relPos.y },
-          style: { ...node.style }
+          position: { x: pos.x, y: pos.y },
+          width: childBox.width,
+          height: childBox.height,
+          style: { ...node.style, width: childBox.width, height: childBox.height }
         }
       }
     }
