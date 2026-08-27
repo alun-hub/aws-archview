@@ -227,6 +227,24 @@ function computeBoxInternal(
 
 const elk = new ELK()
 
+function getLCA(id1: string, id2: string, nodeMap: Map<string, Node>): string | null {
+  const path1: string[] = []
+  let curr: string | undefined = id1
+  while (curr) {
+    path1.push(curr)
+    curr = nodeMap.get(curr)?.parentId
+  }
+
+  curr = id2
+  while (curr) {
+    if (path1.includes(curr)) {
+      return curr
+    }
+    curr = nodeMap.get(curr)?.parentId
+  }
+  return null
+}
+
 export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<LayoutResult> {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const byParent = new Map<string, Node[]>()
@@ -331,8 +349,19 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
   const tgwRtGroupNode = nodes.find(n => (n.data as { kind?: string })?.kind === 'tgw-rt-group')
   const tgwRtGroupId = tgwRtGroupNode?.id
 
-  // internet -> hub account
-  if (elkNodesMap.has('internet') && hubAccountId && elkNodesMap.has(hubAccountId)) {
+  // internet -> hub VPC (instead of hub account) to align the internet node directly below the VPC with the IGW
+  const internetEdge = edges.find(e => e.target === 'internet' || e.source === 'internet')
+  const internetTargetVpcId = internetEdge 
+    ? (internetEdge.target === 'internet' ? getElkTargetId(internetEdge.source) : getElkTargetId(internetEdge.target))
+    : null
+
+  if (elkNodesMap.has('internet') && internetTargetVpcId && elkNodesMap.has(internetTargetVpcId)) {
+    elkEdges.push({
+      id: 'dummy:internet->hub-vpc',
+      sources: ['internet'],
+      targets: [internetTargetVpcId]
+    })
+  } else if (elkNodesMap.has('internet') && hubAccountId && elkNodesMap.has(hubAccountId)) {
     elkEdges.push({
       id: 'dummy:internet->hub',
       sources: ['internet'],
@@ -411,6 +440,23 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
       const segments: Segment[] = []
       const section = edge.sections?.[0]
       if (section) {
+        // Find Lowest Common Ancestor (LCA) of source and target to compute offset
+        const sId = edge.sources[0]
+        const tId = edge.targets[0]
+        const lcaId = getLCA(sId, tId, nodeMap)
+        const offset = { x: 0, y: 0 }
+        if (lcaId) {
+          let currId: string | undefined = lcaId
+          while (currId) {
+            const pos = finalPositions.get(currId)
+            if (pos) {
+              offset.x += pos.x
+              offset.y += pos.y
+            }
+            currId = nodeMap.get(currId)?.parentId
+          }
+        }
+
         const points = [
           section.startPoint,
           ...(section.bendPoints ?? []),
@@ -420,8 +466,8 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Layo
           const p1 = points[i]
           const p2 = points[i+1]
           segments.push({
-            p1: { x: p1.x, y: p1.y },
-            p2: { x: p2.x, y: p2.y },
+            p1: { x: p1.x + offset.x, y: p1.y + offset.y },
+            p2: { x: p2.x + offset.x, y: p2.y + offset.y },
             isHorizontal: Math.abs(p1.y - p2.y) < 0.1,
             edgeId: edge.id
           })
