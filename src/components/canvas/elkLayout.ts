@@ -314,7 +314,54 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
       sources: [sId],
       targets: [tId]
     }
-  }).filter(e => elkNodesMap.has(e.sources[0]) && elkNodesMap.has(e.targets[0]))
+  }).filter(e => e.sources[0] !== e.targets[0] && elkNodesMap.has(e.sources[0]) && elkNodesMap.has(e.targets[0]))
+
+  // Add layout-only flow constraints to enforce vertical ordering (Internet -> Hub -> TGW -> Spokes -> Route Tables)
+  const tgwNode = nodes.find(n => (n.data as { kind?: string })?.kind === 'tgw')
+  const tgwId = tgwNode?.id
+  const hubAccountName = tgwNode?.data?.account
+  const hubAccountId = hubAccountName ? `account:${hubAccountName}` : null
+  const tgwRtGroupNode = nodes.find(n => (n.data as { kind?: string })?.kind === 'tgw-rt-group')
+  const tgwRtGroupId = tgwRtGroupNode?.id
+
+  // internet -> hub account
+  if (elkNodesMap.has('internet') && hubAccountId && elkNodesMap.has(hubAccountId)) {
+    elkEdges.push({
+      id: 'dummy:internet->hub',
+      sources: ['internet'],
+      targets: [hubAccountId]
+    })
+  }
+
+  // hub account -> tgw
+  if (hubAccountId && elkNodesMap.has(hubAccountId) && tgwId && elkNodesMap.has(tgwId)) {
+    elkEdges.push({
+      id: 'dummy:hub->tgw',
+      sources: [hubAccountId],
+      targets: [tgwId]
+    })
+  }
+
+  // tgw -> spoke accounts
+  for (const n of nodes) {
+    const isAccount = (n.data as { kind?: string })?.kind === 'account'
+    if (isAccount && n.id !== hubAccountId && elkNodesMap.has(n.id) && tgwId && elkNodesMap.has(tgwId)) {
+      elkEdges.push({
+        id: `dummy:tgw->spoke:${n.id}`,
+        sources: [tgwId],
+        targets: [n.id]
+      })
+    }
+    
+    // spoke accounts -> route tables
+    if (isAccount && n.id !== hubAccountId && elkNodesMap.has(n.id) && tgwRtGroupId && elkNodesMap.has(tgwRtGroupId)) {
+      elkEdges.push({
+        id: `dummy:spoke->tgw-rt:${n.id}`,
+        sources: [n.id],
+        targets: [tgwRtGroupId]
+      })
+    }
+  }
 
   const elkGraph = {
     id: 'root-graph',

@@ -520,7 +520,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       const tgwCfg = networkConfig.transitGateways?.find((t) => t.name === att.transitGateway.name)
       const tgwId  = `tgw:${att.transitGateway.name}`
       const isHub  = tgwCfg?.account === vpc.account
-      const edgeId = `${tgwId}->account:${vpc.account}`
+      const edgeId = `${tgwId}->${vpcId}`
 
       if (!edges.find((e) => e.id === edgeId)) {
         const rtSet   = rtByTgwAccount.get(`${att.transitGateway.name}::${vpc.account}`) ?? new Set()
@@ -528,7 +528,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
         edges.push({
           id:     edgeId,
           source: tgwId,
-          target: `account:${vpc.account}`,
+          target: vpcId,
           kind:   isHub ? 'tgw-hub' : 'tgw',
           label:  rtLabel,
         })
