@@ -1,19 +1,63 @@
 import type { AccountsConfig, GraphEdge, GraphModel, GraphNode, OUConfig, OrganizationConfig, SecurityConfig, IamConfig, SCP } from './types'
 import { getNormalizedSecurityConfig } from './securityParser'
+import { findFileContent } from './fileResolve'
+import { parsePolicyStatements, type PolicyStatementEntry } from './policyParse'
+
+function formatPolicyEntry(p: SCP): string {
+  return `${p.name}${p.policy ? ` (${p.policy})` : ''}${p.description ? ` - ${p.description}` : ''}`
+}
+
+function matchesTarget(p: SCP, kind: 'ou' | 'account', name: string): boolean {
+  return kind === 'ou'
+    ? !!p.deploymentTargets?.organizationalUnits?.includes(name)
+    : !!p.deploymentTargets?.accounts?.includes(name)
+}
+
+// Resolves everything a single OU/account attaches to it: formatted SCP list,
+// raw SCP names (for the highlight-on-click feature), parsed SCP statements
+// (when the policy file was loaded), and tagging/backup policy lists.
+function computePolicyAttachments(
+  targetKind: 'ou' | 'account',
+  targetName: string,
+  scps: SCP[],
+  taggingPolicies: SCP[],
+  backupPolicies: SCP[],
+  loadedFiles: Record<string, string>,
+) {
+  const matchedScps = scps.filter((p) => matchesTarget(p, targetKind, targetName))
+  const matchedTagging = taggingPolicies.filter((p) => matchesTarget(p, targetKind, targetName))
+  const matchedBackup = backupPolicies.filter((p) => matchesTarget(p, targetKind, targetName))
+
+  const scpStatements: PolicyStatementEntry[] = []
+  for (const p of matchedScps) {
+    if (!p.policy) continue
+    const content = findFileContent(p.policy, loadedFiles)
+    if (content) scpStatements.push(...parsePolicyStatements(p.name, content))
+  }
+
+  return {
+    scps: matchedScps.length > 0 ? matchedScps.map(formatPolicyEntry) : undefined,
+    scpNames: matchedScps.length > 0 ? matchedScps.map((p) => p.name) : undefined,
+    scpStatements: scpStatements.length > 0 ? scpStatements : undefined,
+    taggingPolicies: matchedTagging.length > 0 ? matchedTagging.map(formatPolicyEntry) : undefined,
+    backupPolicies: matchedBackup.length > 0 ? matchedBackup.map(formatPolicyEntry) : undefined,
+  }
+}
 
 function collectOUs(
   ous: OUConfig[],
   parentId: string,
   nodes: GraphNode[],
   scps: SCP[],
+  taggingPolicies: SCP[],
+  backupPolicies: SCP[],
+  loadedFiles: Record<string, string>,
   iamConfig?: IamConfig,
 ) {
   for (const ou of ous) {
     if (ou.ignore) continue
     const id = `ou:${ou.name}`
-    const attachedScps = scps
-      .filter((s) => s.deploymentTargets?.organizationalUnits?.includes(ou.name))
-      .map((s) => `${s.name}${s.policy ? ` (${s.policy})` : ''}${s.description ? ` - ${s.description}` : ''}`)
+    const policyAttachments = computePolicyAttachments('ou', ou.name, scps, taggingPolicies, backupPolicies, loadedFiles)
 
     const ouAssignments = iamConfig?.identityCenterAssignments
       ?.filter((a) => a.deploymentTargets?.organizationalUnits?.includes(ou.name))
@@ -26,13 +70,13 @@ function collectOUs(
       data: {
         kind: 'ou',
         tags: ou.tags,
-        scps: attachedScps.length > 0 ? attachedScps : undefined,
+        ...policyAttachments,
         iamAssignments: ouAssignments.length > 0 ? ouAssignments : undefined,
       },
       parentId,
     })
     if (ou.organizationalUnits?.length) {
-      collectOUs(ou.organizationalUnits, id, nodes, scps, iamConfig)
+      collectOUs(ou.organizationalUnits, id, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
     }
   }
 }
@@ -42,6 +86,7 @@ export function parseOrganization(
   accountsConfig: AccountsConfig,
   securityConfig?: SecurityConfig,
   iamConfig?: IamConfig,
+  loadedFiles: Record<string, string> = {},
 ): GraphModel {
   const normSecurity = securityConfig ? getNormalizedSecurityConfig(securityConfig) : null
   const delegatedAdmin = securityConfig?.centralSecurityServices?.delegatedAdminAccount ?? 'Audit'
@@ -54,9 +99,11 @@ export function parseOrganization(
   nodes.push({ id: rootId, kind: 'root', label: 'AWS Organization', data: { kind: 'ou' } })
 
   const scps = orgConfig.serviceControlPolicies ?? []
+  const taggingPolicies = orgConfig.taggingPolicies ?? []
+  const backupPolicies = orgConfig.backupPolicies ?? []
 
   if (orgConfig.organizationalUnits?.length) {
-    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps, iamConfig)
+    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
   }
 
   const nodeSet = new Set(nodes.map((n) => n.id))
@@ -73,9 +120,7 @@ export function parseOrganization(
     const leafOU = ouPath.split('/').pop() ?? ouPath
     const parentId = leafOU === 'Root' ? rootId : `ou:${leafOU}`
 
-    const attachedScps = scps
-      .filter((s) => s.deploymentTargets?.accounts?.includes(account.name))
-      .map((s) => `${s.name}${s.policy ? ` (${s.policy})` : ''}${s.description ? ` - ${s.description}` : ''}`)
+    const policyAttachments = computePolicyAttachments('account', account.name, scps, taggingPolicies, backupPolicies, loadedFiles)
 
     const accountAssignments = iamConfig?.identityCenterAssignments
       ?.filter((a) => a.deploymentTargets?.accounts?.includes(account.name))
@@ -90,7 +135,7 @@ export function parseOrganization(
         email: account.email,
         description: account.description,
         tags: account.tags,
-        scps: attachedScps.length > 0 ? attachedScps : undefined,
+        ...policyAttachments,
         iamAssignments: accountAssignments.length > 0 ? accountAssignments : undefined,
       },
       parentId: nodeSet.has(parentId) ? parentId : rootId,

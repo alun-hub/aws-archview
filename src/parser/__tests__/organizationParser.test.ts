@@ -278,4 +278,72 @@ describe('organizationParser', () => {
     expect(ctNode?.data.trailEnabled).toBe(true)
     expect(ctNode?.data.s3BucketName).toBe('enterprise-ct-logs')
   })
+
+  it('should resolve SCP policy documents into statements when the file is loaded, and expose raw scpNames', () => {
+    const org: OrganizationConfig = {
+      enable: true,
+      organizationalUnits: [{ name: 'Workloads' }],
+      serviceControlPolicies: [
+        {
+          name: 'DenyRootUser',
+          policy: 'policies/deny-root.json',
+          deploymentTargets: { organizationalUnits: ['Workloads'] }
+        },
+        {
+          name: 'UnresolvedScp',
+          policy: 'policies/not-loaded.json',
+          deploymentTargets: { organizationalUnits: ['Workloads'] }
+        }
+      ]
+    }
+    const accounts: AccountsConfig = { mandatoryAccounts: [] }
+    const loadedFiles = {
+      'policies/deny-root.json': JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [
+          { Sid: 'DenyRoot', Effect: 'Deny', Action: 'sts:AssumeRole', Resource: '*', Condition: { StringLike: { 'aws:PrincipalArn': '*:root' } } },
+          { Effect: 'Deny', NotAction: ['iam:GetRole', 'iam:ListRoles'], Resource: '*' }
+        ]
+      })
+    }
+
+    const model = parseOrganization(org, accounts, undefined, undefined, loadedFiles)
+    const ouNode = model.nodes.find(n => n.id === 'ou:Workloads')
+
+    expect(ouNode?.data.scpNames).toEqual(['DenyRootUser', 'UnresolvedScp'])
+
+    const statements = ouNode?.data.scpStatements as { name: string; effect: string; action: string; resource: string }[]
+    expect(statements).toHaveLength(2)
+    expect(statements[0]).toEqual({ name: 'DenyRootUser [DenyRoot]', effect: 'Deny', action: 'sts:AssumeRole', resource: '*' })
+    expect(statements[1]).toEqual({ name: 'DenyRootUser', effect: 'Deny', action: 'NOT iam:GetRole, iam:ListRoles', resource: '*' })
+    // UnresolvedScp's file was never loaded — no statements for it, and no crash
+  })
+
+  it('should parse tagging and backup policies alongside SCPs', () => {
+    const org: OrganizationConfig = {
+      enable: true,
+      organizationalUnits: [{ name: 'Workloads' }],
+      taggingPolicies: [
+        {
+          name: 'RequireCostCenter',
+          description: 'Requires a CostCenter tag on all resources',
+          deploymentTargets: { organizationalUnits: ['Workloads'] }
+        }
+      ],
+      backupPolicies: [
+        {
+          name: 'DailyBackups',
+          description: 'Daily backup plan for all workloads',
+          deploymentTargets: { organizationalUnits: ['Workloads'] }
+        }
+      ]
+    }
+    const accounts: AccountsConfig = { mandatoryAccounts: [] }
+
+    const model = parseOrganization(org, accounts)
+    const ouNode = model.nodes.find(n => n.id === 'ou:Workloads')
+
+    expect(ouNode?.data.taggingPolicies).toEqual(['RequireCostCenter - Requires a CostCenter tag on all resources'])
+    expect(ouNode?.data.backupPolicies).toEqual(['DailyBackups - Daily backup plan for all workloads'])
+  })
 })

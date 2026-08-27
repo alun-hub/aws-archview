@@ -32,8 +32,10 @@ export interface OrganizationConfig {
   enable: boolean
   organizationalUnits?: OUConfig[]
   serviceControlPolicies?: SCP[]
-  taggingPolicies?: unknown[]
-  backupPolicies?: unknown[]
+  // Tagging and backup policies use the same {name, description, policy,
+  // deploymentTargets} shape as SCPs in LZA's organization-config.yaml.
+  taggingPolicies?: SCP[]
+  backupPolicies?: SCP[]
 }
 
 export interface SubnetConfig {
@@ -331,6 +333,69 @@ export interface IamAssignment {
   }
 }
 
+// ── Account-level IAM (roles/users/groups/policies) ────────────────────────────
+// Distinct from Identity Center above — these are IAM resources LZA provisions
+// directly inside member accounts via roleSets/userSets/groupSets/policySets.
+
+export interface IamPolicyAttachments {
+  awsManaged?: string[]
+  customerManaged?: string[]
+}
+
+export interface DeploymentTargets {
+  organizationalUnits?: string[]
+  accounts?: string[]
+}
+
+export interface IamPolicyConfig {
+  name: string
+  policy: string
+}
+
+export interface PolicySetConfig {
+  name?: string
+  deploymentTargets?: DeploymentTargets
+  policies?: IamPolicyConfig[]
+}
+
+export interface IamRoleConfig {
+  name: string
+  assumedBy?: { type: string; principal?: string }[]
+  policies?: IamPolicyAttachments
+  boundaryPolicy?: string
+  instanceProfile?: boolean
+}
+
+export interface RoleSetConfig {
+  name?: string
+  path?: string
+  deploymentTargets?: DeploymentTargets
+  roles?: IamRoleConfig[]
+}
+
+export interface IamGroupConfig {
+  name: string
+  policies?: IamPolicyAttachments
+}
+
+export interface GroupSetConfig {
+  name?: string
+  deploymentTargets?: DeploymentTargets
+  groups?: IamGroupConfig[]
+}
+
+export interface IamUserConfig {
+  username: string
+  group?: string
+  boundaryPolicy?: string
+}
+
+export interface UserSetConfig {
+  name?: string
+  deploymentTargets?: DeploymentTargets
+  users?: IamUserConfig[]
+}
+
 export interface IamConfig {
   identityCenter?: {
     enable?: boolean
@@ -340,6 +405,10 @@ export interface IamConfig {
   }
   permissionSets?: PermissionSetConfig[]
   identityCenterAssignments?: IdentityCenterAssignmentConfig[]
+  policySets?: PolicySetConfig[]
+  roleSets?: RoleSetConfig[]
+  groupSets?: GroupSetConfig[]
+  userSets?: UserSetConfig[]
 }
 
 // ── Global config ─────────────────────────────────────────────────────────────

@@ -223,12 +223,12 @@ function AppContent() {
       }
     }
     return {
-      organization:   safe(() => buildOrganizationGraph(config.configs)),
+      organization:   safe(() => buildOrganizationGraph(config.configs, config.loadedFiles)),
       network:        safe(() => buildNetworkGraph(config.configs, config.loadedFiles)),
       global:         safe(() => buildGlobalGraph(config.configs)),
       customizations: safe(() => buildCustomizationsGraph(config.configs, config.aggregateStacks)),
       security:       safe(() => buildSecurityGraph(config.configs)),
-      iam:            safe(() => buildIamGraph(config.configs)),
+      iam:            safe(() => buildIamGraph(config.configs, config.loadedFiles)),
     }
   }, [config.configs, config.aggregateStacks, config.loadedFiles])
 

@@ -55,7 +55,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
   const processFiles = useCallback(
     (files: PickedFile[]) => {
       for (const { file, path } of files) {
-        if (!file.name.match(/\.(yaml|yml|txt|rules)$/i)) continue
+        if (!file.name.match(/\.(yaml|yml|txt|rules|json)$/i)) continue
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
@@ -157,7 +157,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         <input
           ref={fileInputRef}
           type="file"
-          accept=".yaml,.yml,.txt,.rules"
+          accept=".yaml,.yml,.txt,.rules,.json"
           multiple
           style={{ display: 'none' }}
           onChange={(e) => processFiles(fromFileList(Array.from(e.target.files ?? [])))}

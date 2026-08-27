@@ -16,6 +16,7 @@ interface State {
   aggregateStacks: boolean
   enableFocusMode: boolean
   enableSemanticZoom: boolean
+  highlightedScp: string | null
 }
 
 type Action =
@@ -30,6 +31,7 @@ type Action =
   | { type: 'TOGGLE_FOCUS_MODE' }
   | { type: 'TOGGLE_SEMANTIC_ZOOM' }
   | { type: 'CLEAR_FILES' }
+  | { type: 'SET_SCP_HIGHLIGHT'; name: string }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -101,6 +103,7 @@ const getInitialState = (): State => {
     aggregateStacks: true,
     enableFocusMode: true,
     enableSemanticZoom: false,
+    highlightedScp: null,
   }
 }
 
@@ -120,7 +123,7 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>() }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), highlightedScp: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'TOGGLE_LAYER':
@@ -152,6 +155,9 @@ function reducer(state: State, action: Action): State {
         localStorage.removeItem('aws-archview:loadedFiles')
       }
       return { ...state, loadedFiles: {}, configs: {}, parseErrors: {} }
+    case 'SET_SCP_HIGHLIGHT':
+      // Click the same SCP again to clear the highlight
+      return { ...state, highlightedScp: state.highlightedScp === action.name ? null : action.name }
     default:
       return state
   }

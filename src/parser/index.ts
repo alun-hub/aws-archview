@@ -147,9 +147,9 @@ export function parsedForKey(key: keyof LzaConfigs, content: string, loadedFiles
   }
 }
 
-export function buildOrganizationGraph(configs: LzaConfigs) {
+export function buildOrganizationGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
   if (!configs.organization || !configs.accounts) return null
-  return parseOrganization(configs.organization, configs.accounts, configs.security, configs.iam)
+  return parseOrganization(configs.organization, configs.accounts, configs.security, configs.iam, loadedFiles)
 }
 
 export function buildNetworkGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
@@ -172,7 +172,7 @@ export function buildSecurityGraph(configs: LzaConfigs) {
   return parseSecurity(configs.security)
 }
 
-export function buildIamGraph(configs: LzaConfigs) {
+export function buildIamGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
   if (!configs.iam) return null
-  return parseIam(configs.iam, configs.accounts)
+  return parseIam(configs.iam, configs.accounts, loadedFiles)
 }

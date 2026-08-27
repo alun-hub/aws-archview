@@ -1,0 +1,36 @@
+{
+  "plans": {
+    "DailyBackupPlan": {
+      "rules": {
+        "DailyRule": {
+          "schedule_expression": {
+            "@@assign": "cron(0 5 ? * * *)"
+          },
+          "target_backup_vault_name": {
+            "@@assign": "BackupVault-Default"
+          },
+          "lifecycle": {
+            "delete_after_days": {
+              "@@assign": "30"
+            }
+          }
+        }
+      },
+      "selections": {
+        "tags": {
+          "DailyBackupSelection": {
+            "iam_role_arn": {
+              "@@assign": "arn:aws:iam::$account:role/AWSBackupDefaultServiceRole"
+            },
+            "tag_key": {
+              "@@assign": "Backup"
+            },
+            "tag_value": {
+              "@@assign": ["daily"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

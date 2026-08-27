@@ -7,7 +7,7 @@ import Button from '@cloudscape-design/components/button'
 import Input from '@cloudscape-design/components/input'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
-import { useConfig } from '../../store/configStore'
+import { useConfig, useDispatch } from '../../store/configStore'
 import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig, CfnStackConfig, Route53ResolverRuleConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
 
@@ -152,10 +152,21 @@ const FIELD_LABEL: Record<string, string> = {
   enableScanTypes:   'Inspector Scan Types',
   snsTopics:         'SNS Topics',
   products:          'Service Catalog Products',
+  // Org governance / account-level IAM fields
+  taggingPolicies:   'Tagging Policies',
+  backupPolicies:    'Backup Policies (Org)',
+  deploymentTargets: 'Deployment Targets',
+  policies:          'IAM Policies',
+  roles:             'IAM Roles',
+  groups:            'IAM Groups',
+  users:             'IAM Users',
+  scpStatements:     'SCP Policy Statements',
+  policyStatements:  'Policy Statements',
 }
 
-// Keys to skip from raw data (shown separately or irrelevant)
-const SKIP_KEYS = new Set(['kind', 'sublabel', 'rules', 'isAggregate', 'stacks'])
+// Keys to skip from raw data (shown separately or irrelevant, or — like scps —
+// rendered by a bespoke block instead of the generic Row)
+const SKIP_KEYS = new Set(['kind', 'sublabel', 'rules', 'isAggregate', 'stacks', 'scps', 'scpNames'])
 
 interface FlattenedRule {
   type: string
@@ -356,6 +367,7 @@ function Row({ label, value }: { label: string; value: unknown }) {
 
 export function DetailPanel({ node }: Props) {
   const config = useConfig()
+  const dispatch = useDispatch()
   const [modalOpen, setModalOpen] = useState(false)
   const [filteringText, setFilteringText] = useState('')
   const [sortingColumn, setSortingColumn] = useState<'principal' | 'role' | null>(null)
@@ -742,6 +754,46 @@ export function DetailPanel({ node }: Props) {
       <div style={{ fontSize: 16, fontWeight: 700, color: '#232F3E', marginBottom: 12 }}>
         {node.label}
       </div>
+      {Array.isArray(node.data.scps) && node.data.scps.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+            {FIELD_LABEL.scps}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(node.data.scps as string[]).map((label, i) => {
+              const name = (node.data.scpNames as string[] | undefined)?.[i]
+              const isActive = !!name && config.highlightedScp === name
+              return (
+                <button
+                  key={i}
+                  className="nodrag"
+                  disabled={!name}
+                  onClick={() => name && dispatch({ type: 'SET_SCP_HIGHLIGHT', name })}
+                  title={name ? 'Click to highlight every OU/account this SCP targets' : label}
+                  style={{
+                    fontSize: 11,
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    padding: '3px 8px',
+                    borderRadius: 12,
+                    border: isActive ? '1.5px solid #232F3E' : '1px solid #ddd',
+                    background: isActive ? '#232F3E' : '#f5f5f5',
+                    color: isActive ? '#fff' : '#232F3E',
+                    cursor: name ? 'pointer' : 'default',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          {config.highlightedScp && (
+            <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>
+              Highlighting targets of "{config.highlightedScp}" in the diagram — click it again to clear.
+            </div>
+          )}
+        </div>
+      )}
       {Object.entries(node.data)
         .filter(([k]) => !SKIP_KEYS.has(k))
         .map(([k, v]) => (

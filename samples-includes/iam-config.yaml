@@ -45,3 +45,63 @@ identityCenterAssignments:
     deploymentTargets:
       organizationalUnits:
         - Security
+
+# ─── Account-level IAM ──────────────────────────────────────────────────────────
+# Distinct from Identity Center above: roles/users/groups/policies LZA
+# provisions directly inside member accounts.
+
+policySets:
+  - name: Custom-Policies
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+    policies:
+      - name: S3-ReadOnly-Custom
+        policy: include/policies/s3-readonly.json
+
+roleSets:
+  - name: EC2-Instance-Roles
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+    roles:
+      - name: EC2-SSM-Role
+        assumedBy:
+          - type: service
+            principal: ec2.amazonaws.com
+        policies:
+          awsManaged:
+            - AmazonSSMManagedInstanceCore
+          customerManaged:
+            - S3-ReadOnly-Custom
+        instanceProfile: true
+      - name: EC2-Backup-Role
+        assumedBy:
+          - type: service
+            principal: ec2.amazonaws.com
+        policies:
+          awsManaged:
+            - AWSBackupServiceRolePolicyForBackup
+        boundaryPolicy: Custom-Permissions-Boundary
+        instanceProfile: true
+
+groupSets:
+  - name: Break-Glass-Groups
+    deploymentTargets:
+      accounts:
+        - Management
+    groups:
+      - name: BreakGlassAdministrators
+        policies:
+          awsManaged:
+            - AdministratorAccess
+
+userSets:
+  - name: Break-Glass-Users
+    deploymentTargets:
+      accounts:
+        - Management
+    users:
+      - username: break-glass-admin
+        group: BreakGlassAdministrators
+        boundaryPolicy: Custom-Permissions-Boundary

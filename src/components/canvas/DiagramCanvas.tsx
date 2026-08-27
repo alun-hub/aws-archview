@@ -700,8 +700,33 @@ export function DiagramCanvas({ model }: Props) {
     }
   }, [model, collapsedNodes])
 
-  // Compute which node ids should be dimmed based on current selection
+  // Compute which node ids should be dimmed — either because an SCP is
+  // pinned for highlighting (click an SCP chip in the detail panel: show
+  // exactly the OUs/accounts it targets), or based on the current selection
+  // (focus mode).
   const dimmedNodeIds = useMemo(() => {
+    const allNodes = new Map(nodes.map(n => [n.id, n]))
+    const withAncestorsOf = (visible: Set<string>) => {
+      const withAncestors = new Set(visible)
+      for (const id of visible) {
+        let cur = allNodes.get(id)
+        while (cur?.parentId) {
+          withAncestors.add(cur.parentId)
+          cur = allNodes.get(cur.parentId)
+        }
+      }
+      return withAncestors
+    }
+
+    if (config.highlightedScp) {
+      const visible = new Set<string>()
+      for (const n of nodes) {
+        const names = (n.data as { scpNames?: unknown }).scpNames
+        if (Array.isArray(names) && names.includes(config.highlightedScp)) visible.add(n.id)
+      }
+      return new Set(nodes.map(n => n.id).filter(id => !withAncestorsOf(visible).has(id)))
+    }
+
     if (!config.enableFocusMode) return new Set<string>()
     if (!config.selectedNodeId) return new Set<string>()
     const visible = new Set<string>([config.selectedNodeId])
@@ -709,18 +734,8 @@ export function DiagramCanvas({ model }: Props) {
       if (e.source === config.selectedNodeId) visible.add(e.target)
       if (e.target === config.selectedNodeId) visible.add(e.source)
     }
-    // Also keep ancestor group nodes undimmed (walk parentId chain)
-    const allNodes = new Map(nodes.map(n => [n.id, n]))
-    const withAncestors = new Set(visible)
-    for (const id of visible) {
-      let cur = allNodes.get(id)
-      while (cur?.parentId) {
-        withAncestors.add(cur.parentId)
-        cur = allNodes.get(cur.parentId)
-      }
-    }
-    return new Set(nodes.map(n => n.id).filter(id => !withAncestors.has(id)))
-  }, [config.selectedNodeId, edges, nodes, config.enableFocusMode])
+    return new Set(nodes.map(n => n.id).filter(id => !withAncestorsOf(visible).has(id)))
+  }, [config.selectedNodeId, config.highlightedScp, edges, nodes, config.enableFocusMode])
 
   const routingContextValue = useMemo(() => {
     if (nodes.length === 0) return null

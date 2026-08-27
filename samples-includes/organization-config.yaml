@@ -18,7 +18,7 @@ organizationalUnits:
 serviceControlPolicies:
   - name: DenyRootUser
     description: Deny root user actions
-    policy: service-control-policies/deny-root-user.json
+    policy: include/policies/deny-root-user.json
     deploymentTargets:
       organizationalUnits:
         - Security
@@ -26,8 +26,25 @@ serviceControlPolicies:
         - Workloads
   - name: DenyLeavingOrganization
     description: Prevent accounts from leaving the organization
-    policy: service-control-policies/deny-leave-org.json
+    policy: include/policies/deny-leave-org.json
     deploymentTargets:
       organizationalUnits:
         - Workloads
         - Sandbox
+
+taggingPolicies:
+  - name: RequireCostCenterTag
+    description: Requires a CostCenter tag on all taggable resources
+    policy: include/policies/require-cost-center-tag.json
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+
+backupPolicies:
+  - name: DailyBackupPlan
+    description: Daily backups with 30-day retention for all workload accounts
+    policy: include/policies/daily-backup-plan.json
+    deploymentTargets:
+      organizationalUnits:
+        - Workloads
+        - Infrastructure
