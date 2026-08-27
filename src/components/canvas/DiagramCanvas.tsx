@@ -166,6 +166,7 @@ const EDGE_STYLES: Record<string, { color: string; dash?: string }> = {
   'tgw':         { color: '#6B3FA0', dash: '6 3' },
   'tgw-hub':     { color: '#6B3FA0', dash: '6 3' },
   'vpn':         { color: '#CC7700', dash: '4 4' },
+  'dx':          { color: '#6B3FA0', dash: '8 2 2 2' },
   'peering':     { color: '#1A6CAE', dash: '5 3' },
   'flow':        { color: '#248814' },
   'propagation': { color: '#6B3FA0', dash: '2 3' },
@@ -177,7 +178,7 @@ function toFlowEdges(model: GraphModel): Edge[] {
 
     const isTgwHub       = e.kind === 'tgw-hub'
     const isTgwSpoke     = e.kind === 'tgw'
-    const isVpnToTgw     = e.kind === 'vpn' && e.source.startsWith('vpn:') && e.target.startsWith('tgw:')
+    const isVpnToTgw     = (e.kind === 'vpn' || e.kind === 'dx') && (e.source.startsWith('vpn:') || e.source.startsWith('dx:')) && e.target.startsWith('tgw:')
     const isPropagation  = e.kind === 'propagation'
     const isPeering      = e.kind === 'peering'
 
@@ -779,7 +780,7 @@ export function DiagramCanvas({ model }: Props) {
 
     const filteredEdges = filteredModel.edges.filter((e) => {
       if (e.kind === 'propagation') return config.showPropagations
-      if (e.kind === 'vpn')         return config.showVpnConnections
+      if (e.kind === 'vpn' || e.kind === 'dx') return config.showVpnConnections
       if (e.kind === 'flow')        return config.showInternetFlows
       if (e.kind === 'tgw' || e.kind === 'tgw-hub') return config.showTgwAttachments
       return true

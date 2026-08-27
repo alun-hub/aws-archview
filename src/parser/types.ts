@@ -114,6 +114,38 @@ export interface CustomerGatewayConfig {
   vpnConnections?: VpnConnectionConfig[]
 }
 
+export interface DxVirtualInterfaceConfig {
+  name: string
+  connectionId?: string
+  customerAsn?: number
+  interfaceName?: string
+  ownerAccount?: string
+  region?: string
+  type?: 'private' | 'transit' | string
+  vlan?: number
+  addressFamily?: string
+  amazonAddress?: string
+  customerAddress?: string
+  jumboFrame?: boolean
+  tags?: Record<string, string>[]
+}
+
+export interface DxTgwAssociationConfig {
+  name: string
+  account: string
+  region?: string
+  routeTableAssociations?: string[]
+  allowedPrefixes?: string[]
+}
+
+export interface DirectConnectGatewayConfig {
+  name: string
+  asn: number
+  gatewayName?: string
+  virtualInterfaces?: DxVirtualInterfaceConfig[]
+  transitGatewayAssociations?: DxTgwAssociationConfig[]
+}
+
 export interface VpcPeeringConfig {
   name: string
   vpcs: string[]
@@ -238,6 +270,7 @@ export interface NetworkConfig {
   transitGateways?: TgwConfig[]
   transitGatewayRouteTables?: TgwRouteTableConfig[]
   customerGateways?: CustomerGatewayConfig[]
+  directConnectGateways?: DirectConnectGatewayConfig[]
   centralNetworkServices?: {
     networkFirewall?: {
       firewalls?: { name: string; vpc: string; subnets: string[] }[]
@@ -394,7 +427,7 @@ export interface GraphEdge {
   source: string
   target: string
   label?: string
-  kind?: 'tgw' | 'tgw-hub' | 'vpn' | 'peering' | 'flow' | 'propagation'
+  kind?: 'tgw' | 'tgw-hub' | 'vpn' | 'dx' | 'peering' | 'flow' | 'propagation'
 }
 
 export interface GraphModel {

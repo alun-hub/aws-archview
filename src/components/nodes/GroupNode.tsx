@@ -267,6 +267,27 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                 <span>{d.scps.length} SCP</span>
               </div>
             )}
+            {Array.isArray(d.dnsFirewallRuleGroups) && d.dnsFirewallRuleGroups.length > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  background: '#007DB8',
+                  color: '#fff',
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  fontSize: 9,
+                  fontWeight: 800,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                }}
+                title={`${d.dnsFirewallRuleGroups.length} DNS Firewall rule group(s): ${d.dnsFirewallRuleGroups.join(', ')}`}
+              >
+                <AwsIcon kind="route53" size={10} style={{ filter: 'brightness(0) invert(1)' }} />
+                <span>{d.dnsFirewallRuleGroups.length} DNS FW</span>
+              </div>
+            )}
           </div>
         </>
       )}

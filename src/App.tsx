@@ -176,7 +176,7 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   checked={config.showVpnConnections}
                   onChange={() => dispatch({ type: 'TOGGLE_LAYER', layer: 'vpnConnections' })}
                 >
-                  VPN connections
+                  VPN / Direct Connect
                 </Checkbox>
                 <Checkbox
                   checked={config.showInternetFlows}

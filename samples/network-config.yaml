@@ -46,6 +46,26 @@ customerGateways:
           - tunnelInsideCidr: 169.254.100.0/30
           - tunnelInsideCidr: 169.254.100.4/30
 
+# ─── Direct Connect Gateways ───────────────────────────────────────────────────
+directConnectGateways:
+  - name: Accelerator-DXGW
+    asn: 64512
+    virtualInterfaces:
+      - name: Accelerator-VIF
+        connectionId: dx-12345678
+        customerAsn: 64513
+        type: transit
+        region: eu-west-1
+        vlan: 100
+    transitGatewayAssociations:
+      - name: Main-TGW
+        account: Network
+        region: eu-west-1
+        routeTableAssociations:
+          - VPN-RT
+        allowedPrefixes:
+          - 10.0.0.0/8
+
 # ─── VPCs ─────────────────────────────────────────────────────────────────────
 vpcs:
 
@@ -59,6 +79,8 @@ vpcs:
     internetGateway: true
     enableDnsHostnames: true
     enableDnsSupport: true
+    dnsFirewallRuleGroups:
+      - Block-Malicious-Domains
     subnets:
       - name: Public-Subnet-A
         availabilityZone: a
@@ -440,3 +462,14 @@ centralNetworkServices:
                     settings: ["Block SSH access from untrusted sources"]
                   - keyword: sid
                     settings: ["10003"]
+  route53Resolver:
+    firewallRuleGroups:
+      - name: Block-Malicious-Domains
+        regions:
+          - eu-west-1
+        rules:
+          - name: Block-Known-Bad-Domains
+            action: BLOCK
+            priority: 100
+            customDomainList: malicious-domains.txt
+            blockResponse: NXDOMAIN

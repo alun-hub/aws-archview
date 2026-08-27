@@ -282,6 +282,36 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     }
   }
 
+  // ── Direct Connect Gateways ────────────────────────────────────────────────
+  const dxGateways = networkConfig.directConnectGateways ?? []
+  if (dxGateways.length > 0 && !nodes.some((n) => n.id === 'on-premises')) {
+    nodes.push({ id: 'on-premises', kind: 'on-premises', label: 'On-Premises', data: { kind: 'on-premises' } })
+  }
+  for (const dxgw of dxGateways) {
+    const dxId = `dx:${dxgw.name}`
+    nodes.push({
+      id:       dxId,
+      kind:     'dx',
+      label:    dxgw.name,
+      data: {
+        kind: 'dx',
+        asn: dxgw.asn,
+        virtualInterfaces: dxgw.virtualInterfaces,
+      },
+      parentId: 'on-premises',
+    })
+    for (const assoc of dxgw.transitGatewayAssociations ?? []) {
+      const tgwId = `tgw:${assoc.name}`
+      edges.push({
+        id:     `${dxId}->${tgwId}`,
+        source: dxId,
+        target: tgwId,
+        kind:   'dx',
+        label:  assoc.allowedPrefixes && assoc.allowedPrefixes.length > 0 ? assoc.allowedPrefixes.join(', ') : undefined,
+      })
+    }
+  }
+
   const vpcNameToId = new Map<string, string>()
 
   // ── VPCs + IGW + subnets + TGW attachments ────────────────────────────────

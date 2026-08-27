@@ -1,12 +1,28 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useConfig, useDispatch } from '../../store/configStore'
-import { FILE_MAP, findIncludes } from '../../parser'
+import { FILE_MAP, findIncludes, resolveConfigKey } from '../../parser'
 
-// Read all files from a FileSystemEntry recursively (handles folders with >100 entries)
-async function readEntry(entry: FileSystemEntry): Promise<File[]> {
+// A File paired with its path relative to the dropped/selected root, so
+// nested folders (e.g. per-region subfolders with same-named files like
+// vpc-templates.yaml) don't collide into a single basename.
+interface PickedFile {
+  file: File
+  path: string
+}
+
+// Read all files from a FileSystemEntry recursively (handles folders with >100 entries).
+// The Drag & Drop Entries API never populates File.webkitRelativePath (that's an
+// <input webkitdirectory>-only quirk), so the relative path has to be tracked by
+// hand from entry.fullPath or it's lost — collapsing every nested file to its
+// bare basename and risking silent collisions between same-named files in
+// different subfolders.
+async function readEntry(entry: FileSystemEntry): Promise<PickedFile[]> {
   if (entry.isFile) {
     return new Promise((resolve, reject) => {
-      ;(entry as FileSystemFileEntry).file((f) => resolve([f]), reject)
+      ;(entry as FileSystemFileEntry).file(
+        (f) => resolve([{ file: f, path: entry.fullPath.replace(/^\/+/, '') }]),
+        reject,
+      )
     })
   }
   if (entry.isDirectory) {
@@ -25,19 +41,25 @@ async function readEntry(entry: FileSystemEntry): Promise<File[]> {
   return []
 }
 
+// File objects from an <input> (plain or webkitdirectory) do carry
+// webkitRelativePath already — normalize them into the same PickedFile shape.
+function fromFileList(files: File[]): PickedFile[] {
+  return files.map((file) => ({ file, path: file.webkitRelativePath || file.name }))
+}
+
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch    = useDispatch()
   const { parseErrors } = useConfig()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processFiles = useCallback(
-    (files: File[]) => {
-      for (const file of files) {
+    (files: PickedFile[]) => {
+      for (const { file, path } of files) {
         if (!file.name.match(/\.(yaml|yml|txt|rules)$/i)) continue
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
-          dispatch({ type: 'SET_FILE', filename: file.webkitRelativePath || file.name, content })
+          dispatch({ type: 'SET_FILE', filename: path, content })
         }
         reader.readAsText(file)
       }
@@ -52,7 +74,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
       input.type = 'file'
       input.multiple = true
       input.setAttribute('webkitdirectory', '')
-      input.onchange = () => processFiles(Array.from(input.files ?? []))
+      input.onchange = () => processFiles(fromFileList(Array.from(input.files ?? [])))
       input.click()
     },
     [processFiles],
@@ -68,7 +90,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         const allFiles = (await Promise.all(entries.map(readEntry))).flat()
         processFiles(allFiles)
       } else {
-        processFiles(Array.from(e.dataTransfer.files))
+        processFiles(fromFileList(Array.from(e.dataTransfer.files)))
       }
     },
     [processFiles],
@@ -91,8 +113,11 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
 
   const hasFiles = Object.keys(loadedFiles).length > 0
 
+  // Keys in loadedFiles may carry a folder prefix (e.g. "MyLZA/organization-config.yaml")
+  // when a config folder was dropped or selected, so match top-level config files by
+  // basename via resolveConfigKey rather than an exact key match.
   const expectedFiles  = Object.keys(FILE_MAP)
-  const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => !(f in FILE_MAP))
+  const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => resolveConfigKey(f) == null)
 
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '16px 0' }}>
@@ -135,7 +160,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           accept=".yaml,.yml,.txt,.rules"
           multiple
           style={{ display: 'none' }}
-          onChange={(e) => processFiles(Array.from(e.target.files ?? []))}
+          onChange={(e) => processFiles(fromFileList(Array.from(e.target.files ?? [])))}
         />
       </div>
 
@@ -206,7 +231,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         Expected files
       </div>
       {expectedFiles.map((f) => {
-        const loaded = f in loadedFiles
+        const loaded = Object.keys(loadedFiles).some((k) => resolveConfigKey(k) === FILE_MAP[f])
         return (
           <div
             key={f}

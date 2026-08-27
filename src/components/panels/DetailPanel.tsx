@@ -30,6 +30,7 @@ const KIND_LABEL: Record<string, string> = {
   'tgw-rt':       'TGW Route Table',
   vpn:            'VPN Connection',
   cgw:            'Customer Gateway',
+  dx:             'Direct Connect Gateway',
   igw:            'Internet Gateway',
   'nat-gateway':   'NAT Gateway',
   'network-firewall': 'Network Firewall',
@@ -67,6 +68,7 @@ const KIND_COLOR: Record<string, string> = {
   'tgw-rt':       '#6B3FA0',
   vpn:            '#CC7700',
   cgw:            '#CC7700',
+  dx:             '#6B3FA0',
   igw:            '#007DB8',
   'nat-gateway':   '#007DB8',
   'network-firewall': '#CC3300',
@@ -129,6 +131,7 @@ const FIELD_LABEL: Record<string, string> = {
   central:           'Centralized Endpoint',
   gateway:           'Gateway Routing',
   resolverRules:     'Associated Resolver Rules',
+  virtualInterfaces: 'Virtual Interfaces',
   dnsFirewallRuleGroups: 'Associated DNS Firewall Groups',
   // Global config fields
   homeRegion:        'Home Region',
@@ -311,6 +314,19 @@ function Row({ label, value }: { label: string; value: unknown }) {
               return (
                 <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
                   <strong>{p.name}</strong>: {valStr}
+                </li>
+              )
+            }
+            // Generic named object (e.g. a virtual interface or permission set entry):
+            // show its name plus a compact summary of its other primitive fields.
+            if (item && typeof item === 'object' && 'name' in item) {
+              const { name, ...rest } = item as Record<string, unknown>
+              const parts = Object.entries(rest)
+                .filter(([, v]) => v !== undefined && v !== null && typeof v !== 'object')
+                .map(([k, v]) => `${k}: ${v}`)
+              return (
+                <li key={i} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+                  <strong>{String(name)}</strong>{parts.length > 0 ? ` (${parts.join(', ')})` : ''}
                 </li>
               )
             }

@@ -413,5 +413,57 @@ describe('networkParser', () => {
     expect(parsedRules[3].action).toBe('LIST_ENTRY')
     expect(parsedRules[3].header.destination).toBe('10.99.0.0/16')
   })
+
+  it('should render Direct Connect gateways under an on-premises group, linked to their associated TGWs', () => {
+    const config: NetworkConfig = {
+      transitGateways: [
+        { name: 'Network-Main', account: 'Network', region: 'eu-west-1', asn: 65000 },
+      ],
+      directConnectGateways: [
+        {
+          name: 'Accelerator-DXGW',
+          asn: 64512,
+          virtualInterfaces: [
+            { name: 'Accelerator-VIF', connectionId: 'dx-12345678', type: 'transit', vlan: 100 },
+          ],
+          transitGatewayAssociations: [
+            { name: 'Network-Main', account: 'Network', allowedPrefixes: ['10.0.0.0/8'] },
+          ],
+        },
+      ],
+    }
+
+    const model = parseNetwork(config)
+
+    const onPrem = model.nodes.find(n => n.id === 'on-premises')
+    expect(onPrem).toBeDefined()
+
+    const dxNode = model.nodes.find(n => n.kind === 'dx')
+    expect(dxNode).toBeDefined()
+    expect(dxNode?.parentId).toBe('on-premises')
+    expect(dxNode?.data.asn).toBe(64512)
+    expect((dxNode?.data.virtualInterfaces as unknown[])?.length).toBe(1)
+
+    const dxEdge = model.edges.find(e => e.kind === 'dx')
+    expect(dxEdge).toBeDefined()
+    expect(dxEdge?.source).toBe('dx:Accelerator-DXGW')
+    expect(dxEdge?.target).toBe('tgw:Network-Main')
+    expect(dxEdge?.label).toBe('10.0.0.0/8')
+  })
+
+  it('should not duplicate the on-premises group when both a CGW and a DX gateway are present', () => {
+    const config: NetworkConfig = {
+      customerGateways: [
+        { name: 'Office-CGW', account: 'Network', region: 'eu-west-1', ipAddress: '1.2.3.4', asn: 65001 },
+      ],
+      directConnectGateways: [
+        { name: 'Accelerator-DXGW', asn: 64512 },
+      ],
+    }
+
+    const model = parseNetwork(config)
+    const onPremNodes = model.nodes.filter(n => n.id === 'on-premises')
+    expect(onPremNodes.length).toBe(1)
+  })
 })
 
