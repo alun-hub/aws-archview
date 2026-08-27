@@ -1,3 +1,4 @@
+import ELK from 'elkjs/lib/elk.bundled.js'
 import type { Edge, Node } from '@xyflow/react'
 
 // ── Padding inside containers ──────────────────────────────────────────────────
@@ -12,11 +13,7 @@ function padTop(kind: string): number {
   return kind === 'tgw-rt-group' ? 42 : PAD_TOP
 }
 
-// Root-level gaps
-const R_H = 64   // horizontal gap between root nodes
-const R_V = 72   // vertical gap between root rows
-const HUB_TO_TGW   = 100  // gap: hub account bottom → TGW top
-const TGW_TO_SPOKE = 260  // gap: TGW bottom → spoke account tops
+
 
 // Max children per row per parent kind
 function maxCols(kind: string): number {
@@ -185,191 +182,176 @@ function computeBox(
   }
 }
 
-// ── Helper: arrange a flat list of boxes in a row-wrapped grid ─────────────────
-function gridLayout(
-  items: { id: string; w: number; h: number }[],
-  startX: number,
-  startY: number,
-  perRow: number,
-): Map<string, { x: number; y: number }> {
-  const pos = new Map<string, { x: number; y: number }>()
-  let x = startX, y = startY, rowH = 0, col = 0
-  for (const item of items) {
-    if (col >= perRow && col > 0) { x = startX; y += rowH + R_V; rowH = 0; col = 0 }
-    pos.set(item.id, { x, y })
-    x   += item.w + R_H
-    rowH = Math.max(rowH, item.h)
-    col++
-  }
-  return pos
-}
 
-// ── Main layout entry point ────────────────────────────────────────────────────
+
+const elk = new ELK()
+
 export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node[]> {
-  void edges
-  const nodeMap  = new Map(nodes.map((n) => [n.id, n]))
+  const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const byParent = new Map<string, Node[]>()
-  const roots: Node[] = []
-
+  
   for (const node of nodes) {
     if (node.parentId) {
       const arr = byParent.get(node.parentId) ?? []
-      arr.push(node); byParent.set(node.parentId, arr)
-    } else {
-      roots.push(node)
+      arr.push(node)
+      byParent.set(node.parentId, arr)
     }
   }
 
-  // Compute sizes for all roots
-  const boxOf = new Map(
-    roots.map((r) => [r.id, computeBox(r.id, byParent, nodeMap)])
-  )
+  // 1. Pre-calculate size and internal layout of VPCs using original computeBox
+  const vpcNodes = nodes.filter(n => (n.data as { kind?: string })?.kind === 'vpc')
+  const vpcInternalLayouts = new Map<string, { width: number; height: number; childPos: Map<string, { x: number; y: number }> }>()
+  
+  for (const vpc of vpcNodes) {
+    const box = computeBox(vpc.id, byParent, nodeMap)
+    vpcInternalLayouts.set(vpc.id, box)
+  }
 
-  // ── Classify roots into zones ──────────────────────────────────────────────
-  // TGW nodes tell us which account they belong to via data.account
-  const tgwNodes    = roots.filter((n) => (n.data as { kind?: string })?.kind === 'tgw')
-  const onPremNodes = roots.filter((n) => (n.data as { kind?: string })?.kind === 'on-premises')
-  const tgwRtNodes  = roots.filter((n) => (n.data as { kind?: string })?.kind === 'tgw-rt-group')
+  // 2. Separate high-level nodes (what ELK will layout) from inner VPC nodes (subnets & services inside VPCs)
+  const isDescendantOfVpc = (nodeId: string): boolean => {
+    let curr = nodeMap.get(nodeId)
+    while (curr?.parentId) {
+      const parent = nodeMap.get(curr.parentId)
+      if ((parent?.data as { kind?: string })?.kind === 'vpc') return true
+      curr = parent
+    }
+    return false
+  }
 
-  // Hub accounts = accounts that OWN a TGW (from data.account on tgw nodes)
-  const hubAccountNames = new Set(
-    tgwNodes.map((n) => (n.data as { account?: string })?.account).filter(Boolean)
-  )
-  const hubAccountNodes = roots.filter(
-    (n) =>
-      (n.data as { kind?: string })?.kind === 'account' &&
-      hubAccountNames.has((n.data as { label?: string })?.label ?? (n.data as { account?: string })?.account ?? '')
-  )
+  const highLevelNodes = nodes.filter(n => !isDescendantOfVpc(n.id))
 
-  // Also try matching by node id: account:{name}
-  const hubAccountNodesByLabel = roots.filter((n) => {
-    if ((n.data as { kind?: string })?.kind !== 'account') return false
-    return [...hubAccountNames].some((name) => n.id === `account:${name}`)
-  })
-  const hubSet = new Set([...hubAccountNodes, ...hubAccountNodesByLabel].map((n) => n.id))
-
-  const hubNodes    = roots.filter((n) => hubSet.has(n.id))
-  const internetNode = roots.find((n) => n.id === 'internet')
-  const spokeNodes  = roots.filter((n) => {
+  // Update high-level VPC nodes with their pre-calculated size
+  const preparedHighLevelNodes = highLevelNodes.map(n => {
     const kind = (n.data as { kind?: string })?.kind
-    return !hubSet.has(n.id) && kind !== 'tgw' && kind !== 'on-premises' && kind !== 'tgw-rt-group' && n.id !== 'internet'
+    if (kind === 'vpc') {
+      const internal = vpcInternalLayouts.get(n.id)
+      if (internal) {
+        return { ...n, width: internal.width, height: internal.height }
+      }
+    }
+    return n
   })
 
-  // ── Compute zone widths for centering ─────────────────────────────────────
-  // Zone 0 (topmost): internet node (if present)
-  const zone0W = internetNode ? boxOf.get(internetNode.id)!.width : 0
-  const zone0H = internetNode ? boxOf.get(internetNode.id)!.height : 0
-
-  // Zone A: hub accounts side by side
-  const hubW = hubNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-  const hubH = hubNodes.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
-
-  // Zone B (center): TGW nodes in a row
-  const tgwW = tgwNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-  const tgwH = tgwNodes.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
-
-  // Zone C (bottom): spoke accounts, 3 per row
-  const SPOKES_PER_ROW = 4
-  const firstSpokeRowW = spokeNodes
-    .slice(0, SPOKES_PER_ROW)
-    .reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-
-  // ── Compute all zone dimensions before picking refW ──────────────────────
-  const onPremH    = onPremNodes.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
-  const onPremW    = onPremNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-  const tgwRtW     = tgwRtNodes.reduce((s, n, i) => s + boxOf.get(n.id)!.width + (i > 0 ? R_H : 0), 0)
-  const tgwRtH     = tgwRtNodes.reduce((m, n) => Math.max(m, boxOf.get(n.id)!.height), 0)
-  const zoneBTotalW =
-    (tgwRtW  > 0 ? tgwRtW  + R_H * 2 : 0) +
-    tgwW +
-    (onPremW > 0 ? onPremW + R_H * 2 : 0)
-
-  // Canvas reference width = widest of Zone 0 / hub / spoke rows / Zone B
-  const refW = Math.max(zone0W, hubW, firstSpokeRowW, tgwW, zoneBTotalW)
-
-  const rootPos = new Map<string, { x: number; y: number }>()
-
-  // ── Zone 0: internet node (top row, centered) ─────────────────────────────
-  const zone0Y = 0
-  if (internetNode) {
-    const ix = Math.round((refW - zone0W) / 2)
-    rootPos.set(internetNode.id, { x: ix, y: zone0Y })
+  // 3. Build ELK Hierarchical Graph
+  interface ElkNode {
+    id: string
+    width?: number
+    height?: number
+    children?: ElkNode[]
+    layoutOptions?: Record<string, string>
+    x?: number
+    y?: number
   }
 
-  // ── Zone A: hub accounts (second row, centered over spoke columns) ────────
-  const zoneAY = zone0Y + (zone0H > 0 ? zone0H + R_V : 0)
-  const hubStartX = Math.round((refW - hubW) / 2)
-  let hx = hubStartX
-  for (const n of hubNodes) {
-    rootPos.set(n.id, { x: hx, y: zoneAY })
-    hx += boxOf.get(n.id)!.width + R_H
+  const elkNodesMap = new Map<string, ElkNode>()
+  
+  for (const n of preparedHighLevelNodes) {
+    elkNodesMap.set(n.id, {
+      id: n.id,
+      width: n.width ?? 120,
+      height: n.height ?? 100,
+      children: [],
+      layoutOptions: {
+        'elk.padding': `[top=${n.parentId ? 40 : 60},left=20,bottom=20,right=20]`
+      }
+    })
   }
 
-  // ── Zone B: [RT Tables] [TGW] [On-Premises] in one row ───────────────────
-  const zoneBY = zoneAY + (hubH > 0 ? hubH + HUB_TO_TGW : 0)
-
-  // Center TGW over spoke row; place RT tables to the left, On-Premises to the right
-  const tgwStartX = Math.round((refW - tgwW) / 2)
-
-  // TGW Route Tables — left of TGW
-  const rtStartX = tgwStartX - (tgwRtW > 0 ? tgwRtW + R_H * 2 : 0)
-  let rx = rtStartX
-  for (const n of tgwRtNodes) {
-    const h = boxOf.get(n.id)!.height
-    rootPos.set(n.id, { x: rx, y: zoneBY + Math.round((Math.max(tgwH, tgwRtH) - h) / 2) })
-    rx += boxOf.get(n.id)!.width + R_H
+  // Build tree
+  const elkRoots: ElkNode[] = []
+  for (const n of preparedHighLevelNodes) {
+    const elkNode = elkNodesMap.get(n.id)
+    if (elkNode) {
+      if (n.parentId && elkNodesMap.has(n.parentId)) {
+        elkNodesMap.get(n.parentId)!.children?.push(elkNode)
+      } else {
+        elkRoots.push(elkNode)
+      }
+    }
   }
 
-  // TGW
-  let tx = tgwStartX
-  for (const n of tgwNodes) {
-    rootPos.set(n.id, { x: tx, y: zoneBY })
-    tx += boxOf.get(n.id)!.width + R_H
+  // Map high-level edges
+  const elkEdges = edges
+    .filter(e => elkNodesMap.has(e.source) && elkNodesMap.has(e.target))
+    .map(e => ({
+      id: e.id,
+      sources: [e.source],
+      targets: [e.target]
+    }))
+
+  const elkGraph = {
+    id: 'root-graph',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': 'DOWN',
+      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+      'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+      'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+      'elk.spacing.nodeNode': '60',
+      'elk.spacing.nodeNodeBetweenLayers': '80'
+    },
+    children: elkRoots,
+    edges: elkEdges
   }
 
-  // On-Premises — right of TGW
-  const onPremX = tgwStartX + tgwW + R_H * 2
-  const onPremY = zoneBY + Math.round((tgwH - onPremH) / 2)
-  let opX = onPremX
-  for (const n of onPremNodes) {
-    rootPos.set(n.id, { x: opX, y: Math.max(zoneBY, onPremY) })
-    opX += boxOf.get(n.id)!.width + R_H
+  // Run ELK layout
+  const layoutedGraph = await elk.layout(elkGraph) as ElkNode
+
+  // 4. Flatten layouted nodes and restore original relative child positions
+  const finalPositions = new Map<string, { x: number; y: number; w: number; h: number }>()
+  
+  const collectPositions = (elkNode: ElkNode) => {
+    if (elkNode.x !== undefined && elkNode.y !== undefined && elkNode.width !== undefined && elkNode.height !== undefined) {
+      finalPositions.set(elkNode.id, { x: elkNode.x, y: elkNode.y, w: elkNode.width, h: elkNode.height })
+    }
+    for (const child of elkNode.children ?? []) {
+      collectPositions(child)
+    }
+  }
+  for (const child of layoutedGraph.children ?? []) {
+    collectPositions(child)
   }
 
-  // ── Zone C: spoke accounts (centered below TGW) ───────────────────────────
-  const zoneCY = zoneBY + Math.max(tgwH, onPremH, tgwRtH) + TGW_TO_SPOKE
-  const spokeStartX = Math.round((refW - firstSpokeRowW) / 2)
-  const spokeGrid = gridLayout(
-    spokeNodes.map((n) => ({ id: n.id, w: boxOf.get(n.id)!.width, h: boxOf.get(n.id)!.height })),
-    spokeStartX,
-    zoneCY,
-    SPOKES_PER_ROW,
-  )
-  for (const [id, pos] of spokeGrid) rootPos.set(id, pos)
-
-  // ── Build output ──────────────────────────────────────────────────────────
-  return nodes.map((node) => {
-    if (!node.parentId) {
-      const rp = rootPos.get(node.id)
-      const rb = boxOf.get(node.id)
-      if (!rp || !rb) return node
+  // Map output
+  return nodes.map(node => {
+    // If it's a high-level node laid out by ELK
+    if (finalPositions.has(node.id)) {
+      const pos = finalPositions.get(node.id)!
       return {
         ...node,
-        position: { x: rp.x, y: rp.y },
-        width: rb.width, height: rb.height,
-        style: { ...node.style, width: rb.width, height: rb.height },
+        position: { x: pos.x, y: pos.y },
+        width: pos.w,
+        height: pos.h,
+        style: { ...node.style, width: pos.w, height: pos.h }
       }
     }
 
-    const parentBox = computeBox(node.parentId, byParent, nodeMap)
-    const pos       = parentBox.childPos.get(node.id)
-    if (!pos) return node
-    const childBox  = computeBox(node.id, byParent, nodeMap)
-    return {
-      ...node,
-      position: { x: pos.x, y: pos.y },
-      width: childBox.width, height: childBox.height,
-      style: { ...node.style, width: childBox.width, height: childBox.height },
+    // If it's an inner VPC node (subnet or service inside VPC)
+    // Find its parent VPC
+    let vpcId = ''
+    let curr = nodeMap.get(node.id)
+    while (curr?.parentId) {
+      const parent = nodeMap.get(curr.parentId)
+      if (parent && (parent.data as { kind?: string })?.kind === 'vpc') {
+        vpcId = parent.id
+        break
+      }
+      curr = parent
     }
+
+    if (vpcId) {
+      const internal = vpcInternalLayouts.get(vpcId)
+      const relPos = internal?.childPos.get(node.id)
+      if (relPos) {
+        return {
+          ...node,
+          position: { x: relPos.x, y: relPos.y },
+          style: { ...node.style }
+        }
+      }
+    }
+
+    return node
   })
 }
