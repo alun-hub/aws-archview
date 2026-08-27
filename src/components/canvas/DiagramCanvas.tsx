@@ -221,6 +221,7 @@ function toFlowEdges(model: GraphModel): Edge[] {
       source: e.source,
       target: e.target,
       type: 'customLoop',
+      data: { kind: e.kind },
       pathOptions: { borderRadius: 16 },
       ...(sourceHandle ? { sourceHandle } : {}),
       ...(targetHandle ? { targetHandle } : {}),

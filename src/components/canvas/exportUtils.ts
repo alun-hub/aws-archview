@@ -72,17 +72,23 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 // ── draw.io XML ──────────────────────────────────────────────────────────────
 
+// Perimeter connection points shared by every container group
+const GROUP_POINTS =
+  'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];'
+
+// grIcon values below are verified against draw.io's mxgraph.aws4 stencil set.
+// Subnets share the generic `group_subnet` glyph and stay distinct via strokeColor.
 const DRAWIO_CONTAINER_STYLE: Record<string, string> = {
-  root:            'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
-  ou:              'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_organizational_unit;strokeColor=#E7157B;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
-  account:         'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#FF9900;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
-  region:          'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#4A90D9;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
-  'on-premises':   'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_corporate_data_center;strokeColor=#5A5A5A;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1;dashed=1',
-  vpc:             'points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;strokeColor=#8C4FFF;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
-  'subnet-public':  'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet_public;strokeColor=#248814;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
-  'subnet-private': 'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet_private;strokeColor=#1A6CAE;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
-  'subnet-firewall':'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_security;strokeColor=#CC3300;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
-  'subnet-tgw':     'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet_private;strokeColor=#6B3FA0;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
+  root:            `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1;dashed=1;dashPattern=6 3`,
+  ou:              `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.organizations_organizational_unit;strokeColor=#E7157B;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1`,
+  account:         `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#FF9900;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1`,
+  region:          `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#4A90D9;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1`,
+  'on-premises':   `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_corporate_data_center;strokeColor=#5A5A5A;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1;dashed=1`,
+  vpc:             `${GROUP_POINTS}shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;strokeColor=#8C4FFF;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1`,
+  'subnet-public':  'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet;strokeColor=#248814;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
+  'subnet-private': 'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet;strokeColor=#1A6CAE;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
+  'subnet-firewall':'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_security_group;strokeColor=#CC3300;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
+  'subnet-tgw':     'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_subnet;strokeColor=#6B3FA0;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=10;dashed=1',
   'tgw-rt-group':   'shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_vpc;strokeColor=#6B3FA0;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontSize=11;fontStyle=1',
 }
 
@@ -99,8 +105,9 @@ const DRAWIO_RESOURCE_STYLE: Record<string, string> = {
   alb:              'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#007DB8;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.elastic_load_balancing;verticalLabelPosition=bottom;verticalAlign=top;',
   dx:               'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#5A5A5A;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.direct_connect;verticalLabelPosition=bottom;verticalAlign=top;',
   'client-vpn':     'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#CC7700;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.client_vpn;verticalLabelPosition=bottom;verticalAlign=top;',
-  route53:          'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#007DB8;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.route_53;verticalLabelPosition=bottom;verticalAlign=top;',
-  cloud:            'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#007DB8;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloud;verticalLabelPosition=bottom;verticalAlign=top;',
+  route53:          'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.route_53_resolver;verticalLabelPosition=bottom;verticalAlign=top;',
+  cloud:            'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#232F3E;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.internet;verticalLabelPosition=bottom;verticalAlign=top;',
+  service:          'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#8C4FFF;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.endpoints;verticalLabelPosition=bottom;verticalAlign=top;',
 
   // Management & Governance
   organizations:    'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#E7157B;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.organizations;verticalLabelPosition=bottom;verticalAlign=top;',
@@ -120,6 +127,7 @@ const DRAWIO_RESOURCE_STYLE: Record<string, string> = {
   macie:            'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.macie;verticalLabelPosition=bottom;verticalAlign=top;',
   iam:              'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.role;verticalLabelPosition=bottom;verticalAlign=top;',
   'iam-core':       'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.role;verticalLabelPosition=bottom;verticalAlign=top;',
+  'access-analyzer':'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.access_analyzer;verticalLabelPosition=bottom;verticalAlign=top;',
   detective:        'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.detective;verticalLabelPosition=bottom;verticalAlign=top;',
   'audit-manager':  'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.audit_manager;verticalLabelPosition=bottom;verticalAlign=top;',
   acm:              'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#DD3B25;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.certificate_manager;verticalLabelPosition=bottom;verticalAlign=top;',
@@ -137,13 +145,31 @@ const DRAWIO_RESOURCE_STYLE: Record<string, string> = {
   ec2:              'outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=none;fillColor=#FF9900;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;verticalLabelPosition=bottom;verticalAlign=top;',
 }
 
+// Base edge styles — one per GraphEdge.kind, mirroring the on-canvas legend.
+// Exit/entry sides are appended per-edge from the ReactFlow connection handles.
+const EDGE_BASE = 'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;'
 const DRAWIO_EDGE_STYLE: Record<string, string> = {
-  tgw:         'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#6B3FA0;strokeWidth=2;dashed=1;dashPattern=8 4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;',
-  'tgw-hub':   'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#6B3FA0;strokeWidth=2;dashed=1;dashPattern=8 4;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;',
-  vpn:         'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#CC7700;strokeWidth=2;dashed=1;dashPattern=6 4;',
-  peering:     'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#1A6CAE;strokeWidth=2;dashed=1;dashPattern=5 3;',
-  flow:        'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#248814;strokeWidth=2;',
-  default:     'edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;strokeColor=#6B3FA0;strokeWidth=2;',
+  tgw:         `${EDGE_BASE}strokeColor=#6B3FA0;fontColor=#6B3FA0;strokeWidth=2;dashed=1;dashPattern=8 4;`,
+  'tgw-hub':   `${EDGE_BASE}strokeColor=#6B3FA0;fontColor=#6B3FA0;strokeWidth=2;dashed=1;dashPattern=8 4;`,
+  vpn:         `${EDGE_BASE}strokeColor=#CC7700;fontColor=#CC7700;strokeWidth=2;dashed=1;dashPattern=6 4;`,
+  dx:          `${EDGE_BASE}strokeColor=#6B3FA0;fontColor=#6B3FA0;strokeWidth=2;dashed=1;dashPattern=8 2 2 2;`,
+  peering:     `${EDGE_BASE}strokeColor=#1A6CAE;fontColor=#1A6CAE;strokeWidth=2;dashed=1;dashPattern=5 3;`,
+  propagation: `${EDGE_BASE}strokeColor=#6B3FA0;fontColor=#6B3FA0;strokeWidth=1;dashed=1;dashPattern=2 3;`,
+  flow:        `${EDGE_BASE}strokeColor=#248814;fontColor=#248814;strokeWidth=2;`,
+  default:     `${EDGE_BASE}strokeColor=#6B3FA0;fontColor=#6B3FA0;strokeWidth=2;`,
+}
+
+// ReactFlow handle id ("bottom-s", "left-t", …) → draw.io exit/entry fractions
+const HANDLE_XY: Record<string, [number, number]> = {
+  top: [0.5, 0], bottom: [0.5, 1], left: [0, 0.5], right: [1, 0.5],
+}
+function exitEntryStyle(sourceHandle?: string | null, targetHandle?: string | null): string {
+  let s = ''
+  const sp = sourceHandle && HANDLE_XY[sourceHandle.replace(/-[st]$/, '')]
+  const tp = targetHandle && HANDLE_XY[targetHandle.replace(/-[st]$/, '')]
+  if (sp) s += `exitX=${sp[0]};exitY=${sp[1]};exitDx=0;exitDy=0;`
+  if (tp) s += `entryX=${tp[0]};entryY=${tp[1]};entryDx=0;entryDy=0;`
+  return s
 }
 
 function escapeXml(s: string): string {
@@ -178,11 +204,12 @@ export function exportToDrawio(nodes: Node[], edges: Edge[], label = 'archview')
 
   let edgeCounter = 0
   const edgeCells = edges.map((e) => {
-    const kind  = (e as { kind?: string })?.kind ?? 'default'
-    const style = DRAWIO_EDGE_STYLE[kind] ?? DRAWIO_EDGE_STYLE.default
-    const lbl   = e.label ? ` label="${escapeXml(String(e.label))}"` : ''
+    const kind  = (e.data as { kind?: string } | undefined)?.kind ?? 'default'
+    const base  = DRAWIO_EDGE_STYLE[kind] ?? DRAWIO_EDGE_STYLE.default
+    const style = base + exitEntryStyle(e.sourceHandle, e.targetHandle)
+    const value = e.label != null && e.label !== '' ? escapeXml(String(e.label)) : ''
     const id    = `edge-${++edgeCounter}`
-    return `    <mxCell id="${id}"${lbl} style="${style}" edge="1" source="${escapeXml(e.source)}" target="${escapeXml(e.target)}" parent="1">
+    return `    <mxCell id="${id}" value="${value}" style="${style}" edge="1" source="${escapeXml(e.source)}" target="${escapeXml(e.target)}" parent="1">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>`
   })
