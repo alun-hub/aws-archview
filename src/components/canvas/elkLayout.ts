@@ -1,5 +1,22 @@
 import ELK from 'elkjs/lib/elk.bundled.js'
 import type { Edge, Node } from '@xyflow/react'
+import type { Segment } from './edgeRouting'
+
+export interface LayoutResult {
+  nodes: Node[]
+  edgeSegments: Map<string, Segment[]>
+}
+
+interface ElkNode {
+  id: string
+  width?: number
+  height?: number
+  children?: ElkNode[]
+  layoutOptions?: Record<string, string>
+  x?: number
+  y?: number
+  edges?: any[]
+}
 
 // ── Padding inside containers ──────────────────────────────────────────────────
 const PAD_TOP    = 60
@@ -210,7 +227,7 @@ function computeBoxInternal(
 
 const elk = new ELK()
 
-export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node[]> {
+export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<LayoutResult> {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const byParent = new Map<string, Node[]>()
   
@@ -258,16 +275,6 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
   })
 
   // 3. Build ELK Hierarchical Graph
-  interface ElkNode {
-    id: string
-    width?: number
-    height?: number
-    children?: ElkNode[]
-    layoutOptions?: Record<string, string>
-    x?: number
-    y?: number
-  }
-
   const elkNodesMap = new Map<string, ElkNode>()
   
   for (const n of preparedHighLevelNodes) {
@@ -397,8 +404,34 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
     collectPositions(child)
   }
 
-  // Map output
-  return nodes.map(node => {
+  // Extract ELK edge segments
+  const edgeSegments = new Map<string, Segment[]>()
+  if (layoutedGraph.edges) {
+    for (const edge of layoutedGraph.edges) {
+      const segments: Segment[] = []
+      const section = edge.sections?.[0]
+      if (section) {
+        const points = [
+          section.startPoint,
+          ...(section.bendPoints ?? []),
+          section.endPoint
+        ]
+        for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i]
+          const p2 = points[i+1]
+          segments.push({
+            p1: { x: p1.x, y: p1.y },
+            p2: { x: p2.x, y: p2.y },
+            isHorizontal: Math.abs(p1.y - p2.y) < 0.1,
+            edgeId: edge.id
+          })
+        }
+      }
+      edgeSegments.set(edge.id, segments)
+    }
+  }
+
+  const mappedNodes = nodes.map(node => {
     // 1. If it's a high-level node laid out by ELK
     if (finalPositions.has(node.id)) {
       const pos = finalPositions.get(node.id)!
@@ -429,4 +462,6 @@ export async function applyElkLayout(nodes: Node[], edges: Edge[]): Promise<Node
 
     return node
   })
+
+  return { nodes: mappedNodes, edgeSegments }
 }

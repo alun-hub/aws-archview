@@ -12,7 +12,7 @@ describe('elkLayout', () => {
     ]
     const edges: Edge[] = []
 
-    const result = await applyElkLayout(nodes, edges)
+    const { nodes: result } = await applyElkLayout(nodes, edges)
     expect(result).toHaveLength(4)
 
     const rootNode = result.find(n => n.id === 'root')
@@ -58,7 +58,7 @@ describe('elkLayout', () => {
     ]
     const edges: Edge[] = []
 
-    const result = await applyElkLayout(nodes, edges)
+    const { nodes: result } = await applyElkLayout(nodes, edges)
     expect(result).toHaveLength(6)
 
     const subnetNode = result.find(n => n.id === 'subnet:prod-public')
@@ -88,7 +88,7 @@ describe('elkLayout', () => {
       { id: 'edge-1', source: 'service:web-server', target: 'service:db-server' }
     ]
 
-    const result = await applyElkLayout(nodes, edges)
+    const { nodes: result } = await applyElkLayout(nodes, edges)
     expect(result).toHaveLength(8)
 
     const webServer = result.find(n => n.id === 'service:web-server')

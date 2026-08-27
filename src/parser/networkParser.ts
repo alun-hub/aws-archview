@@ -112,7 +112,8 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   const rtByTgwAccount = new Map<string, Set<string>>()
   for (const vpc of networkConfig.vpcs ?? []) {
     for (const att of vpc.transitGatewayAttachments ?? []) {
-      const key = `${att.transitGateway.name}::${vpc.account}`
+      const tgwName = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
+      const key = `${tgwName}::${vpc.account}`
       const set = rtByTgwAccount.get(key) ?? new Set()
       for (const rt of att.routeTableAssociations ?? []) set.add(rt.routeTableName)
       rtByTgwAccount.set(key, set)
@@ -175,7 +176,8 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   // ── TGW Route Tables (grouped in a container, placed in Zone B left of TGW) ─
   const rtGroupsByTgw = new Map<string, string[]>()
   for (const rt of networkConfig.transitGatewayRouteTables ?? []) {
-    const tgwName = rt.transitGateway.name
+    const tgwName = typeof rt.transitGateway === 'string' ? rt.transitGateway : rt.transitGateway?.name
+    if (!tgwName) continue
     const arr = rtGroupsByTgw.get(tgwName) ?? []
     arr.push(rt.name)
     rtGroupsByTgw.set(tgwName, arr)
@@ -517,13 +519,15 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
 
     // ③ TGW attachment edges with route table label
     for (const att of vpc.transitGatewayAttachments ?? []) {
-      const tgwCfg = networkConfig.transitGateways?.find((t) => t.name === att.transitGateway.name)
-      const tgwId  = `tgw:${att.transitGateway.name}`
+      const tgwName = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
+      if (!tgwName) continue
+      const tgwCfg = networkConfig.transitGateways?.find((t) => t.name === tgwName)
+      const tgwId  = `tgw:${tgwName}`
       const isHub  = tgwCfg?.account === vpc.account
       const edgeId = `${tgwId}->${vpcId}`
 
       if (!edges.find((e) => e.id === edgeId)) {
-        const rtSet   = rtByTgwAccount.get(`${att.transitGateway.name}::${vpc.account}`) ?? new Set()
+        const rtSet   = rtByTgwAccount.get(`${tgwName}::${vpc.account}`) ?? new Set()
         const rtLabel = rtSet.size > 0 ? [...rtSet].join(', ') : undefined
         edges.push({
           id:     edgeId,

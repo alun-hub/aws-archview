@@ -667,6 +667,7 @@ export function DiagramCanvas({ model }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [fitViewTrigger, setFitViewTrigger] = useState(0)
+  const [elkEdgeSegments, setElkEdgeSegments] = useState<Map<string, Segment[]>>(new Map())
   const config   = useConfig()
   const dispatch = useDispatch()
   const { collapsedNodes } = config
@@ -752,11 +753,15 @@ export function DiagramCanvas({ model }: Props) {
       const sN = nodeMap.get(e.source)
       const tN = nodeMap.get(e.target)
       if (!sN || !tN) continue
-      const sa = absPosMap.get(e.source) ?? { x: 0, y: 0 }
-      const ta = absPosMap.get(e.target) ?? { x: 0, y: 0 }
-      const sp = getHandlePosition(sN, e.sourceHandle ?? null, sa)
-      const tp = getHandlePosition(tN, e.targetHandle ?? null, ta)
-      const segs = getEdgeSegments(sp.x, sp.y, tp.x, tp.y, e.sourceHandle ?? null, e.id)
+
+      const segs = elkEdgeSegments.get(e.id) ?? (() => {
+        const sa = absPosMap.get(e.source) ?? { x: 0, y: 0 }
+        const ta = absPosMap.get(e.target) ?? { x: 0, y: 0 }
+        const sp = getHandlePosition(sN, e.sourceHandle ?? null, sa)
+        const tp = getHandlePosition(tN, e.targetHandle ?? null, ta)
+        return getEdgeSegments(sp.x, sp.y, tp.x, tp.y, e.sourceHandle ?? null, e.id)
+      })()
+
       for (const s of segs) {
         if (!s.isHorizontal) {
           otherVerticals.push(s)
@@ -764,8 +769,8 @@ export function DiagramCanvas({ model }: Props) {
       }
     }
 
-    return { nodeMap, absPosMap, otherVerticals }
-  }, [nodes, edges])
+    return { nodeMap, absPosMap, otherVerticals, elkSegments: elkEdgeSegments }
+  }, [nodes, edges, elkEdgeSegments])
 
   // 1. Re-calculate layout when model or collapse state changes
   useEffect(() => {
@@ -775,8 +780,9 @@ export function DiagramCanvas({ model }: Props) {
       data: { ...n.data, hasChildren: nodeParentIds.has(n.id) },
     }))
     const rawEdges = toFlowEdges(filteredModel)
-    applyElkLayout(rawNodes, rawEdges).then((laid) => {
-      setNodes(sortParentsFirst(laid))
+    applyElkLayout(rawNodes, rawEdges).then(({ nodes: laidNodes, edgeSegments }) => {
+      setNodes(sortParentsFirst(laidNodes))
+      setElkEdgeSegments(edgeSegments)
       setFitViewTrigger(k => k + 1)
     })
   }, [filteredModel, nodeParentIds, setNodes, collapsedNodes])

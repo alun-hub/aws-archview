@@ -17,6 +17,7 @@ export interface EdgeRoutingContextValue {
   nodeMap: Map<string, Node>
   absPosMap: Map<string, Point>
   otherVerticals: Segment[]
+  elkSegments?: Map<string, Segment[]>
 }
 
 export const EdgeRoutingContext = createContext<EdgeRoutingContextValue | null>(null)

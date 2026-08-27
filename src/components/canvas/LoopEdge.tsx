@@ -26,9 +26,10 @@ export function LoopEdge({
   const sPos = getHandlePosition(sourceNode, sourceHandleId ?? null, sAbs)
   const tPos = getHandlePosition(targetNode, targetHandleId ?? null, tAbs)
 
-  const mySegments = getEdgeSegments(sPos.x, sPos.y, tPos.x, tPos.y, sourceHandleId ?? null, id)
+  const mySegments = ctx.elkSegments?.get(id) ?? getEdgeSegments(sPos.x, sPos.y, tPos.x, tPos.y, sourceHandleId ?? null, id)
 
-  let pathD = `M ${sPos.x} ${sPos.y}`
+  const startPoint = mySegments.length > 0 ? mySegments[0].p1 : sPos
+  let pathD = `M ${startPoint.x} ${startPoint.y}`
 
   for (const seg of mySegments) {
     if (seg.isHorizontal) {
