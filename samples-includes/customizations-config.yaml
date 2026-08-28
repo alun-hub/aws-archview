@@ -1,31 +1,34 @@
-cloudFormationStacks: !include include/cloudformation-stacks.yaml
+applications: []
 
-cloudFormationStackSets:
-  - name: SSM-SessionManager-Config
-    description: SSM Session Manager configuration across all workload accounts
-    regions:
-      - {{HOME_REGION}}
-      - eu-north-1
-    deploymentTargets:
-      organizationalUnits:
-        - Workloads
-        - Infrastructure
-    template: cfn-templates/ssm-session-manager.yaml
-    runOrder: 1
+customizations:
+  cloudFormationStacks: !include include/cloudformation-stacks.yaml
 
-serviceCatalogPortfolios:
-  - name: Platform-Products
-    description: Approved cloud platform products for workload teams
-    provider: Platform Engineering
-    regions:
-      - {{HOME_REGION}}
-    deploymentTargets:
-      organizationalUnits:
-        - Workloads
-    products:
-      - name: Standard-VPC
-        version: "1.2.0"
-        description: Pre-approved VPC layout with TGW attachment
-      - name: Managed-RDS-Postgres
-        version: "2.0.1"
-        description: RDS Postgres with automated backups and encryption
+  cloudFormationStackSets:
+    - name: SSM-SessionManager-Config
+      description: SSM Session Manager configuration across all workload accounts
+      regions:
+        - {{HOME_REGION}}
+        - eu-north-1
+      deploymentTargets:
+        organizationalUnits:
+          - Workloads
+          - Infrastructure
+      template: cfn-templates/ssm-session-manager.yaml
+      runOrder: 1
+
+  serviceCatalogPortfolios:
+    - name: Platform-Products
+      description: Approved cloud platform products for workload teams
+      provider: Platform Engineering
+      regions:
+        - {{HOME_REGION}}
+      deploymentTargets:
+        organizationalUnits:
+          - Workloads
+      products:
+        - name: Standard-VPC
+          version: "1.2.0"
+          description: Pre-approved VPC layout with TGW attachment
+        - name: Managed-RDS-Postgres
+          version: "2.0.1"
+          description: RDS Postgres with automated backups and encryption

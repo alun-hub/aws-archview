@@ -458,17 +458,28 @@ export interface CfnStackConfig {
   tags?: { key: string; value: string }[]
 }
 
-export interface CustomizationsConfig {
+export interface ServiceCatalogPortfolioConfig {
+  name: string
+  description?: string
+  provider?: string
+  regions?: string[]
+  deploymentTargets?: CfnDeploymentTargets
+  products?: { name: string; version: string; description?: string }[]
+}
+
+export interface CustomizationConfigBlock {
   cloudFormationStacks?: CfnStackConfig[]
   cloudFormationStackSets?: CfnStackConfig[]
-  serviceCatalogPortfolios?: {
-    name: string
-    description?: string
-    provider?: string
-    regions?: string[]
-    deploymentTargets?: CfnDeploymentTargets
-    products?: { name: string; version: string; description?: string }[]
-  }[]
+  serviceCatalogPortfolios?: ServiceCatalogPortfolioConfig[]
+}
+
+// LZA's customizations-config.yaml nests the stack/portfolio lists under a
+// `customizations:` key (alongside a top-level `applications:`). Hand-written
+// configs sometimes put those lists at the top level instead, so both layouts
+// are accepted — the parser reads `customizations` first, then falls back flat.
+export interface CustomizationsConfig extends CustomizationConfigBlock {
+  customizations?: CustomizationConfigBlock
+  applications?: unknown[]
 }
 
 // ── Parsed graph model ────────────────────────────────────────────────────────

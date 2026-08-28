@@ -14,12 +14,18 @@ export function parseCustomizations(cfg: CustomizationsConfig, aggregateStacks: 
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
 
+  // LZA nests these under `customizations:`; tolerate a flat top-level layout too.
+  const block = cfg.customizations ?? cfg
+  const cfnStacks    = block.cloudFormationStacks    ?? []
+  const cfnStackSets = block.cloudFormationStackSets ?? []
+  const scPortfolios = block.serviceCatalogPortfolios ?? []
+
   const allStacks: StackEntry[] = [
-    ...(cfg.cloudFormationStacks    ?? []).map(s => ({ ...s, isStackSet: false })),
-    ...(cfg.cloudFormationStackSets ?? []).map(s => ({ ...s, isStackSet: true  })),
+    ...cfnStacks.map(s => ({ ...s, isStackSet: false })),
+    ...cfnStackSets.map(s => ({ ...s, isStackSet: true  })),
   ]
 
-  if (allStacks.length === 0 && !(cfg.serviceCatalogPortfolios?.length)) {
+  if (allStacks.length === 0 && scPortfolios.length === 0) {
     return { nodes, edges }
   }
 
@@ -115,7 +121,7 @@ export function parseCustomizations(cfg: CustomizationsConfig, aggregateStacks: 
   }
 
   // Service Catalog portfolios as separate OU-style groups
-  for (const portfolio of cfg.serviceCatalogPortfolios ?? []) {
+  for (const portfolio of scPortfolios) {
     const groupId = `sc-portfolio:${portfolio.name}`
     nodes.push({
       id: groupId,
