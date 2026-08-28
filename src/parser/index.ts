@@ -126,13 +126,36 @@ function loadTolerant(content: string, schema: yaml.Schema): unknown {
   }, {})
 }
 
+// An !include that points at a file the user didn't load resolves to null
+// (see buildIncludeSchema). When that !include sits in a YAML sequence —
+// `vpcs:`, `transitGateways:`, `customerGateways:`, … — the null becomes an
+// array element, and every parser that iterates the sequence (`for (const vpc
+// of networkConfig.vpcs ?? [])`) then throws on the first missing entry. Strip
+// nullish holes from every array in the parsed tree so one absent include
+// degrades gracefully (the "Missing included files" panel already reports it)
+// instead of taking down the whole view. Object properties are left as-is —
+// parsers guard those with optional chaining.
+function compactIncludeHoles(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.filter((v) => v != null).map(compactIncludeHoles)
+  }
+  if (value !== null && typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    for (const key of Object.keys(obj)) {
+      obj[key] = compactIncludeHoles(obj[key])
+    }
+    return obj
+  }
+  return value
+}
+
 // ── Public parse API ──────────────────────────────────────────────────────────
 
 export function parseYaml<T>(content: string, loadedFiles: Record<string, string> = {}): T {
   const replacementsMap = buildReplacementsMap(loadedFiles)
   const resolved = resolveReplacements(content, replacementsMap)
   const schema = buildIncludeSchema(loadedFiles, replacementsMap)
-  return loadTolerant(resolved, schema) as T
+  return compactIncludeHoles(loadTolerant(resolved, schema)) as T
 }
 
 export function parsedForKey(key: keyof LzaConfigs, content: string, loadedFiles: Record<string, string> = {}): Partial<LzaConfigs> {
