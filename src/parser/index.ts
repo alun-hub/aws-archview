@@ -52,22 +52,51 @@ export function findIncludes(content: string, loadedFiles: Record<string, string
 // ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
 
 function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, string> {
-  const raw = loadedFiles['replacements-config.yaml']
+  // Dropping a config folder prefixes every key ("my-lza/replacements-config.yaml"),
+  // so match by basename like findFile does — an exact-key miss here silently
+  // collapses every {{ TOKEN }} to its literal name, which then makes every
+  // templated !include path read as a missing file.
+  const raw =
+    findFile('replacements-config.yaml', loadedFiles) ??
+    findFile('replacements-config.yml', loadedFiles)
   if (!raw) return new Map()
   try {
     const config = yaml.load(raw, { schema: yaml.DEFAULT_SCHEMA, json: true }) as {
-      globalReplacements?: Array<{ key: string; type?: string; value?: string | string[] }>
+      globalReplacements?: Array<{ key?: string; type?: string; value?: string | string[] }>
     }
     const map = new Map<string, string>()
     for (const r of config?.globalReplacements ?? []) {
-      if (!r.key || r.value == null) continue
-      // SSM path-based replacements are skipped in the browser
+      if (!r?.key || r.value == null) continue
+      // SSM path-based replacements (no literal value) can't resolve in the browser
       map.set(r.key, Array.isArray(r.value) ? r.value.join(', ') : String(r.value))
     }
     return map
   } catch {
     return new Map()
   }
+}
+
+// Replacement tokens used inside !include paths that don't resolve to anything —
+// the reason a templated path degrades to a literal "missing" file name such as
+// "Classification-Stage-RegionName-CVpn.yaml". Colon-bearing keys are LZA
+// lookups (resolve:ssm:…, accel-lookup:…) that never resolve client-side, so
+// they're excluded as noise.
+export function findUnresolvedReplacements(loadedFiles: Record<string, string> = {}): string[] {
+  const map = buildReplacementsMap(loadedFiles)
+  // Grab the rest of each !include line (tokens like "{{ Stage }}" contain
+  // spaces, so a \S+ path capture would stop at the first one).
+  const includeLineRe = /!include[ \t]+(.+)/g
+  const tokenRe = /\{\{\s*([^{}]+?)\s*\}\}/g
+  const unresolved = new Set<string>()
+  for (const content of Object.values(loadedFiles)) {
+    for (const inc of content.matchAll(includeLineRe)) {
+      for (const tok of inc[1].matchAll(tokenRe)) {
+        const key = tok[1].trim()
+        if (!key.includes(':') && !map.has(key)) unresolved.add(key)
+      }
+    }
+  }
+  return [...unresolved].sort()
 }
 
 function resolveReplacements(content: string, replacementsMap: Map<string, string>): string {

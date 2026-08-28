@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseYaml } from '../index'
+import { parseYaml, findUnresolvedReplacements } from '../index'
 import { parseNetwork } from '../networkParser'
 import type { NetworkConfig } from '../types'
 
@@ -41,6 +41,50 @@ describe('parseYaml — missing !include handling', () => {
     expect(() => parseNetwork(config)).not.toThrow()
     const model = parseNetwork(config)
     expect(model.nodes.some((n) => n.kind === 'vpc' && n.label === 'Present-VPC')).toBe(true)
+  })
+
+  it('resolves {{ tokens }} when replacements-config.yaml sits under a folder prefix', () => {
+    const replacements = [
+      'globalReplacements:',
+      '  - key: Classification',
+      '    type: String',
+      '    value: Restricted',
+      '  - key: Stage',
+      '    type: String',
+      '    value: Prod',
+    ].join('\n')
+
+    const networkYaml = [
+      'vpcs:',
+      '  - !include includes_network/vpc/{{ Classification }}-{{ Stage }}-CVpn.yaml',
+    ].join('\n')
+
+    const vpcYaml = [
+      'name: Restricted-Prod-CVpn',
+      'account: Network',
+      'region: eu-north-1',
+      'cidrs: [10.9.0.0/22]',
+    ].join('\n')
+
+    // Folder drop → every key carries the "my-lza/" prefix
+    const config = parseYaml<NetworkConfig>(networkYaml, {
+      'my-lza/replacements-config.yaml': replacements,
+      'my-lza/includes_network/vpc/Restricted-Prod-CVpn.yaml': vpcYaml,
+    })
+
+    expect(config.vpcs).toHaveLength(1)
+    expect(config.vpcs?.[0]?.name).toBe('Restricted-Prod-CVpn')
+  })
+
+  it('reports {{ tokens }} in !include paths that have no replacement value', () => {
+    const files = {
+      'my-lza/network-config.yaml': [
+        'vpcs:',
+        '  - !include includes/{{ Classification }}-{{ Stage }}-{{ RegionName }}-CVpn.yaml',
+      ].join('\n'),
+      'my-lza/replacements-config.yaml': 'globalReplacements:\n  - key: Stage\n    value: Prod\n',
+    }
+    expect(findUnresolvedReplacements(files)).toEqual(['Classification', 'RegionName'])
   })
 
   it('leaves a nullish object property (not a sequence hole) untouched', () => {

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useConfig, useDispatch } from '../../store/configStore'
-import { FILE_MAP, findIncludes, resolveConfigKey } from '../../parser'
+import { FILE_MAP, findIncludes, findUnresolvedReplacements, resolveConfigKey } from '../../parser'
 
 // A File paired with its path relative to the dropped/selected root, so
 // nested folders (e.g. per-region subfolders with same-named files like
@@ -111,6 +111,14 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
     return missing
   }, [loadedFiles])
 
+  // {{ TOKEN }} placeholders in !include paths that aren't defined in
+  // replacements-config.yaml — the usual reason a whole batch of includes
+  // shows up as "missing" with templated-looking names.
+  const unresolvedReplacements = useMemo(
+    () => findUnresolvedReplacements(loadedFiles),
+    [loadedFiles],
+  )
+
   const hasFiles = Object.keys(loadedFiles).length > 0
 
   // Keys in loadedFiles may carry a folder prefix (e.g. "MyLZA/organization-config.yaml")
@@ -204,6 +212,28 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
               <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>✗ {f}</div>
               <div style={{ opacity: 0.85, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Unresolved replacement tokens — explains templated "missing" names */}
+      {unresolvedReplacements.length > 0 && (
+        <div style={{
+          background: '#fffbe6',
+          border: '1px solid #ffe58f',
+          borderRadius: 6,
+          padding: '8px 10px',
+          marginBottom: 12,
+          fontSize: 11,
+          color: '#7c5c00',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Unresolved replacements:</div>
+          <div style={{ marginBottom: 4, opacity: 0.85 }}>
+            These <code>{'{{ }}'}</code> tokens in <code>!include</code> paths have no value —
+            add them to <code>replacements-config.yaml</code> (and make sure that file is loaded).
+          </div>
+          {unresolvedReplacements.map((k) => (
+            <div key={k} style={{ fontFamily: 'monospace', opacity: 0.85 }}>↳ {'{{ '}{k}{' }}'}</div>
           ))}
         </div>
       )}
