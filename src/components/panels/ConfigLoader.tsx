@@ -47,6 +47,11 @@ function fromFileList(files: File[]): PickedFile[] {
   return files.map((file) => ({ file, path: file.webkitRelativePath || file.name }))
 }
 
+// Shared style for the parse-error / missing-file / unresolved-token callouts.
+const noticeBase = { borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 11 }
+const noticeError = { ...noticeBase, background: '#fdf0ee', border: '1px solid #f0b5ac', color: '#8b2c1e' }
+const noticeWarn  = { ...noticeBase, background: '#fffbe6', border: '1px solid #ffe58f', color: '#7c5c00' }
+
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch    = useDispatch()
   const { parseErrors } = useConfig()
@@ -197,15 +202,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
 
       {/* Parse errors */}
       {Object.keys(parseErrors).length > 0 && (
-        <div style={{
-          background: '#fdf0ee',
-          border: '1px solid #f0b5ac',
-          borderRadius: 6,
-          padding: '8px 10px',
-          marginBottom: 12,
-          fontSize: 11,
-          color: '#8b2c1e',
-        }}>
+        <div style={noticeError}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Files that failed to parse:</div>
           {Object.entries(parseErrors).map(([f, msg]) => (
             <div key={f} style={{ marginBottom: 4 }}>
@@ -218,15 +215,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
 
       {/* Unresolved replacement tokens — explains templated "missing" names */}
       {unresolvedReplacements.length > 0 && (
-        <div style={{
-          background: '#fffbe6',
-          border: '1px solid #ffe58f',
-          borderRadius: 6,
-          padding: '8px 10px',
-          marginBottom: 12,
-          fontSize: 11,
-          color: '#7c5c00',
-        }}>
+        <div style={noticeWarn}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Unresolved replacements:</div>
           <div style={{ marginBottom: 4, opacity: 0.85 }}>
             These <code>{'{{ }}'}</code> tokens in <code>!include</code> paths have no value —
@@ -240,15 +229,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
 
       {/* Unresolved include warnings */}
       {unresolvedIncludes.length > 0 && (
-        <div style={{
-          background: '#fffbe6',
-          border: '1px solid #ffe58f',
-          borderRadius: 6,
-          padding: '8px 10px',
-          marginBottom: 12,
-          fontSize: 11,
-          color: '#7c5c00',
-        }}>
+        <div style={noticeWarn}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Missing included files:</div>
           {unresolvedIncludes.map((f) => (
             <div key={f} style={{ fontFamily: 'monospace', opacity: 0.85 }}>↳ {f}</div>

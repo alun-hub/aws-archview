@@ -1,4 +1,5 @@
 import ELK from 'elkjs/lib/elk.bundled.js'
+import type { ElkExtendedEdge } from 'elkjs/lib/elk-api'
 import type { Edge, Node } from '@xyflow/react'
 import type { Segment } from './edgeRouting'
 
@@ -15,7 +16,7 @@ interface ElkNode {
   layoutOptions?: Record<string, string>
   x?: number
   y?: number
-  edges?: any[]
+  edges?: ElkExtendedEdge[]
 }
 
 // ── Padding inside containers ──────────────────────────────────────────────────
