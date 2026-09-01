@@ -160,7 +160,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               color: '#1a1a1a',
               fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
               whiteSpace: 'nowrap',
+              maxWidth: 640,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
+            title={d.label}
           >
             {d.label}
           </div>
@@ -241,7 +245,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                 color: '#1a1a1a',
                 fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
                 whiteSpace: 'nowrap',
+                ...(d.kind === 'vpc'
+                  ? { maxWidth: 640, overflow: 'hidden', textOverflow: 'ellipsis' }
+                  : {}),
               }}
+              title={getHeaderText()}
             >
               {getHeaderText()}
             </div>

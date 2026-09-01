@@ -31,6 +31,29 @@ function padTop(kind: string): number {
   return kind === 'tgw-rt-group' ? 42 : PAD_TOP
 }
 
+// ── Header-label width ────────────────────────────────────────────────────────
+// VPC / subnet names can be long (50+ chars). Their label sits on the top
+// border with a nowrap white background, so the box must be wide enough to hold
+// it or the text spills outside and collides with neighbours. Approximate the
+// rendered width of the 11px bold Amazon Ember header and use it as a floor.
+const HEADER_CHAR_PX = 7
+const HEADER_MAX_PX   = 660   // ~90 chars — hard cap so a pathological name can't blow up layout
+
+function headerLabelWidth(node: Node): number {
+  const d = node.data as { label?: string; kind?: string; cidr?: string; cidrs?: string[] }
+  const kind = d.kind ?? ''
+  if (kind !== 'vpc' && !kind.startsWith('subnet')) return 0
+  let text = d.label ?? ''
+  if (kind === 'vpc') {
+    const cidr = Array.isArray(d.cidrs) && d.cidrs.length > 0
+      ? d.cidrs[0]
+      : (typeof d.cidr === 'string' ? d.cidr : '')
+    if (cidr) text += ` (${cidr})`
+  }
+  const px = Math.round(text.length * HEADER_CHAR_PX) + 44
+  return Math.min(HEADER_MAX_PX, px)
+}
+
 
 
 // Max children per row per parent kind
@@ -87,7 +110,7 @@ function computeBoxInternal(
 
   if (children.length === 0) {
     return {
-      width:    (node.width  ?? 120) as number,
+      width:    Math.max((node.width ?? 120) as number, headerLabelWidth(node)),
       height:   (node.height ?? 160) as number,
       childPos: new Map(),
     }
@@ -198,7 +221,7 @@ function computeBoxInternal(
     const totalGridHeight = gridStartY + rowHeights.reduce((sum, h) => sum + h, 0) + (rowHeights.length - 1) * V_GAP + PAD_BOTTOM
 
     return {
-      width: Math.max(totalGridWidth, nsX + PAD_H, 200),
+      width: Math.max(totalGridWidth, nsX + PAD_H, 200, headerLabelWidth(node)),
       height: Math.max(totalGridHeight, 120),
       childPos,
     }
@@ -218,7 +241,7 @@ function computeBoxInternal(
   }
 
   return {
-    width:    Math.max(totalW, 200),
+    width:    Math.max(totalW, 200, headerLabelWidth(node)),
     height:   Math.max(rowY + rowMaxH + PAD_BOTTOM, 100),
     childPos,
   }
