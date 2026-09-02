@@ -6,9 +6,11 @@ import { parseGlobal } from './globalParser'
 import { parseCustomizations } from './customizationsParser'
 import { parseSecurity } from './securityParser'
 import { parseIam } from './iamParser'
+import { buildPolicyMatrix as buildPolicyMatrixImpl } from './policyMatrix'
 
 export type { GraphEdge, GraphModel, GraphNode } from './types'
 export type { GlobalConfig, CustomizationsConfig } from './types'
+export type { PolicyMatrix, PolicyMatrixRow, PolicyColumn, PolicyColumnType, PolicyMatrixCellState } from './policyMatrix'
 
 export interface LzaConfigs {
   organization?: OrganizationConfig
@@ -20,7 +22,7 @@ export interface LzaConfigs {
   customizations?: CustomizationsConfig
 }
 
-export type ViewKind = 'organization' | 'network' | 'global' | 'customizations' | 'security' | 'iam'
+export type ViewKind = 'organization' | 'network' | 'global' | 'customizations' | 'security' | 'iam' | 'policies'
 
 export const FILE_MAP: Record<string, keyof LzaConfigs> = {
   'organization-config.yaml':  'organization',
@@ -227,4 +229,8 @@ export function buildSecurityGraph(configs: LzaConfigs) {
 export function buildIamGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
   if (!configs.iam) return null
   return parseIam(configs.iam, configs.accounts, loadedFiles)
+}
+
+export function buildPolicyMatrix(configs: LzaConfigs) {
+  return buildPolicyMatrixImpl(configs.organization, configs.accounts)
 }

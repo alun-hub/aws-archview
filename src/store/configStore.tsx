@@ -87,7 +87,7 @@ const getInitialState = (): State => {
   let activeView: ViewKind = 'organization'
   if (typeof window !== 'undefined') {
     const savedView = localStorage.getItem('aws-archview:activeView')
-    const validViews: ViewKind[] = ['organization', 'network', 'global', 'customizations', 'security', 'iam']
+    const validViews: ViewKind[] = ['organization', 'policies', 'network', 'global', 'customizations', 'security', 'iam']
     if (validViews.includes(savedView as ViewKind)) {
       activeView = savedView as ViewKind
     }

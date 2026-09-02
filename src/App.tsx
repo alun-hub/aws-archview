@@ -15,11 +15,13 @@ import {
   buildCustomizationsGraph,
   buildSecurityGraph,
   buildIamGraph,
+  buildPolicyMatrix,
   type ViewKind,
 } from './parser'
 import { ConfigLoader, ConfigFileList } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas, KIND_LABEL } from './components/canvas/DiagramCanvas'
+import { PolicyMatrixView } from './components/panels/PolicyMatrixView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
 import type { NodeKind } from './parser/types'
@@ -28,6 +30,7 @@ import type { NodeKind } from './parser/types'
 
 const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'organization',   label: 'Organization',   requiredConfig: 'organization-config.yaml'  },
+  { id: 'policies',       label: 'Policies',       requiredConfig: 'organization-config.yaml'  },
   { id: 'network',        label: 'Network',        requiredConfig: 'network-config.yaml'        },
   { id: 'security',       label: 'Security',       requiredConfig: 'security-config.yaml'       },
   { id: 'iam',            label: 'IAM',            requiredConfig: 'iam-config.yaml'            },
@@ -320,6 +323,7 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
 
 const VIEW_LABELS: Record<ViewKind, string> = {
   organization:   'Organization',
+  policies:       'Policies',
   network:        'Network',
   global:         'Global',
   customizations: 'Customizations',
@@ -328,7 +332,8 @@ const VIEW_LABELS: Record<ViewKind, string> = {
 }
 
 function AppContent() {
-  const config = useConfig()
+  const config   = useConfig()
+  const dispatch = useDispatch()
   const [navOpen,   setNavOpen]   = useState(true)
   const [toolsOpen, setToolsOpen] = useState(false)
 
@@ -355,9 +360,15 @@ function AppContent() {
     }
   }, [config.configs, config.aggregateStacks, config.loadedFiles])
 
-  const activeEntry  = graphs[config.activeView]
+  const activeEntry  = graphs[config.activeView as keyof typeof graphs]
   const activeGraph  = activeEntry?.graph ?? null
   const buildError   = activeEntry?.error ?? null
+
+  const policyMatrix = useMemo(() => buildPolicyMatrix(config.configs), [config.configs])
+  const handleNavigateToNode = (nodeId: string) => {
+    dispatch({ type: 'SET_VIEW', view: 'organization' })
+    dispatch({ type: 'SELECT_NODE', id: nodeId })
+  }
 
   const selectedNode = useMemo<GraphNode | null>(() => {
     if (!config.selectedNodeId || !activeGraph) return null
@@ -392,7 +403,9 @@ function AppContent() {
           fitHeight
         >
           <div style={{ height: 'calc(100vh - 160px)' }}>
-            {buildError ? (
+            {config.activeView === 'policies' ? (
+              <PolicyMatrixView matrix={policyMatrix} onNavigate={handleNavigateToNode} />
+            ) : buildError ? (
               <div style={{ padding: 32, fontFamily: 'sans-serif', color: '#8b2c1e', maxWidth: 760 }}>
                 <h2 style={{ marginTop: 0 }}>Could not render the {VIEW_LABELS[config.activeView]} view</h2>
                 <p style={{ color: '#555' }}>
