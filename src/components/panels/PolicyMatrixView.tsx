@@ -28,10 +28,11 @@ function Cell({ state, color }: { state: PolicyMatrixCellState; color: string })
 
 interface Props {
   matrix: PolicyMatrix | null
-  onNavigate: (nodeId: string) => void
+  selectedId?: string | null
+  onSelect: (nodeId: string) => void
 }
 
-export function PolicyMatrixView({ matrix, onNavigate }: Props) {
+export function PolicyMatrixView({ matrix, selectedId, onSelect }: Props) {
   if (!matrix) {
     return (
       <div
@@ -56,9 +57,11 @@ export function PolicyMatrixView({ matrix, onNavigate }: Props) {
     )
   }
 
-  const ROW_H  = 34
-  const COL_W  = 108
-  const LEFT_W = 240
+  const ROW_H     = 34
+  const COL_W     = 120
+  const LEFT_W    = 240
+  const HEADER_H  = 78
+  const NAME_LINES = 3
 
   return (
     <div style={{ height: '100%', overflow: 'auto', background: '#fff', fontFamily: FONT }}>
@@ -69,7 +72,8 @@ export function PolicyMatrixView({ matrix, onNavigate }: Props) {
               style={{
                 position: 'sticky', top: 0, left: 0, zIndex: 3,
                 background: '#fff', borderBottom: '2px solid #232F3E', borderRight: '2px solid #232F3E',
-                width: LEFT_W, minWidth: LEFT_W, padding: '8px 12px', textAlign: 'left',
+                width: LEFT_W, minWidth: LEFT_W, height: HEADER_H, padding: '8px 12px', textAlign: 'left',
+                verticalAlign: 'bottom',
                 fontSize: 11, fontWeight: 700, color: '#232F3E',
               }}
             >
@@ -83,16 +87,28 @@ export function PolicyMatrixView({ matrix, onNavigate }: Props) {
                   style={{
                     position: 'sticky', top: 0, zIndex: 2,
                     background: g.bg, borderBottom: '2px solid #232F3E', borderLeft: '1px solid #e5e5e5',
-                    width: COL_W, minWidth: COL_W, maxWidth: COL_W,
-                    padding: '6px 4px', verticalAlign: 'bottom',
+                    width: COL_W, minWidth: COL_W, maxWidth: COL_W, height: HEADER_H,
+                    padding: '6px 4px 8px',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  {/* Fixed height + line-clamp keeps every header the same
+                      shape regardless of how long the policy name is — a
+                      mix of 1-, 2-, and 3-line labels otherwise reads as a
+                      ragged, uncentered header row. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 4 }}>
                     <span style={{ fontSize: 8, fontWeight: 700, color: g.dot, letterSpacing: 0.3 }}>{g.label}</span>
                     <span
+                      title={col.name}
                       style={{
                         fontSize: 10, fontWeight: 600, color: '#414d5c',
-                        whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'center', lineHeight: 1.25,
+                        display: '-webkit-box',
+                        WebkitLineClamp: NAME_LINES,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        wordBreak: 'break-word',
+                        textAlign: 'center',
+                        lineHeight: 1.25,
                       }}
                     >
                       {col.name}
@@ -104,47 +120,52 @@ export function PolicyMatrixView({ matrix, onNavigate }: Props) {
           </tr>
         </thead>
         <tbody>
-          {matrix.rows.map((row) => (
-            <tr key={row.id}>
-              <td
-                style={{
-                  position: 'sticky', left: 0, zIndex: 1,
-                  background: '#fff', borderRight: '2px solid #232F3E', borderBottom: '1px solid #f0f0f0',
-                  height: ROW_H, padding: 0,
-                }}
-              >
-                <button
-                  onClick={() => onNavigate(row.id)}
-                  title="Open in Organization view"
-                  style={{
-                    display: 'flex', alignItems: 'center', width: '100%', height: ROW_H,
-                    padding: `0 12px 0 ${12 + row.depth * 16}px`,
-                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-                    fontFamily: FONT, fontSize: row.kind === 'ou' ? 12 : 11.5,
-                    fontWeight: row.kind === 'ou' ? 700 : 400,
-                    color: row.kind === 'ou' ? '#232F3E' : '#414d5c',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f5f7ff')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                >
-                  {row.kind === 'account' && <span style={{ color: '#bbb', marginRight: 6 }}>↳</span>}
-                  {row.label}
-                </button>
-              </td>
-              {matrix.columns.map((col) => (
+          {matrix.rows.map((row) => {
+            const selected = row.id === selectedId
+            const rowBg = selected ? '#eaf3fb' : '#fff'
+            return (
+              <tr key={row.id}>
                 <td
-                  key={col.key}
                   style={{
-                    width: COL_W, minWidth: COL_W, maxWidth: COL_W, height: ROW_H,
-                    borderLeft: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0',
-                    textAlign: 'center',
+                    position: 'sticky', left: 0, zIndex: 1,
+                    background: rowBg, borderRight: '2px solid #232F3E', borderBottom: '1px solid #f0f0f0',
+                    height: ROW_H, padding: 0,
                   }}
                 >
-                  <Cell state={row.cells[col.key]} color={GROUP[col.type].dot} />
+                  <button
+                    onClick={() => onSelect(row.id)}
+                    title="Show details"
+                    style={{
+                      display: 'flex', alignItems: 'center', width: '100%', height: ROW_H,
+                      padding: `0 12px 0 ${12 + row.depth * 16}px`,
+                      background: rowBg, border: 'none', cursor: 'pointer', textAlign: 'left',
+                      fontFamily: FONT, fontSize: row.kind === 'ou' ? 12 : 11.5,
+                      fontWeight: row.kind === 'ou' ? 700 : 400,
+                      color: row.kind === 'ou' ? '#232F3E' : '#414d5c',
+                    }}
+                    onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = '#f5f7ff' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = rowBg }}
+                  >
+                    {row.kind === 'account' && <span style={{ color: '#bbb', marginRight: 6 }}>↳</span>}
+                    {row.label}
+                  </button>
                 </td>
-              ))}
-            </tr>
-          ))}
+                {matrix.columns.map((col) => (
+                  <td
+                    key={col.key}
+                    style={{
+                      width: COL_W, minWidth: COL_W, maxWidth: COL_W, height: ROW_H,
+                      background: rowBg,
+                      borderLeft: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Cell state={row.cells[col.key]} color={GROUP[col.type].dot} />
+                  </td>
+                ))}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 
@@ -156,7 +177,7 @@ export function PolicyMatrixView({ matrix, onNavigate }: Props) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <Cell state="inherited" color="#666" /> Inherited from an ancestor OU
         </span>
-        <span>Click a row to open that node in the Organization view.</span>
+        <span>Click a row to see its details in the panel on the right.</span>
       </div>
     </div>
   )

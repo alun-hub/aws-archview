@@ -365,15 +365,18 @@ function AppContent() {
   const buildError   = activeEntry?.error ?? null
 
   const policyMatrix = useMemo(() => buildPolicyMatrix(config.configs), [config.configs])
-  const handleNavigateToNode = (nodeId: string) => {
-    dispatch({ type: 'SET_VIEW', view: 'organization' })
+  const handleSelectPolicyRow = (nodeId: string) => {
     dispatch({ type: 'SELECT_NODE', id: nodeId })
   }
 
+  // The Policies view has no diagram graph of its own — its rows share ids
+  // with the Organization graph, so look selections up there instead of in
+  // `activeGraph` (which is null for this view) to show details in place.
   const selectedNode = useMemo<GraphNode | null>(() => {
-    if (!config.selectedNodeId || !activeGraph) return null
-    return activeGraph.nodes.find((n) => n.id === config.selectedNodeId) ?? null
-  }, [config.selectedNodeId, activeGraph])
+    if (!config.selectedNodeId) return null
+    const lookupGraph = config.activeView === 'policies' ? graphs.organization.graph : activeGraph
+    return lookupGraph?.nodes.find((n) => n.id === config.selectedNodeId) ?? null
+  }, [config.selectedNodeId, activeGraph, config.activeView, graphs.organization.graph])
 
   // Auto-open detail panel when a node is selected
   useEffect(() => {
@@ -404,7 +407,7 @@ function AppContent() {
         >
           <div style={{ height: 'calc(100vh - 160px)' }}>
             {config.activeView === 'policies' ? (
-              <PolicyMatrixView matrix={policyMatrix} onNavigate={handleNavigateToNode} />
+              <PolicyMatrixView matrix={policyMatrix} selectedId={config.selectedNodeId} onSelect={handleSelectPolicyRow} />
             ) : buildError ? (
               <div style={{ padding: 32, fontFamily: 'sans-serif', color: '#8b2c1e', maxWidth: 760 }}>
                 <h2 style={{ marginTop: 0 }}>Could not render the {VIEW_LABELS[config.activeView]} view</h2>
