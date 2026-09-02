@@ -1,0 +1,18 @@
+export const KIND_LABEL: Record<string, string> = {
+  root: 'Root', ou: 'OU', account: 'Account', region: 'Region',
+  vpc: 'VPC', subnet: 'Subnet', 'subnet-public': 'Public Subnet', 'subnet-private': 'Private Subnet',
+  'subnet-firewall': 'Firewall Subnet', 'subnet-tgw': 'TGW Subnet',
+  tgw: 'Transit Gateway', 'tgw-rt': 'TGW Route Table', 'tgw-rt-group': 'Route Table Group',
+  vpn: 'VPN', cgw: 'Customer Gateway', dx: 'Direct Connect',
+  'on-premises': 'On-Premises', 'security-hub': 'Security Hub',
+  guardduty: 'GuardDuty', inspector: 'Inspector', macie: 'Macie',
+  iam: 'IAM', acm: 'ACM', kms: 'KMS',
+  detective: 'Detective', 'audit-manager': 'Audit Manager', 'access-analyzer': 'Access Analyzer',
+  'firewall-manager': 'Firewall Manager', s3: 'S3', backup: 'Backup', lambda: 'Lambda',
+  'network-firewall': 'Network Firewall', 'nat-gateway': 'NAT Gateway', igw: 'Internet Gateway',
+  nlb: 'Network LB', alb: 'Application LB', route53: 'Route 53',
+  cloudwatch: 'CloudWatch', cloudtrail: 'CloudTrail', config: 'AWS Config',
+  organizations: 'Organizations', 'control-tower': 'Control Tower',
+  cloudformation: 'CloudFormation', 'service-catalog': 'Service Catalog',
+  service: 'Service', cloud: 'Internet',
+}

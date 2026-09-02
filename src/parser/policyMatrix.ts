@@ -32,19 +32,27 @@ function matchesTarget(p: SCP, kind: 'ou' | 'account', name: string): boolean {
 interface TreeNode {
   id: string
   label: string
+  // Full org-tree path (e.g. "Infrastructure/Network") for OUs; equals label
+  // for accounts, which don't nest. Two OUs in different branches can share
+  // a name, so the path — not the label — is what uniquely identifies an OU.
+  path: string
   kind: 'ou' | 'account'
   children: TreeNode[]
 }
 
-function buildOuTree(ous: OUConfig[]): TreeNode[] {
+function buildOuTree(ous: OUConfig[], parentPath: string): TreeNode[] {
   return ous
     .filter((ou) => !ou.ignore)
-    .map((ou) => ({
-      id: `ou:${ou.name}`,
-      label: ou.name,
-      kind: 'ou' as const,
-      children: buildOuTree(ou.organizationalUnits ?? []),
-    }))
+    .map((ou) => {
+      const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
+      return {
+        id: `ou:${path}`,
+        label: ou.name,
+        path,
+        kind: 'ou' as const,
+        children: buildOuTree(ou.organizationalUnits ?? [], path),
+      }
+    })
 }
 
 // AWS Organizations (and LZA) always name the top-level OU "Root" — match
@@ -57,15 +65,14 @@ function attachAccounts(root: TreeNode, ouChildren: Map<string, TreeNode>, accou
   ]
   for (const account of allAccounts) {
     const ouPath = account.organizationalUnit ?? 'Root'
-    const leafOU = ouPath.split('/').pop() ?? ouPath
-    const parent = leafOU === 'Root' ? root : (ouChildren.get(leafOU) ?? root)
-    parent.children.push({ id: `account:${account.name}`, label: account.name, kind: 'account', children: [] })
+    const parent = ouPath === 'Root' ? root : (ouChildren.get(ouPath) ?? root)
+    parent.children.push({ id: `account:${account.name}`, label: account.name, path: account.name, kind: 'account', children: [] })
   }
 }
 
 function indexOus(nodes: TreeNode[], map: Map<string, TreeNode>) {
   for (const n of nodes) {
-    if (n.kind === 'ou') map.set(n.label, n)
+    if (n.kind === 'ou') map.set(n.path, n)
     indexOus(n.children, map)
   }
 }
@@ -92,7 +99,7 @@ export function buildPolicyMatrix(
     ...backup.map((p) => [`backup:${p.name}`, p] as const),
   ])
 
-  const root: TreeNode = { id: 'root', label: 'Root', kind: 'ou', children: buildOuTree(orgConfig.organizationalUnits ?? []) }
+  const root: TreeNode = { id: 'root', label: 'Root', path: 'Root', kind: 'ou', children: buildOuTree(orgConfig.organizationalUnits ?? [], '') }
   const ouChildren = new Map<string, TreeNode>()
   indexOus([root], ouChildren)
   attachAccounts(root, ouChildren, accountsConfig)
@@ -103,7 +110,7 @@ export function buildPolicyMatrix(
     const directKeys = new Set<string>()
     for (const col of columns) {
       const policy = policyByKey.get(col.key)!
-      if (matchesTarget(policy, node.kind, node.label)) directKeys.add(col.key)
+      if (matchesTarget(policy, node.kind, node.path)) directKeys.add(col.key)
     }
     const cells: Record<string, PolicyMatrixCellState> = {}
     for (const col of columns) {

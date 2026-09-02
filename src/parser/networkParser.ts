@@ -327,7 +327,15 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     }
 
     const vpcId = `vpc:${vpc.name}:${vpc.account}`
-    vpcNameToId.set(vpc.name, vpcId)
+    // vpcPeering entries reference VPCs by name only (no account), matching
+    // LZA's own config schema, so a duplicate name across accounts is
+    // inherently ambiguous. Keep the first match instead of silently letting
+    // the last one win, and surface the ambiguity instead of staying silent.
+    if (vpcNameToId.has(vpc.name)) {
+      console.warn(`aws-archview: duplicate VPC name "${vpc.name}" (account ${vpc.account}) — vpcPeering entries referencing this name will resolve to the first VPC seen with that name.`)
+    } else {
+      vpcNameToId.set(vpc.name, vpcId)
+    }
 
     nodes.push({
       id:   vpcId,

@@ -47,6 +47,7 @@ function computePolicyAttachments(
 function collectOUs(
   ous: OUConfig[],
   parentId: string,
+  parentPath: string,
   nodes: GraphNode[],
   scps: SCP[],
   taggingPolicies: SCP[],
@@ -56,11 +57,15 @@ function collectOUs(
 ) {
   for (const ou of ous) {
     if (ou.ignore) continue
-    const id = `ou:${ou.name}`
-    const policyAttachments = computePolicyAttachments('ou', ou.name, scps, taggingPolicies, backupPolicies, loadedFiles)
+    // Full org-tree path (e.g. "Infrastructure/Network"), not just the leaf
+    // name — two OUs in different branches can share a name, and only the
+    // full path uniquely identifies an OU (matching how LZA config targets it).
+    const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
+    const id = `ou:${path}`
+    const policyAttachments = computePolicyAttachments('ou', path, scps, taggingPolicies, backupPolicies, loadedFiles)
 
     const ouAssignments = iamConfig?.identityCenterAssignments
-      ?.filter((a) => a.deploymentTargets?.organizationalUnits?.includes(ou.name))
+      ?.filter((a) => a.deploymentTargets?.organizationalUnits?.includes(path))
       ?.map((a) => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${a.permissionSetName}`) ?? []
 
     nodes.push({
@@ -76,7 +81,7 @@ function collectOUs(
       parentId,
     })
     if (ou.organizationalUnits?.length) {
-      collectOUs(ou.organizationalUnits, id, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
+      collectOUs(ou.organizationalUnits, id, path, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
     }
   }
 }
@@ -103,7 +108,7 @@ export function parseOrganization(
   const backupPolicies = orgConfig.backupPolicies ?? []
 
   if (orgConfig.organizationalUnits?.length) {
-    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
+    collectOUs(orgConfig.organizationalUnits, rootId, '', nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
   }
 
   const nodeSet = new Set(nodes.map((n) => n.id))
@@ -115,10 +120,10 @@ export function parseOrganization(
 
   for (const account of allAccounts) {
     const id = `account:${account.name}`
-    // OU path may be nested like "Infrastructure/Network" — map to the leaf OU
+    // OU path may be nested like "Infrastructure/Network" — match the full
+    // path against the OU node id (which now also keys on the full path)
     const ouPath = account.organizationalUnit ?? 'Root'
-    const leafOU = ouPath.split('/').pop() ?? ouPath
-    const parentId = leafOU === 'Root' ? rootId : `ou:${leafOU}`
+    const parentId = ouPath === 'Root' ? rootId : `ou:${ouPath}`
 
     const policyAttachments = computePolicyAttachments('account', account.name, scps, taggingPolicies, backupPolicies, loadedFiles)
 
