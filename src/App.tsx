@@ -17,7 +17,7 @@ import {
   buildIamGraph,
   type ViewKind,
 } from './parser'
-import { ConfigLoader } from './components/panels/ConfigLoader'
+import { ConfigLoader, ConfigFileList } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas, KIND_LABEL } from './components/canvas/DiagramCanvas'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -300,6 +300,14 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
             </div>
           </ExpandableSection>
         )}
+
+        {/* Files — expected/loaded config file status, moved to the bottom
+            so it doesn't push the more frequently used tools down */}
+        <ExpandableSection header="Files" variant="navigation">
+          <div style={{ padding: '4px 12px 8px' }}>
+            <ConfigFileList loadedFiles={config.loadedFiles} />
+          </div>
+        </ExpandableSection>
       </div>
     </div>
   )

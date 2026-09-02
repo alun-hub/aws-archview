@@ -126,12 +126,6 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
 
   const hasFiles = Object.keys(loadedFiles).length > 0
 
-  // Keys in loadedFiles may carry a folder prefix (e.g. "MyLZA/organization-config.yaml")
-  // when a config folder was dropped or selected, so match top-level config files by
-  // basename via resolveConfigKey rather than an exact key match.
-  const expectedFiles  = Object.keys(FILE_MAP)
-  const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => resolveConfigKey(f) == null)
-
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '16px 0' }}>
       {/* Drop zone */}
@@ -236,7 +230,21 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
           ))}
         </div>
       )}
+    </div>
+  )
+}
 
+// Separate from the drop zone so the caller can place the (often long) file
+// list somewhere else in the layout — e.g. lower down, below Diagram Tools.
+export function ConfigFileList({ loadedFiles }: { loadedFiles: Record<string, string> }) {
+  // Keys in loadedFiles may carry a folder prefix (e.g. "MyLZA/organization-config.yaml")
+  // when a config folder was dropped or selected, so match top-level config files by
+  // basename via resolveConfigKey rather than an exact key match.
+  const expectedFiles  = Object.keys(FILE_MAP)
+  const auxiliaryFiles = Object.keys(loadedFiles).filter((f) => resolveConfigKey(f) == null)
+
+  return (
+    <div style={{ fontFamily: 'sans-serif' }}>
       {/* Expected config files */}
       <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>
         Expected files
