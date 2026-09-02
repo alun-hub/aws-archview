@@ -8,17 +8,21 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ## Screenshots
 
-| Organization | Network |
+| Organization | Policies |
 |---|---|
-| ![Organization view](docs/screenshots/organization.png) | ![Network view](docs/screenshots/network.png) |
+| ![Organization view](docs/screenshots/organization.png) | ![Policies view](docs/screenshots/policies.png) |
 
-| Security | IAM |
+| Network | Security |
 |---|---|
-| ![Security view](docs/screenshots/security.png) | ![IAM view](docs/screenshots/iam.png) |
+| ![Network view](docs/screenshots/network.png) | ![Security view](docs/screenshots/security.png) |
 
-| Global | Customizations |
+| IAM | Global |
 |---|---|
-| ![Global view](docs/screenshots/global.png) | ![Customizations view](docs/screenshots/customizations.png) |
+| ![IAM view](docs/screenshots/iam.png) | ![Global view](docs/screenshots/global.png) |
+
+| Customizations |
+|---|
+| ![Customizations view](docs/screenshots/customizations.png) |
 
 ---
 
@@ -26,6 +30,7 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ### 1. Multi-View Architecture Visualization
 - **Organization View** — Maps out your AWS Organization structure from the Root level, through Organizational Units (OUs), down to individual Accounts.
+- **Policies View** — A matrix of every OU/Account (rows) against every Service Control Policy, Tagging Policy, and Backup Policy (columns), showing direct vs. inherited attachment at a glance — including policies attached at the Root level, which aren't visible by clicking through the org tree node by node. Click a row to see that node's full policy details in the side panel without leaving the matrix.
 - **Network View** — Visualizes your global networking layout, including Transit Gateways (TGWs), VPCs, subnet boundaries classified by function (public, private, TGW, firewall), NAT Gateways, Internet Gateways (IGWs), Load Balancers, Network Firewalls, and Customer Gateways (CGWs).
 - **Security, IAM, and Global Views** — Renders service logging and protections (Macie, GuardDuty, Security Hub, Config, CloudTrail) and IAM components.
 
