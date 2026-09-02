@@ -679,7 +679,7 @@ export function DiagramCanvas({ model }: Props) {
   const [elkEdgeSegments, setElkEdgeSegments] = useState<Map<string, Segment[]>>(new Map())
   const config   = useConfig()
   const dispatch = useDispatch()
-  const { collapsedNodes, hiddenKinds } = config
+  const { collapsedNodes, hiddenNodeIds } = config
 
 
 
@@ -691,20 +691,19 @@ export function DiagramCanvas({ model }: Props) {
     return new Set(model.nodes.filter(n => n.parentId).map(n => n.parentId!))
   }, [model])
 
-  // Filter out descendants of collapsed nodes and nodes whose kind (or an
-  // ancestor's kind) is hidden via the "Node types" filter
+  // Filter out descendants of collapsed nodes and nodes hidden (individually,
+  // or via an ancestor) through the "Node types" filter
   const filteredModel = useMemo(() => {
     if (!model) return null
     const nodeMap = new Map(model.nodes.map(n => [n.id, n]))
     const visibleIds = new Set<string>()
     for (const n of model.nodes) {
-      if (hiddenKinds.has(n.kind)) continue
+      if (hiddenNodeIds.has(n.id)) continue
       let visible = true
       let pid = n.parentId
       while (pid) {
-        const parent = nodeMap.get(pid)
-        if (collapsedNodes.has(pid) || (parent && hiddenKinds.has(parent.kind))) { visible = false; break }
-        pid = parent?.parentId
+        if (collapsedNodes.has(pid) || hiddenNodeIds.has(pid)) { visible = false; break }
+        pid = nodeMap.get(pid)?.parentId
       }
       if (visible) visibleIds.add(n.id)
     }
@@ -712,7 +711,7 @@ export function DiagramCanvas({ model }: Props) {
       nodes: model.nodes.filter(n => visibleIds.has(n.id)),
       edges: model.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target)),
     }
-  }, [model, collapsedNodes, hiddenKinds])
+  }, [model, collapsedNodes, hiddenNodeIds])
 
   // Compute which node ids should be dimmed — either because an SCP is
   // pinned for highlighting (click an SCP chip in the detail panel: show

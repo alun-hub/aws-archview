@@ -38,6 +38,7 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
 function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
   const config   = useConfig()
   const dispatch = useDispatch()
+  const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
 
   const parentIds = useMemo<string[]>(() => {
     if (!activeGraph) return []
@@ -45,15 +46,34 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
     return Array.from(pIds)
   }, [activeGraph])
 
-  // Node kinds present in the current view, with counts, for the "Node types" filter
-  const kindCounts = useMemo<{ kind: NodeKind; label: string; count: number }[]>(() => {
+  // Node kinds present in the current view, grouped with their individual
+  // instances, for the "Node types" filter — lets users hide a whole kind
+  // (e.g. all Accounts) or pick specific instances (e.g. just 2 of 9 accounts).
+  const kindGroups = useMemo<{ kind: NodeKind; label: string; nodes: { id: string; label: string }[] }[]>(() => {
     if (!activeGraph) return []
-    const counts = new Map<NodeKind, number>()
-    for (const n of activeGraph.nodes) counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1)
-    return Array.from(counts.entries())
-      .map(([kind, count]) => ({ kind, label: KIND_LABEL[kind] ?? kind, count }))
+    const byKind = new Map<NodeKind, { id: string; label: string }[]>()
+    for (const n of activeGraph.nodes) {
+      const list = byKind.get(n.kind)
+      if (list) list.push({ id: n.id, label: n.label })
+      else byKind.set(n.kind, [{ id: n.id, label: n.label }])
+    }
+    return Array.from(byKind.entries())
+      .map(([kind, nodes]) => ({
+        kind,
+        label: KIND_LABEL[kind] ?? kind,
+        nodes: nodes.sort((a, b) => a.label.localeCompare(b.label)),
+      }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [activeGraph])
+
+  const toggleExpanded = (kind: NodeKind) => {
+    setExpandedKinds((prev) => {
+      const next = new Set(prev)
+      if (next.has(kind)) next.delete(kind)
+      else next.add(kind)
+      return next
+    })
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -166,18 +186,20 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
           </ExpandableSection>
         )}
 
-        {/* Node types — visibility filter for the current view's diagram */}
-        {kindCounts.length > 0 && (
+        {/* Node types — visibility filter for the current view's diagram.
+            Each kind can be hidden wholesale, or expanded to hide/show
+            individual instances (e.g. specific accounts). */}
+        {kindGroups.length > 0 && (
           <ExpandableSection header="Node types" variant="navigation">
             <div style={{ padding: '4px 12px 8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <button
-                  onClick={() => dispatch({ type: 'SHOW_ALL_KINDS' })}
-                  disabled={config.hiddenKinds.size === 0}
+                  onClick={() => dispatch({ type: 'SHOW_ALL_NODES' })}
+                  disabled={config.hiddenNodeIds.size === 0}
                   style={{
                     background: 'none', border: 'none', padding: 0,
-                    fontSize: 11, color: config.hiddenKinds.size === 0 ? '#bbb' : '#0073bb',
-                    cursor: config.hiddenKinds.size === 0 ? 'default' : 'pointer',
+                    fontSize: 11, color: config.hiddenNodeIds.size === 0 ? '#bbb' : '#0073bb',
+                    cursor: config.hiddenNodeIds.size === 0 ? 'default' : 'pointer',
                     fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
                   }}
                 >
@@ -185,17 +207,61 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                 </button>
               </div>
               <SpaceBetween size="xs">
-                {kindCounts.map(({ kind, label, count }) => (
-                  <Checkbox
-                    key={kind}
-                    checked={!config.hiddenKinds.has(kind)}
-                    onChange={() => dispatch({ type: 'TOGGLE_KIND', kind })}
-                  >
-                    <span style={{ fontSize: 13 }}>
-                      {label} <span style={{ color: '#999' }}>({count})</span>
-                    </span>
-                  </Checkbox>
-                ))}
+                {kindGroups.map(({ kind, label, nodes }) => {
+                  const hiddenCount = nodes.filter((n) => config.hiddenNodeIds.has(n.id)).length
+                  const allHidden   = hiddenCount === nodes.length
+                  const someHidden  = hiddenCount > 0 && !allHidden
+                  const expanded    = expandedKinds.has(kind)
+                  const canExpand   = nodes.length > 1
+                  return (
+                    <div key={kind}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {canExpand ? (
+                          <button
+                            onClick={() => toggleExpanded(kind)}
+                            aria-label={expanded ? 'Collapse' : 'Expand'}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              padding: '0 2px', fontSize: 9, color: '#888', lineHeight: 1,
+                            }}
+                          >
+                            {expanded ? '▼' : '▶'}
+                          </button>
+                        ) : (
+                          <span style={{ width: 13 }} />
+                        )}
+                        <Checkbox
+                          checked={!allHidden}
+                          indeterminate={someHidden}
+                          onChange={() =>
+                            dispatch({
+                              type: 'SET_NODES_HIDDEN',
+                              ids: nodes.map((n) => n.id),
+                              hidden: !allHidden,
+                            })
+                          }
+                        >
+                          <span style={{ fontSize: 13 }}>
+                            {label} <span style={{ color: '#999' }}>({nodes.length})</span>
+                          </span>
+                        </Checkbox>
+                      </div>
+                      {expanded && (
+                        <div style={{ marginLeft: 21, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {nodes.map((n) => (
+                            <Checkbox
+                              key={n.id}
+                              checked={!config.hiddenNodeIds.has(n.id)}
+                              onChange={() => dispatch({ type: 'TOGGLE_NODE_VISIBILITY', id: n.id })}
+                            >
+                              <span style={{ fontSize: 12, color: '#555' }}>{n.label}</span>
+                            </Checkbox>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </SpaceBetween>
             </div>
           </ExpandableSection>
