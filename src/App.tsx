@@ -75,8 +75,11 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
     })
   }
 
+  // No wrapper here manages its own scrolling — Cloudscape's navigation
+  // panel already applies overflow-y: auto to itself. Nesting a second
+  // `overflow: auto` container inside it produced two stacked scrollbars.
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div>
       {/* App header */}
       <div style={{
         padding: '14px 16px 12px',
@@ -91,8 +94,8 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
         </div>
       </div>
 
-      {/* Scrollable sections */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      {/* Sections */}
+      <div>
 
         {/* Views */}
         <ExpandableSection header="Views" defaultExpanded variant="navigation">
