@@ -19,9 +19,10 @@ import {
 } from './parser'
 import { ConfigLoader } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
-import { DiagramCanvas } from './components/canvas/DiagramCanvas'
+import { DiagramCanvas, KIND_LABEL } from './components/canvas/DiagramCanvas'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
+import type { NodeKind } from './parser/types'
 
 // ── Left navigation panel ────────────────────────────────────────────────────
 
@@ -42,6 +43,16 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
     if (!activeGraph) return []
     const pIds = new Set<string>(activeGraph.nodes.filter((n) => n.parentId).map((n) => String(n.parentId)))
     return Array.from(pIds)
+  }, [activeGraph])
+
+  // Node kinds present in the current view, with counts, for the "Node types" filter
+  const kindCounts = useMemo<{ kind: NodeKind; label: string; count: number }[]>(() => {
+    if (!activeGraph) return []
+    const counts = new Map<NodeKind, number>()
+    for (const n of activeGraph.nodes) counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1)
+    return Array.from(counts.entries())
+      .map(([kind, count]) => ({ kind, label: KIND_LABEL[kind] ?? kind, count }))
+      .sort((a, b) => a.label.localeCompare(b.label))
   }, [activeGraph])
 
   return (
@@ -151,6 +162,41 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   Semantic Zoom (LOD)
                 </Checkbox>
               </div>
+            </div>
+          </ExpandableSection>
+        )}
+
+        {/* Node types — visibility filter for the current view's diagram */}
+        {kindCounts.length > 0 && (
+          <ExpandableSection header="Node types" variant="navigation">
+            <div style={{ padding: '4px 12px 8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <button
+                  onClick={() => dispatch({ type: 'SHOW_ALL_KINDS' })}
+                  disabled={config.hiddenKinds.size === 0}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    fontSize: 11, color: config.hiddenKinds.size === 0 ? '#bbb' : '#0073bb',
+                    cursor: config.hiddenKinds.size === 0 ? 'default' : 'pointer',
+                    fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+                  }}
+                >
+                  Show all
+                </button>
+              </div>
+              <SpaceBetween size="xs">
+                {kindCounts.map(({ kind, label, count }) => (
+                  <Checkbox
+                    key={kind}
+                    checked={!config.hiddenKinds.has(kind)}
+                    onChange={() => dispatch({ type: 'TOGGLE_KIND', kind })}
+                  >
+                    <span style={{ fontSize: 13 }}>
+                      {label} <span style={{ color: '#999' }}>({count})</span>
+                    </span>
+                  </Checkbox>
+                ))}
+              </SpaceBetween>
             </div>
           </ExpandableSection>
         )}

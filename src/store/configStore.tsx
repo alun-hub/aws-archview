@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
 import { resolveConfigKey, parsedForKey, type LzaConfigs, type ViewKind } from '../parser'
+import type { NodeKind } from '../parser/types'
 
 interface State {
   configs: LzaConfigs
@@ -13,6 +14,7 @@ interface State {
   showVpnConnections: boolean
   showInternetFlows: boolean
   collapsedNodes: Set<string>
+  hiddenKinds: Set<NodeKind>
   aggregateStacks: boolean
   enableFocusMode: boolean
   enableSemanticZoom: boolean
@@ -32,6 +34,8 @@ type Action =
   | { type: 'TOGGLE_SEMANTIC_ZOOM' }
   | { type: 'CLEAR_FILES' }
   | { type: 'SET_SCP_HIGHLIGHT'; name: string }
+  | { type: 'TOGGLE_KIND'; kind: NodeKind }
+  | { type: 'SHOW_ALL_KINDS' }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -100,6 +104,7 @@ const getInitialState = (): State => {
     showVpnConnections: true,
     showInternetFlows: true,
     collapsedNodes: new Set<string>(),
+    hiddenKinds: new Set<NodeKind>(),
     aggregateStacks: true,
     enableFocusMode: true,
     enableSemanticZoom: false,
@@ -123,7 +128,7 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), highlightedScp: null }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), hiddenKinds: new Set<NodeKind>(), highlightedScp: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'TOGGLE_LAYER':
@@ -158,6 +163,14 @@ function reducer(state: State, action: Action): State {
     case 'SET_SCP_HIGHLIGHT':
       // Click the same SCP again to clear the highlight
       return { ...state, highlightedScp: state.highlightedScp === action.name ? null : action.name }
+    case 'TOGGLE_KIND': {
+      const next = new Set(state.hiddenKinds)
+      if (next.has(action.kind)) next.delete(action.kind)
+      else next.add(action.kind)
+      return { ...state, hiddenKinds: next }
+    }
+    case 'SHOW_ALL_KINDS':
+      return { ...state, hiddenKinds: new Set<NodeKind>() }
     default:
       return state
   }

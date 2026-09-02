@@ -252,14 +252,23 @@ function toFlowEdges(model: GraphModel): Edge[] {
 
 // ── SearchBar ────────────────────────────────────────────────────────────────
 
-const KIND_LABEL: Record<string, string> = {
+export const KIND_LABEL: Record<string, string> = {
   root: 'Root', ou: 'OU', account: 'Account', region: 'Region',
-  vpc: 'VPC', 'subnet-public': 'Public Subnet', 'subnet-private': 'Private Subnet',
+  vpc: 'VPC', subnet: 'Subnet', 'subnet-public': 'Public Subnet', 'subnet-private': 'Private Subnet',
   'subnet-firewall': 'Firewall Subnet', 'subnet-tgw': 'TGW Subnet',
-  tgw: 'Transit Gateway', vpn: 'VPN', cgw: 'Customer Gateway',
+  tgw: 'Transit Gateway', 'tgw-rt': 'TGW Route Table', 'tgw-rt-group': 'Route Table Group',
+  vpn: 'VPN', cgw: 'Customer Gateway', dx: 'Direct Connect',
   'on-premises': 'On-Premises', 'security-hub': 'Security Hub',
-  guardduty: 'GuardDuty', 'tgw-rt-group': 'Route Table Group',
-  'network-firewall': 'Network Firewall', 'nat-gateway': 'NAT Gateway',
+  guardduty: 'GuardDuty', inspector: 'Inspector', macie: 'Macie',
+  iam: 'IAM', acm: 'ACM', kms: 'KMS',
+  detective: 'Detective', 'audit-manager': 'Audit Manager', 'access-analyzer': 'Access Analyzer',
+  'firewall-manager': 'Firewall Manager', s3: 'S3', backup: 'Backup', lambda: 'Lambda',
+  'network-firewall': 'Network Firewall', 'nat-gateway': 'NAT Gateway', igw: 'Internet Gateway',
+  nlb: 'Network LB', alb: 'Application LB', route53: 'Route 53',
+  cloudwatch: 'CloudWatch', cloudtrail: 'CloudTrail', config: 'AWS Config',
+  organizations: 'Organizations', 'control-tower': 'Control Tower',
+  cloudformation: 'CloudFormation', 'service-catalog': 'Service Catalog',
+  service: 'Service', cloud: 'Internet',
 }
 
 function SearchBar() {
@@ -670,7 +679,7 @@ export function DiagramCanvas({ model }: Props) {
   const [elkEdgeSegments, setElkEdgeSegments] = useState<Map<string, Segment[]>>(new Map())
   const config   = useConfig()
   const dispatch = useDispatch()
-  const { collapsedNodes } = config
+  const { collapsedNodes, hiddenKinds } = config
 
 
 
@@ -682,17 +691,20 @@ export function DiagramCanvas({ model }: Props) {
     return new Set(model.nodes.filter(n => n.parentId).map(n => n.parentId!))
   }, [model])
 
-  // Filter out descendants of collapsed nodes
+  // Filter out descendants of collapsed nodes and nodes whose kind (or an
+  // ancestor's kind) is hidden via the "Node types" filter
   const filteredModel = useMemo(() => {
     if (!model) return null
     const nodeMap = new Map(model.nodes.map(n => [n.id, n]))
     const visibleIds = new Set<string>()
     for (const n of model.nodes) {
+      if (hiddenKinds.has(n.kind)) continue
       let visible = true
       let pid = n.parentId
       while (pid) {
-        if (collapsedNodes.has(pid)) { visible = false; break }
-        pid = nodeMap.get(pid)?.parentId
+        const parent = nodeMap.get(pid)
+        if (collapsedNodes.has(pid) || (parent && hiddenKinds.has(parent.kind))) { visible = false; break }
+        pid = parent?.parentId
       }
       if (visible) visibleIds.add(n.id)
     }
@@ -700,7 +712,7 @@ export function DiagramCanvas({ model }: Props) {
       nodes: model.nodes.filter(n => visibleIds.has(n.id)),
       edges: model.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target)),
     }
-  }, [model, collapsedNodes])
+  }, [model, collapsedNodes, hiddenKinds])
 
   // Compute which node ids should be dimmed — either because an SCP is
   // pinned for highlighting (click an SCP chip in the detail panel: show
