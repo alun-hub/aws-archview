@@ -909,6 +909,9 @@ export function DiagramCanvas({ model }: Props) {
             zoomOnScroll={false}
             style={{ background: '#f8f8f8' }}
             elevateEdgesOnSelect
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable={false}
           >
             <SemanticZoomController enableSemanticZoom={config.enableSemanticZoom} />
             <Background color="#d0d0d0" gap={20} size={1} />

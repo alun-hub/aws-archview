@@ -106,7 +106,7 @@ const getInitialState = (): State => {
     collapsedNodes: new Set<string>(),
     hiddenNodeIds: new Set<string>(),
     aggregateStacks: true,
-    enableFocusMode: true,
+    enableFocusMode: false,
     enableSemanticZoom: false,
     highlightedScp: null,
   }
