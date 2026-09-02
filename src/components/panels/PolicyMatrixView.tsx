@@ -57,11 +57,17 @@ export function PolicyMatrixView({ matrix, selectedId, onSelect }: Props) {
     )
   }
 
-  const ROW_H     = 34
-  const COL_W     = 120
-  const LEFT_W    = 240
-  const HEADER_H  = 78
-  const NAME_LINES = 3
+  const ROW_H      = 34
+  const COL_W      = 120
+  const LEFT_W     = 240
+  const NAME_LINES  = 3
+  const NAME_LINE_H = 12.5
+  const NAME_H      = Math.ceil(NAME_LINE_H * NAME_LINES) // reserved, so a 1-line name takes the same space as a 3-line one
+  const HEADER_PAD_TOP = 8
+  const HEADER_PAD_BOTTOM = 6
+  const LABEL_H     = 11
+  const LABEL_GAP   = 4
+  const HEADER_H    = HEADER_PAD_TOP + LABEL_H + LABEL_GAP + NAME_H + HEADER_PAD_BOTTOM
 
   return (
     <div style={{ height: '100%', overflow: 'auto', background: '#fff', fontFamily: FONT }}>
@@ -88,31 +94,33 @@ export function PolicyMatrixView({ matrix, selectedId, onSelect }: Props) {
                     position: 'sticky', top: 0, zIndex: 2,
                     background: g.bg, borderBottom: '2px solid #232F3E', borderLeft: '1px solid #e5e5e5',
                     width: COL_W, minWidth: COL_W, maxWidth: COL_W, height: HEADER_H,
-                    padding: '6px 4px 8px',
+                    padding: `${HEADER_PAD_TOP}px 4px ${HEADER_PAD_BOTTOM}px`,
                   }}
                 >
-                  {/* Fixed height + line-clamp keeps every header the same
-                      shape regardless of how long the policy name is — a
-                      mix of 1-, 2-, and 3-line labels otherwise reads as a
-                      ragged, uncentered header row. */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%', gap: 4 }}>
+                  {/* Both rows are top-aligned with a fixed-height name box
+                      (not just line-clamped) so the type label sits at the
+                      same y on every column, and short names don't get
+                      pulled down to align with long, wrapped ones. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 8, fontWeight: 700, color: g.dot, letterSpacing: 0.3 }}>{g.label}</span>
-                    <span
-                      title={col.name}
-                      style={{
-                        fontSize: 10, fontWeight: 600, color: '#414d5c',
-                        display: '-webkit-box',
-                        WebkitLineClamp: NAME_LINES,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        wordBreak: 'break-word',
-                        textAlign: 'center',
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {col.name}
-                    </span>
+                    <div style={{ height: NAME_H, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', width: '100%' }}>
+                      <span
+                        title={col.name}
+                        style={{
+                          fontSize: 10, fontWeight: 600, color: '#414d5c',
+                          display: '-webkit-box',
+                          WebkitLineClamp: NAME_LINES,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          wordBreak: 'break-word',
+                          textAlign: 'center',
+                          lineHeight: `${NAME_LINE_H}px`,
+                        }}
+                      >
+                        {col.name}
+                      </span>
+                    </div>
                   </div>
                 </th>
               )
