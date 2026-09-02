@@ -6,6 +6,22 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ---
 
+## Screenshots
+
+| Organization | Network |
+|---|---|
+| ![Organization view](docs/screenshots/organization.png) | ![Network view](docs/screenshots/network.png) |
+
+| Security | IAM |
+|---|---|
+| ![Security view](docs/screenshots/security.png) | ![IAM view](docs/screenshots/iam.png) |
+
+| Global | Customizations |
+|---|---|
+| ![Global view](docs/screenshots/global.png) | ![Customizations view](docs/screenshots/customizations.png) |
+
+---
+
 ## Key Features
 
 ### 1. Multi-View Architecture Visualization
@@ -17,11 +33,12 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 - **VPC Peering Connections** — Automatically parses `vpcPeering` configurations from `network-config.yaml` and draws peering links as blue dashed lines between VPC side handles.
 - **Smart Resource Aggregation (CloudFormation Stacks)** — Groups duplicate or redundant customizations/stacks into a single `CloudFormation Stacks (N)` node. Clicking the node opens a searchable modal panel containing regions, types (Stack vs. StackSet), descriptions, and full parameter listings (safely serializing complex configurations).
 - **SSO Assignment Details Modal** — Displays comprehensive AWS IAM Identity Center group permissions inside a searchable and sortable table for any selected Account or OU, resolving both direct and inherited assignments dynamically.
-- **Focus Selection (Solo Mode)** — Selecting a node automatically highlights its direct connections and dims the rest of the canvas. This behavior can be toggled on/off in the **Diagram Tools** sidebar.
-- **Semantic Zoom (LOD)** — Smoothly fades out subnets, service nodes, and connection lines when zooming out below 50% scale, leaving only high-level boundary boxes (OUs, Accounts, VPCs) visible to prevent screen clutter.
+- **Focus Selection (Solo Mode)** — Selecting a node highlights its direct connections and dims the rest of the canvas. Off by default; toggle it on in the **Diagram Tools** sidebar.
+- **Semantic Zoom (LOD)** — Smoothly fades out subnets, service nodes, and connection lines when zooming out below 50% scale, leaving only high-level boundary boxes (OUs, Accounts, VPCs) visible to prevent screen clutter. Off by default.
+- **Node Types Filter** — Show or hide entire node kinds (e.g. all Accounts) or expand a kind to pick individual instances (e.g. two specific accounts out of nine) to declutter large diagrams. Available in the **Node types** sidebar section for every view.
 
 ### 3. High-Fidelity Exports
-- **Vector Images (SVG/PDF)** — Export high-resolution vector representations of your diagram for documentation and printing (configured for A3 landscape).
+- **Raster & Vector Images (PNG/SVG/PDF)** — Export a PNG for quick sharing, or high-resolution vector output (SVG, or PDF configured for A3 landscape) for documentation and printing.
 - **Draw.io Vector Exporting** — Generates `.drawio` XML files with fully matching AWS 4 stencils:
   - Resource labels are placed below stencils to prevent text boxes from masking the icons.
   - Subnet containers are mapped to correct stencil boundaries (`group_subnet_public` and `group_subnet_private`).
@@ -54,19 +71,21 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your web browser.
 
-### Build & Run Standalone Desktop App (Linux)
+### Build & Run Standalone Desktop App
 
-You can package and run AWS ArchView as a standalone desktop application using Electron:
+Prebuilt Linux (`.AppImage`) and Windows (`.exe`) desktop builds are published automatically to the [GitHub Releases](../../releases) page whenever a `v*` tag is pushed — no need to build locally unless you're developing.
+
+To package and run it yourself with Electron:
 
 ```bash
 # 1. Package the AppImage
 npm run electron:build
 
-# 2. Make it executable
-chmod +x "dist-desktop/AWS ArchView-0.1.29.AppImage"
+# 2. Make it executable (the version suffix matches package.json, e.g. 0.1.35)
+chmod +x "dist-desktop/AWS ArchView-<version>.AppImage"
 
 # 3. Run the application standalone
-./"dist-desktop/AWS ArchView-0.1.29.AppImage"
+./"dist-desktop/AWS ArchView-<version>.AppImage"
 ```
 
 ---
@@ -130,7 +149,7 @@ Connect your Git repository directly to modern hosting providers such as:
 Configure `npm run build` as the build command and `dist` as the output directory.
 
 #### C. Docker Container
-Run the application in a lightweight Nginx container. Build the image using the provided multi-stage build:
+Run the application in a lightweight Nginx container. There's no `Dockerfile` checked into the repo, but this multi-stage build works as-is — save it as `Dockerfile` in the project root:
 
 ```dockerfile
 # Dockerfile

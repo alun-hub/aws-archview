@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.35",
   "type": "module",
+  "license": "MIT",
   "main": "electron/main.cjs",
   "author": {
     "name": "AWS ArchView Maintainers",
