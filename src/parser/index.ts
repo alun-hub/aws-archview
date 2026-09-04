@@ -1,4 +1,4 @@
-import yaml from 'js-yaml'
+import * as yaml from 'js-yaml'
 import type { AccountsConfig, NetworkConfig, OrganizationConfig, SecurityConfig, IamConfig, GlobalConfig, CustomizationsConfig } from './types'
 import { parseNetwork } from './networkParser'
 import { parseOrganization } from './organizationParser'
@@ -53,6 +53,13 @@ export function findIncludes(content: string, loadedFiles: Record<string, string
 
 // ── Replacements: {{KEY}} → value from replacements-config.yaml ───────────────
 
+// js-yaml v5 removed DEFAULT_SCHEMA and defaults `load()` to the YAML 1.2
+// CORE_SCHEMA, which drops merge keys (`<<`). LZA configs use them, so add
+// mergeTag back. CORE_SCHEMA (not YAML11_SCHEMA) keeps v4's scalar parsing:
+// under YAML 1.1, `yes`/`no`/`on`/`off` become booleans and `0755` is octal,
+// which would silently change values read out of existing configs.
+const BASE_SCHEMA = yaml.CORE_SCHEMA.withTags(yaml.mergeTag)
+
 function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, string> {
   // Dropping a config folder prefixes every key ("my-lza/replacements-config.yaml"),
   // so match by basename like findFile does — an exact-key miss here silently
@@ -63,7 +70,7 @@ function buildReplacementsMap(loadedFiles: Record<string, string>): Map<string, 
     findFile('replacements-config.yml', loadedFiles)
   if (!raw) return new Map()
   try {
-    const config = yaml.load(raw, { schema: yaml.DEFAULT_SCHEMA, json: true }) as {
+    const config = yaml.load(raw, { schema: BASE_SCHEMA, json: true }) as {
       globalReplacements?: Array<{ key?: string; type?: string; value?: string | string[] }>
     }
     const map = new Map<string, string>()
@@ -132,23 +139,25 @@ function buildIncludeSchema(
 ): yaml.Schema {
   // eslint-disable-next-line prefer-const
   let schema: yaml.Schema
-  const includeType = new yaml.Type('!include', {
-    kind: 'scalar',
-    resolve: (data) => typeof data === 'string',
-    construct: (data: string) => {
-      const content = findFile(data, loadedFiles)
+  // v5 replaced the Type class with the tags API: a scalar tag's `resolve`
+  // returns the value itself (v4 split that across resolve + construct), and
+  // `identify` is mandatory — false here because this tag is load-only.
+  const includeTag = yaml.defineScalarTag('!include', {
+    resolve: (source: string) => {
+      const content = findFile(source, loadedFiles)
       if (content == null) return null
       return loadTolerant(resolveReplacements(content, replacementsMap), schema)
     },
+    identify: () => false,
   })
-  schema = yaml.DEFAULT_SCHEMA.extend([includeType])
+  schema = BASE_SCHEMA.withTags(includeTag)
   return schema
 }
 
 // Tolerant load: accepts duplicate keys (json: true) and multi-document files
 // (documents are shallow-merged; a single document is returned as-is).
 function loadTolerant(content: string, schema: yaml.Schema): unknown {
-  const docs = yaml.loadAll(content, undefined, { schema, json: true }).filter((d) => d != null)
+  const docs = yaml.loadAll(content, { schema, json: true }).filter((d) => d != null)
   if (docs.length === 0) return null
   if (docs.length === 1) return docs[0]
   return docs.reduce((acc: Record<string, unknown>, d) => {
