@@ -5,7 +5,6 @@ import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import Checkbox from '@cloudscape-design/components/checkbox'
 import ExpandableSection from '@cloudscape-design/components/expandable-section'
-import Button from '@cloudscape-design/components/button'
 
 import { ConfigProvider, useConfig, useDispatch } from './store/configStore'
 import {
@@ -22,6 +21,7 @@ import { ConfigLoader, ConfigFileList } from './components/panels/ConfigLoader'
 import { DetailPanel } from './components/panels/DetailPanel'
 import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { KIND_LABEL } from './components/canvas/kindLabels'
+import { computeDetailLevels, defaultDetailLevel, type DetailLevel } from './components/canvas/detailLevels'
 import { PolicyMatrixView } from './components/panels/PolicyMatrixView'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
@@ -39,16 +39,63 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
+// ── Detail level control ─────────────────────────────────────────────────────
+
+/** Segmented control stepping through the hierarchy: each button expands the
+ *  diagram down to one more tier. The endpoints are the old Collapse All /
+ *  Expand All, so they stay one click away. */
+function DetailLevelControl({ levels }: { levels: DetailLevel[] }) {
+  const config   = useConfig()
+  const dispatch = useDispatch()
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: '#5f6b7a', marginBottom: 4, fontWeight: 700 }}>
+        Detail level
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        {levels.map(({ level, label }) => {
+          const active = config.detailLevel === level
+          return (
+            <button
+              key={level}
+              aria-pressed={active}
+              onClick={() =>
+                dispatch({
+                  type: 'SET_DETAIL_LEVEL',
+                  level,
+                  ids: levels.find((l) => l.level === level)?.collapsedIds ?? [],
+                })
+              }
+              style={{
+                padding: '3px 8px',
+                fontSize: 12,
+                borderRadius: 4,
+                cursor: 'pointer',
+                border: `1px solid ${active ? '#0073bb' : '#c6c6cd'}`,
+                background: active ? 'rgba(0, 115, 187, 0.10)' : '#fff',
+                color: active ? '#0073bb' : '#414d5c',
+                fontWeight: active ? 700 : 400,
+                fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
 
-  const parentIds = useMemo<string[]>(() => {
-    if (!activeGraph) return []
-    const pIds = new Set<string>(activeGraph.nodes.filter((n) => n.parentId).map((n) => String(n.parentId)))
-    return Array.from(pIds)
-  }, [activeGraph])
+  // Progressive disclosure: one level per tier of the hierarchy, so a dense
+  // view opens readable instead of fully expanded.
+  const levels = useMemo(() => computeDetailLevels(activeGraph), [activeGraph])
 
   // Node kinds present in the current view, grouped with their individual
   // instances, for the "Node types" filter — lets users hide a whole kind
@@ -148,23 +195,15 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
         </ExpandableSection>
 
         {/* Diagram Tools */}
-        {parentIds.length > 0 && (
+        {levels.length > 0 && (
           <ExpandableSection header="Diagram Tools" defaultExpanded variant="navigation">
             <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Button
-                variant="normal"
-                onClick={() => dispatch({ type: 'COLLAPSE_ALL', ids: parentIds })}
-                disabled={config.collapsedNodes.size === parentIds.length}
-              >
-                Collapse All
-              </Button>
-              <Button
-                variant="normal"
-                onClick={() => dispatch({ type: 'EXPAND_ALL' })}
-                disabled={config.collapsedNodes.size === 0}
-              >
-                Expand All
-              </Button>
+              <DetailLevelControl levels={levels} />
+              <div style={{ fontSize: 11, color: '#888', lineHeight: 1.4 }}>
+                {config.detailLevel === null
+                  ? 'Custom — expand or collapse containers on the diagram'
+                  : `${levels.find((l) => l.level === config.detailLevel)?.visibleCount ?? 0} of ${activeGraph?.nodes.length ?? 0} nodes shown`}
+              </div>
               {config.activeView === 'customizations' && (
                 <div style={{ marginTop: 8 }}>
                   <Checkbox
@@ -378,6 +417,17 @@ function AppContent() {
     const lookupGraph = config.activeView === 'policies' ? graphs.organization.graph : activeGraph
     return lookupGraph?.nodes.find((n) => n.id === config.selectedNodeId) ?? null
   }, [config.selectedNodeId, activeGraph, config.activeView, graphs.organization.graph])
+
+  // Open a dense view at a readable detail level instead of fully expanded.
+  // Re-runs when the view or the underlying graph changes; a level the user
+  // picks afterwards stands until then.
+  useEffect(() => {
+    const levels = computeDetailLevels(activeGraph)
+    const level  = defaultDetailLevel(levels)
+    if (level === null) return
+    const target = levels.find((l) => l.level === level)
+    if (target) dispatch({ type: 'SET_DETAIL_LEVEL', level, ids: target.collapsedIds })
+  }, [activeGraph, config.activeView, dispatch])
 
   // Auto-open detail panel when a node is selected
   useEffect(() => {

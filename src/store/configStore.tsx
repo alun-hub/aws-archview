@@ -13,6 +13,10 @@ interface State {
   showVpnConnections: boolean
   showInternetFlows: boolean
   collapsedNodes: Set<string>
+  /** Active progressive-disclosure level, or null when the collapsed set was
+   *  reached by toggling individual containers. Purely for the UI to reflect
+   *  which level button is active — `collapsedNodes` stays the source of truth. */
+  detailLevel: number | null
   hiddenNodeIds: Set<string>
   aggregateStacks: boolean
   enableFocusMode: boolean
@@ -26,8 +30,7 @@ type Action =
   | { type: 'SELECT_NODE'; id: string | null }
   | { type: 'TOGGLE_LAYER'; layer: 'propagations' | 'tgwAttachments' | 'vpnConnections' | 'internetFlows' }
   | { type: 'TOGGLE_COLLAPSE'; id: string }
-  | { type: 'COLLAPSE_ALL'; ids: string[] }
-  | { type: 'EXPAND_ALL' }
+  | { type: 'SET_DETAIL_LEVEL'; level: number; ids: string[] }
   | { type: 'TOGGLE_AGGREGATE_STACKS' }
   | { type: 'TOGGLE_FOCUS_MODE' }
   | { type: 'TOGGLE_SEMANTIC_ZOOM' }
@@ -104,6 +107,7 @@ const getInitialState = (): State => {
     showVpnConnections: true,
     showInternetFlows: true,
     collapsedNodes: new Set<string>(),
+    detailLevel: null,
     hiddenNodeIds: new Set<string>(),
     aggregateStacks: true,
     enableFocusMode: false,
@@ -128,7 +132,7 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), hiddenNodeIds: new Set<string>(), highlightedScp: null }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'TOGGLE_LAYER':
@@ -143,12 +147,11 @@ function reducer(state: State, action: Action): State {
       const next = new Set(state.collapsedNodes)
       if (next.has(action.id)) next.delete(action.id)
       else next.add(action.id)
-      return { ...state, collapsedNodes: next }
+      // A hand-picked collapse no longer matches any uniform level
+      return { ...state, collapsedNodes: next, detailLevel: null }
     }
-    case 'COLLAPSE_ALL':
-      return { ...state, collapsedNodes: new Set(action.ids) }
-    case 'EXPAND_ALL':
-      return { ...state, collapsedNodes: new Set() }
+    case 'SET_DETAIL_LEVEL':
+      return { ...state, collapsedNodes: new Set(action.ids), detailLevel: action.level }
     case 'TOGGLE_AGGREGATE_STACKS':
       return { ...state, aggregateStacks: !state.aggregateStacks }
     case 'TOGGLE_FOCUS_MODE':
