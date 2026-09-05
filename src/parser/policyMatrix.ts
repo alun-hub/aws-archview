@@ -3,7 +3,7 @@ import { accountNodeId, ouNodeId } from './nodeIds'
 
 export type PolicyMatrixCellState = 'direct' | 'inherited' | 'none'
 
-export type PolicyColumnType = 'scp' | 'tagging' | 'backup'
+export type PolicyColumnType = 'scp' | 'rcp' | 'tagging' | 'backup'
 
 export interface PolicyColumn {
   key: string
@@ -85,17 +85,22 @@ export function buildPolicyMatrix(
   if (!orgConfig || !accountsConfig) return null
 
   const scps = orgConfig.serviceControlPolicies ?? []
+  // Resource control policies target OUs and accounts exactly as SCPs do, so
+  // they belong in the same matrix rather than being invisible in it.
+  const rcps = orgConfig.resourceControlPolicies ?? []
   const tagging = orgConfig.taggingPolicies ?? []
   const backup = orgConfig.backupPolicies ?? []
-  if (scps.length + tagging.length + backup.length === 0) return null
+  if (scps.length + rcps.length + tagging.length + backup.length === 0) return null
 
   const columns: PolicyColumn[] = [
     ...scps.map((p) => ({ key: `scp:${p.name}`, name: p.name, type: 'scp' as const })),
+    ...rcps.map((p) => ({ key: `rcp:${p.name}`, name: p.name, type: 'rcp' as const })),
     ...tagging.map((p) => ({ key: `tag:${p.name}`, name: p.name, type: 'tagging' as const })),
     ...backup.map((p) => ({ key: `backup:${p.name}`, name: p.name, type: 'backup' as const })),
   ]
   const policyByKey = new Map<string, SCP>([
     ...scps.map((p) => [`scp:${p.name}`, p] as const),
+    ...rcps.map((p) => [`rcp:${p.name}`, p] as const),
     ...tagging.map((p) => [`tag:${p.name}`, p] as const),
     ...backup.map((p) => [`backup:${p.name}`, p] as const),
   ])

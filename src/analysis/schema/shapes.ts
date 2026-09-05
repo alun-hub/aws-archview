@@ -9,8 +9,9 @@
 //              real, and which handful of fields the parsers cannot work
 //              without.
 //
-// The distinction matters because LZA's real schema is far larger than what
-// this app models. Flagging every key we don't know would bury a user's config
+// Key lists here are verified against the LZA v1.14.1 typedocs, not against
+// what `samples/` contains. The distinction matters because LZA's real schema
+// is far larger than what this app models. Flagging every key we don't know would bury a user's config
 // in warnings that are all our fault. So `keys` is used only to catch
 // near-misses ("cidr" vs "cidrs"), never for completeness, and `required` lists
 // only fields whose absence actually breaks a view.
@@ -50,6 +51,24 @@ const subnet: Shape = {
   required: ['name'],
 }
 
+const routeTableEntry: Shape = {
+  label: 'route',
+  nameKey: 'name',
+  keys: [
+    'name', 'destination', 'ipv6Destination', 'destinationPrefixList',
+    'type', 'target', 'targetAvailabilityZone',
+  ],
+  required: ['name'],
+}
+
+const routeTable: Shape = {
+  label: 'route table',
+  nameKey: 'name',
+  keys: ['name', 'gatewayAssociation', 'routes', 'tags'],
+  required: ['name'],
+  children: { routes: { list: true, shape: routeTableEntry } },
+}
+
 const tgwAttachment: Shape = {
   label: 'Transit Gateway attachment',
   nameKey: 'name',
@@ -69,7 +88,8 @@ const vpc: Shape = {
   nameKey: 'name',
   // cidrs is absent when the VPC is carved from IPAM, so it is not required.
   keys: [
-    'name', 'account', 'region', 'cidrs', 'ipamAllocations', 'internetGateway',
+    'name', 'account', 'region', 'cidrs', 'ipv6Cidrs', 'ipamAllocations',
+    'internetGateway', 'egressOnlyIgw',
     'enableDnsHostnames', 'enableDnsSupport', 'instanceTenancy', 'defaultSecurityGroupRulesDeletion',
     'dhcpOptions', 'dnsFirewallRuleGroups', 'queryLogs', 'resolverRules',
     'interfaceEndpoints', 'gatewayEndpoints', 'useCentralEndpoints',
@@ -81,6 +101,7 @@ const vpc: Shape = {
   required: ['name', 'account', 'region'],
   children: {
     subnets: { list: true, shape: subnet },
+    routeTables: { list: true, shape: routeTable },
     transitGatewayAttachments: { list: true, shape: tgwAttachment },
   },
 }
@@ -92,7 +113,7 @@ const vpcTemplate: Shape = {
   ...vpc,
   label: 'VPC template',
   keys: [...vpc.keys.filter((k) => k !== 'account'), 'deploymentTargets'],
-  required: ['name', 'region'],
+  required: ['name', 'deploymentTargets'],
   children: {
     ...vpc.children,
     deploymentTargets: { shape: { label: 'deploymentTargets', keys: DEPLOYMENT_TARGET_KEYS } },
@@ -106,10 +127,20 @@ const transitGateway: Shape = {
     'name', 'account', 'region', 'asn', 'dnsSupport', 'vpnEcmpSupport',
     'defaultRouteTableAssociation', 'defaultRouteTablePropagation',
     'autoAcceptSharingAttachments', 'routeTables', 'shareTargets', 'tags',
+    'transitGatewayCidrBlocks', 'transitGatewayIpv6CidrBlocks', 'transitGatewayFlowLogs',
   ],
   required: ['name', 'account', 'region'],
   children: {
     shareTargets: { shape: { label: 'shareTargets', keys: DEPLOYMENT_TARGET_KEYS } },
+    routeTables: {
+      list: true,
+      shape: {
+        label: 'Transit Gateway route table',
+        nameKey: 'name',
+        keys: ['name', 'routes', 'tags'],
+        required: ['name'],
+      },
+    },
   },
 }
 
@@ -118,8 +149,10 @@ const vpnConnection: Shape = {
   nameKey: 'name',
   keys: [
     'name', 'transitGateway', 'vpc', 'staticRoutesOnly', 'routeTableAssociations',
-    'routeTablePropagations', 'tunnelSpecifications', 'amazonIpv4NetworkCidr',
-    'customerIpv4NetworkCidr', 'enableVpnAcceleration', 'tags',
+    'routeTablePropagations', 'tunnelSpecifications',
+    'amazonIpv4NetworkCidr', 'amazonIpv6NetworkCidr',
+    'customerIpv4NetworkCidr', 'customerIpv6NetworkCidr',
+    'enableVpnAcceleration', 'outsideIpAddressType', 'tags',
   ],
   required: ['name'],
   children: {
@@ -140,9 +173,14 @@ export const NETWORK_SHAPE: Shape = {
   label: 'network-config.yaml',
   keys: [
     'homeRegion', 'defaultVpc', 'endpointPolicies', 'vpcFlowLogs', 'vpcs', 'vpcTemplates', 'vpcPeering',
-    'transitGateways', 'transitGatewayRouteTables', 'transitGatewayConnects',
+    'transitGateways', 'transitGatewayConnects', 'transitGatewayPeering',
     'customerGateways', 'directConnectGateways', 'dhcpOptions', 'prefixLists',
     'centralNetworkServices', 'firewallManagerService', 'certificates', 'elbAccountIds',
+    'accountVpcIds', 'accountVpcEndpointIds',
+    // Not part of INetworkConfig: LZA nests route tables under their Transit
+    // Gateway. Listed so a config using this shape — which the parser still
+    // reads — is not told it looks like a typo.
+    'transitGatewayRouteTables',
   ],
   children: {
     vpcs: { list: true, shape: vpc },
@@ -186,11 +224,13 @@ export const ORGANIZATION_SHAPE: Shape = {
   label: 'organization-config.yaml',
   keys: [
     'enable', 'organizationalUnits', 'quarantineNewAccounts', 'serviceControlPolicies',
-    'taggingPolicies', 'backupPolicies', 'chatbotPolicies', 'declarativePolicies',
+    'resourceControlPolicies', 'taggingPolicies', 'backupPolicies',
+    'chatbotPolicies', 'declarativePolicies',
   ],
   children: {
     organizationalUnits: { list: true, shape: organizationalUnit },
     serviceControlPolicies: { list: true, shape: policy },
+    resourceControlPolicies: { list: true, shape: policy },
     taggingPolicies: { list: true, shape: policy },
     backupPolicies: { list: true, shape: policy },
   },

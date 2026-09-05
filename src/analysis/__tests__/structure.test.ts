@@ -188,3 +188,76 @@ describe('yaml-parse-failure', () => {
     expect(findings[0].detail).toContain('bad indentation at line 4')
   })
 })
+
+describe('key lists against the LZA schema', () => {
+  // Verified against the v1.14.1 typedocs. A key missing here is not harmless:
+  // `unknown-key` would offer a near-miss suggestion for a perfectly valid
+  // field, which is worse than saying nothing.
+  const has = (shape: { keys: string[] }, keys: string[]) =>
+    keys.filter((k) => !shape.keys.includes(k))
+
+  it('covers every documented IVpcConfig property', () => {
+    expect(has(NETWORK_SHAPE.children!.vpcs.shape, [
+      'account', 'cidrs', 'defaultSecurityGroupRulesDeletion', 'dhcpOptions',
+      'dnsFirewallRuleGroups', 'egressOnlyIgw', 'enableDnsHostnames', 'enableDnsSupport',
+      'gatewayEndpoints', 'instanceTenancy', 'interfaceEndpoints', 'internetGateway',
+      'ipamAllocations', 'ipv6Cidrs', 'loadBalancers', 'name', 'natGateways',
+      'networkAcls', 'outposts', 'queryLogs', 'region', 'resolverRules', 'routeTables',
+      'securityGroups', 'subnets', 'tags', 'targetGroups', 'transitGatewayAttachments',
+      'useCentralEndpoints', 'virtualPrivateGateway', 'vpcFlowLogs', 'vpcRoute53Resolver',
+    ])).toEqual([])
+  })
+
+  it('covers every documented INetworkConfig property', () => {
+    expect(has(NETWORK_SHAPE, [
+      'accountVpcEndpointIds', 'accountVpcIds', 'centralNetworkServices', 'certificates',
+      'customerGateways', 'defaultVpc', 'dhcpOptions', 'directConnectGateways',
+      'elbAccountIds', 'endpointPolicies', 'firewallManagerService', 'homeRegion',
+      'prefixLists', 'transitGatewayConnects', 'transitGatewayPeering', 'transitGateways',
+      'vpcFlowLogs', 'vpcPeering', 'vpcs', 'vpcTemplates',
+    ])).toEqual([])
+  })
+
+  it('covers every documented ITransitGatewayConfig property', () => {
+    expect(has(NETWORK_SHAPE.children!.transitGateways.shape, [
+      'account', 'asn', 'autoAcceptSharingAttachments', 'defaultRouteTableAssociation',
+      'defaultRouteTablePropagation', 'dnsSupport', 'name', 'region', 'routeTables',
+      'shareTargets', 'tags', 'transitGatewayCidrBlocks', 'transitGatewayIpv6CidrBlocks',
+    ])).toEqual([])
+  })
+
+  it('covers every documented ISubnetConfig property', () => {
+    expect(has(NETWORK_SHAPE.children!.vpcs.shape.children!.subnets.shape, [
+      'assignIpv6OnCreation', 'availabilityZone', 'enableDns64', 'ipamAllocation',
+      'ipv4CidrBlock', 'ipv6CidrBlock', 'localZone', 'mapPublicIpOnLaunch', 'name',
+      'outpost', 'privateDnsOptions', 'routeTable', 'shareTargets', 'tags',
+    ])).toEqual([])
+  })
+
+  it('treats a VPC template as targeting OUs rather than naming an account', () => {
+    const template = NETWORK_SHAPE.children!.vpcTemplates.shape
+    expect(template.keys).toContain('deploymentTargets')
+    expect(template.keys).not.toContain('account')
+    expect(template.required).toEqual(['name', 'deploymentTargets'])
+  })
+})
+
+describe('resource control policies', () => {
+  const configs: LzaConfigs = {
+    organization: {
+      enable: true,
+      organizationalUnits: [{ name: 'Workloads' }],
+      serviceControlPolicies: [{ name: 'Guard', deploymentTargets: { organizationalUnits: ['Workloads'] } }],
+      resourceControlPolicies: [{ name: 'HttpsOnly', deploymentTargets: { organizationalUnits: ['Nope'] } }],
+    },
+    accounts: {
+      mandatoryAccounts: [{ name: 'Prod', email: 'p@example.com', organizationalUnit: 'Workloads' }],
+    },
+  }
+
+  it('checks their deployment targets like any other policy', () => {
+    const findings = of({ configs }, 'unknown-deployment-target')
+    expect(findings).toHaveLength(1)
+    expect(findings[0].detail).toContain('resourceControlPolicies: HttpsOnly')
+  })
+})

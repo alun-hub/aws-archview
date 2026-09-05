@@ -35,8 +35,10 @@ export interface OrganizationConfig {
    *  that policy legitimately has no deploymentTargets of its own. */
   quarantineNewAccounts?: { enable?: boolean; scpPolicyName?: string }
   serviceControlPolicies?: SCP[]
-  // Tagging and backup policies use the same {name, description, policy,
-  // deploymentTargets} shape as SCPs in LZA's organization-config.yaml.
+  // Resource control, tagging and backup policies all use the same
+  // {name, description, policy, deploymentTargets} shape as SCPs in LZA's
+  // organization-config.yaml.
+  resourceControlPolicies?: SCP[]
   taggingPolicies?: SCP[]
   backupPolicies?: SCP[]
 }

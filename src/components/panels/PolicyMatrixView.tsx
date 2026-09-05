@@ -4,6 +4,7 @@ const FONT = '"Amazon Ember", "Helvetica Neue", Arial, sans-serif'
 
 const GROUP: Record<PolicyColumnType, { bg: string; dot: string; label: string }> = {
   scp:     { bg: '#fdf0ee', dot: '#DD3B25', label: 'SCP' },
+  rcp:     { bg: '#fff4e6', dot: '#B7791F', label: 'RCP' },
   tagging: { bg: '#eaf3fb', dot: '#1A6CAE', label: 'Tagging' },
   backup:  { bg: '#f3eefc', dot: '#6B3FA0', label: 'Backup' },
 }

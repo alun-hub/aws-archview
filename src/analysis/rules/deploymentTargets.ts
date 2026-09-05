@@ -24,6 +24,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
 
   const orgPolicies: [string, { name: string; deploymentTargets?: ExpandableTargets }[] | undefined][] = [
     ['serviceControlPolicies', organization?.serviceControlPolicies],
+    ['resourceControlPolicies', organization?.resourceControlPolicies],
     ['taggingPolicies', organization?.taggingPolicies],
     ['backupPolicies', organization?.backupPolicies],
   ]

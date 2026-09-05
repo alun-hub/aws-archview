@@ -23,7 +23,7 @@ export interface ProfileLink {
 export interface PolicyAttachment {
   name: string
   description?: string
-  type: 'scp' | 'tagging' | 'backup'
+  type: 'scp' | 'rcp' | 'tagging' | 'backup'
   /** 'direct' when the account is named outright, otherwise the OU path the
    *  attachment is inherited from. */
   source: 'direct' | string
@@ -142,6 +142,7 @@ export function buildAccountProfile(
   // ── Policies ──────────────────────────────────────────────────────────────
   const policies = [
     ...policyAttachments(org?.serviceControlPolicies, 'scp', accountName, ouChain),
+    ...policyAttachments(org?.resourceControlPolicies, 'rcp', accountName, ouChain),
     ...policyAttachments(org?.taggingPolicies, 'tagging', accountName, ouChain),
     ...policyAttachments(org?.backupPolicies, 'backup', accountName, ouChain),
   ]
