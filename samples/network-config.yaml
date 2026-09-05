@@ -224,7 +224,7 @@ vpcs:
     account: Dev-Application
     region: eu-west-1
     cidrs:
-      - 10.10.0.0/22
+      - 10.10.0.0/21
     enableDnsHostnames: true
     enableDnsSupport: true
     subnets:
@@ -247,11 +247,11 @@ vpcs:
       - name: TGW-Attach-Subnet-A
         availabilityZone: a
         routeTable: TGW-RT
-        ipv4CidrBlock: 10.10.0.0/28
+        ipv4CidrBlock: 10.10.4.0/28
       - name: TGW-Attach-Subnet-B
         availabilityZone: b
         routeTable: TGW-RT
-        ipv4CidrBlock: 10.10.0.16/28
+        ipv4CidrBlock: 10.10.4.16/28
     transitGatewayAttachments:
       - name: Dev-TGW-Attachment
         transitGateway:
@@ -270,7 +270,7 @@ vpcs:
     account: Test-Application
     region: eu-west-1
     cidrs:
-      - 10.11.0.0/22
+      - 10.11.0.0/21
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -291,11 +291,11 @@ vpcs:
       - name: TGW-Attach-Subnet-A
         availabilityZone: a
         routeTable: TGW-RT
-        ipv4CidrBlock: 10.11.0.0/28
+        ipv4CidrBlock: 10.11.4.0/28
       - name: TGW-Attach-Subnet-B
         availabilityZone: b
         routeTable: TGW-RT
-        ipv4CidrBlock: 10.11.0.16/28
+        ipv4CidrBlock: 10.11.4.16/28
     transitGatewayAttachments:
       - name: Test-TGW-Attachment
         transitGateway:

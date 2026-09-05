@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { useHighlight } from '../canvas/HighlightContext'
+import { severityOutline } from '../canvas/severityStyle'
 
 export interface ServiceNodeData {
   label: string
@@ -12,8 +13,9 @@ export interface ServiceNodeData {
 
 export function ServiceNode({ id, data, selected }: NodeProps) {
   const d = data as ServiceNodeData
-  const { dimmedNodeIds } = useHighlight()
+  const { dimmedNodeIds, severityByNodeId } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
+  const severity = severityByNodeId.get(id)
 
   return (
     <div
@@ -43,6 +45,7 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
           transition: 'all 0.15s',
           boxSizing: 'border-box' as const,
           flexShrink: 0,
+          ...severityOutline(severity),
         }}
       >
         <AwsIcon kind={d.kind as IconKind} service={d.service as string} size={52} />

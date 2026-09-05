@@ -2,6 +2,7 @@ import type { AccountsConfig, GraphEdge, GraphModel, GraphNode, OUConfig, Organi
 import { getNormalizedSecurityConfig } from './securityParser'
 import { findFileContent } from './fileResolve'
 import { parsePolicyStatements, type PolicyStatementEntry } from './policyParse'
+import { accountNodeId, ouNodeId } from './nodeIds'
 
 function formatPolicyEntry(p: SCP): string {
   return `${p.name}${p.policy ? ` (${p.policy})` : ''}${p.description ? ` - ${p.description}` : ''}`
@@ -61,7 +62,7 @@ function collectOUs(
     // name — two OUs in different branches can share a name, and only the
     // full path uniquely identifies an OU (matching how LZA config targets it).
     const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
-    const id = `ou:${path}`
+    const id = ouNodeId(path)
     const policyAttachments = computePolicyAttachments('ou', path, scps, taggingPolicies, backupPolicies, loadedFiles)
 
     const ouAssignments = iamConfig?.identityCenterAssignments
@@ -119,11 +120,11 @@ export function parseOrganization(
   ]
 
   for (const account of allAccounts) {
-    const id = `account:${account.name}`
+    const id = accountNodeId(account.name)
     // OU path may be nested like "Infrastructure/Network" — match the full
     // path against the OU node id (which now also keys on the full path)
     const ouPath = account.organizationalUnit ?? 'Root'
-    const parentId = ouPath === 'Root' ? rootId : `ou:${ouPath}`
+    const parentId = ouPath === 'Root' ? rootId : ouNodeId(ouPath)
 
     const policyAttachments = computePolicyAttachments('account', account.name, scps, taggingPolicies, backupPolicies, loadedFiles)
 

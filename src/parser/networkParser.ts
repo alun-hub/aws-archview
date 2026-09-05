@@ -1,5 +1,9 @@
 import type { GraphEdge, GraphModel, GraphNode, NetworkConfig, NodeKind, Route53ResolverRuleConfig, StatefulRule } from './types'
 import { findFileContent } from './fileResolve'
+import {
+  accountNodeId, cgwNodeId, dxNodeId, regionNodeId, subnetNodeId,
+  tgwNodeId, tgwRouteTableNodeId, vpcNodeId, vpnNodeId,
+} from './nodeIds'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
 function subnetKind(name: string): NodeKind {
@@ -95,7 +99,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   const ensureAccount = (account: string) => {
     if (!accountsSeen.has(account)) {
       accountsSeen.add(account)
-      nodes.push({ id: `account:${account}`, kind: 'account', label: account, data: { kind: 'account' } })
+      nodes.push({ id: accountNodeId(account), kind: 'account', label: account, data: { kind: 'account' } })
     }
   }
 
@@ -133,7 +137,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   for (const tgw of networkConfig.transitGateways ?? []) {
     ensureAccount(tgw.account)
     nodes.push({
-      id:   `tgw:${tgw.name}`,
+      id:   tgwNodeId(tgw.name),
       kind: 'tgw',
       label: tgw.name,
       data: { kind: 'tgw', account: tgw.account, region: tgw.region, asn: tgw.asn, sublabel: tgw.account },
@@ -192,7 +196,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     })
     for (const rtName of rtNames) {
       nodes.push({
-        id:       `tgw-rt:${rtName}`,
+        id:       tgwRouteTableNodeId(rtName),
         kind:     'tgw-rt',
         label:    rtName,
         data: {
@@ -223,11 +227,11 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     nodes.push({ id: 'on-premises', kind: 'on-premises', label: 'On-Premises', data: { kind: 'on-premises' } })
 
     for (const cgw of gateways) {
-      const cgwId = `cgw:${cgw.name}`
+      const cgwId = cgwNodeId(cgw.name)
 
       // VPN first → placed LEFT of CGW so VPN→TGW edge exits left without crossing CGW
       for (const vpn of cgw.vpnConnections ?? []) {
-        const vpnId  = `vpn:${vpn.name}`
+        const vpnId  = vpnNodeId(vpn.name)
         const rtSet  = rtByVpn.get(vpn.name) ?? new Set()
         const rtLabel = rtSet.size > 0 ? [...rtSet].join(', ') : undefined
         const tunnels = vpn.tunnelSpecifications?.map(t => t.tunnelInsideCidr) ?? []
@@ -242,7 +246,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           },
           parentId: 'on-premises',
         })
-        const tgwId = `tgw:${vpn.transitGateway}`
+        const tgwId = tgwNodeId(vpn.transitGateway)
         edges.push({ id: `${vpnId}->${tgwId}`, source: vpnId, target: tgwId, kind: 'vpn', label: rtLabel })
         edges.push({ id: `${cgwId}->${vpnId}`, source: cgwId, target: vpnId, kind: 'vpn' })
 
@@ -251,7 +255,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           edges.push({
             id: `prop:vpn:${vpn.name}->tgw-rt:${prop.routeTableName}`,
             source: vpnId,
-            target: `tgw-rt:${prop.routeTableName}`,
+            target: tgwRouteTableNodeId(prop.routeTableName),
             kind: 'propagation',
             label: 'Propagates',
           })
@@ -274,7 +278,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     nodes.push({ id: 'on-premises', kind: 'on-premises', label: 'On-Premises', data: { kind: 'on-premises' } })
   }
   for (const dxgw of dxGateways) {
-    const dxId = `dx:${dxgw.name}`
+    const dxId = dxNodeId(dxgw.name)
     nodes.push({
       id:       dxId,
       kind:     'dx',
@@ -287,7 +291,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       parentId: 'on-premises',
     })
     for (const assoc of dxgw.transitGatewayAssociations ?? []) {
-      const tgwId = `tgw:${assoc.name}`
+      const tgwId = tgwNodeId(assoc.name)
       edges.push({
         id:     `${dxId}->${tgwId}`,
         source: dxId,
@@ -304,7 +308,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   for (const vpc of networkConfig.vpcs ?? []) {
     ensureAccount(vpc.account)
     
-    const regionId = `region:${vpc.account}:${vpc.region}`
+    const regionId = regionNodeId(vpc.account, vpc.region)
     let regionNode = nodes.find(n => n.id === regionId)
     if (!regionNode) {
       regionNode = {
@@ -317,7 +321,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           account: vpc.account,
           vpcs: []
         },
-        parentId: `account:${vpc.account}`,
+        parentId: accountNodeId(vpc.account),
       }
       nodes.push(regionNode)
     }
@@ -326,7 +330,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       regionVpcs.push(vpc.name)
     }
 
-    const vpcId = `vpc:${vpc.name}:${vpc.account}`
+    const vpcId = vpcNodeId(vpc.name, vpc.account)
     // vpcPeering entries reference VPCs by name only (no account), matching
     // LZA's own config schema, so a duplicate name across accounts is
     // inherently ambiguous. Keep the first match instead of silently letting
@@ -396,10 +400,10 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     // ② Subnets — output each subnet individually
     for (const subnet of vpc.subnets ?? []) {
       const kind = subnetKind(subnet.name)
-      const subnetNodeId = `subnet:${vpcId}:${subnet.name}`
-      subnetNodeIds.add(subnetNodeId)
+      const subId = subnetNodeId(vpc.name, vpc.account, subnet.name)
+      subnetNodeIds.add(subId)
       nodes.push({
-        id: subnetNodeId,
+        id: subId,
         kind,
         label: subnet.name,
         data: {
@@ -424,7 +428,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           kind: 'nat-gateway',
           label: 'NAT Gateway',
           data: { kind: 'nat-gateway' },
-          parentId: subnetNodeId,
+          parentId: subId,
         })
       }
 
@@ -464,7 +468,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           kind: 'network-firewall',
           label: 'Network Firewall',
           data: { kind: 'network-firewall', rules },
-          parentId: subnetNodeId,
+          parentId: subId,
         })
       }
 
@@ -474,7 +478,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           kind: 'nlb',
           label: 'NLB',
           data: { kind: 'nlb' },
-          parentId: subnetNodeId,
+          parentId: subId,
         })
       }
 
@@ -484,7 +488,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
           kind: 'alb',
           label: 'ALB',
           data: { kind: 'alb' },
-          parentId: subnetNodeId,
+          parentId: subId,
         })
       }
     }
@@ -495,7 +499,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       const targetSubnets = ieConfig.subnets ?? vpc.subnets?.map(s => s.name) ?? []
       for (const ep of ieConfig.endpoints ?? []) {
         for (const subName of targetSubnets) {
-          const subNodeId = `subnet:${vpcId}:${subName}`
+          const subNodeId = subnetNodeId(vpc.name, vpc.account, subName)
           if (subnetNodeIds.has(subNodeId)) {
             nodes.push({
               id: `vpce:${vpcId}:${ep.service}:${subName}`,
@@ -513,7 +517,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
     const geConfig = vpc.gatewayEndpoints
     if (geConfig && vpc.subnets && vpc.subnets.length > 0) {
       const firstSubName = vpc.subnets[0].name
-      const subNodeId = `subnet:${vpcId}:${firstSubName}`
+      const subNodeId = subnetNodeId(vpc.name, vpc.account, firstSubName)
       for (const ep of geConfig.endpoints ?? []) {
         nodes.push({
           id: `vpce-gw:${vpcId}:${ep.service}:${firstSubName}`,
@@ -530,7 +534,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       const tgwName = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
       if (!tgwName) continue
       const tgwCfg = networkConfig.transitGateways?.find((t) => t.name === tgwName)
-      const tgwId  = `tgw:${tgwName}`
+      const tgwId  = tgwNodeId(tgwName)
       const isHub  = tgwCfg?.account === vpc.account
       const edgeId = `${tgwId}->${vpcId}`
 
@@ -551,7 +555,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
         edges.push({
           id: `prop:${vpcId}->tgw-rt:${prop.routeTableName}`,
           source: vpcId,
-          target: `tgw-rt:${prop.routeTableName}`,
+          target: tgwRouteTableNodeId(prop.routeTableName),
           kind: 'propagation',
           label: 'Propagates',
         })
@@ -566,13 +570,12 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       // Find endpoint host VPC
       const targetVpc = networkConfig.vpcs?.find(v => v.name === endpoint.vpc)
       if (targetVpc) {
-        const targetVpcId = `vpc:${targetVpc.name}:${targetVpc.account}`
         const combinedRules = [
           ...(endpoint.rules ?? []),
           ...(rulesByEndpointName.get(endpoint.name) ?? [])
         ]
         for (const subName of endpoint.subnets ?? []) {
-          const subNodeId = `subnet:${targetVpcId}:${subName}`
+          const subNodeId = subnetNodeId(targetVpc.name, targetVpc.account, subName)
           if (subnetNodeIds.has(subNodeId)) {
             nodes.push({
               id: `route53:resolver:${endpoint.name}:${subName}`,
@@ -597,10 +600,10 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   // Central VPCE logical edges
   const centralVpc = networkConfig.vpcs?.find(v => v.interfaceEndpoints?.central)
   if (centralVpc) {
-    const centralVpcId = `vpc:${centralVpc.name}:${centralVpc.account}`
+    const centralVpcId = vpcNodeId(centralVpc.name, centralVpc.account)
     for (const otherVpc of networkConfig.vpcs ?? []) {
       if (otherVpc.useCentralEndpoints && otherVpc.name !== centralVpc.name) {
-        const spokeVpcId = `vpc:${otherVpc.name}:${otherVpc.account}`
+        const spokeVpcId = vpcNodeId(otherVpc.name, otherVpc.account)
         edges.push({
           id: `central-vpce-sharing:${spokeVpcId}->${centralVpcId}`,
           source: spokeVpcId,

@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { kindBackground, kindBorderColor } from '../../icons/awsIconStyles'
 import { useHighlight } from '../canvas/HighlightContext'
+import { severityOutline } from '../canvas/severityStyle'
 import { useConfig, useDispatch } from '../../store/configStore'
 
 export interface GroupNodeData {
@@ -20,8 +21,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const d = data as GroupNodeData
   const border = kindBorderColor(d.kind)
   const bg = kindBackground(d.kind)
-  const { dimmedNodeIds } = useHighlight()
+  const { dimmedNodeIds, severityByNodeId } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
+  const severity = severityByNodeId.get(id)
   const dispatch = useDispatch()
   const { collapsedNodes } = useConfig()
   const isCollapsed = collapsedNodes.has(id)
@@ -70,6 +72,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           transition: 'box-shadow 0.15s, opacity 0.2s',
           position: 'relative',
           cursor: 'pointer',
+          ...severityOutline(severity),
         }}
       >
         <AwsIcon kind={d.kind as IconKind} size={18} style={{ flexShrink: 0 }} />
@@ -145,6 +148,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           : '0 1px 4px rgba(0,0,0,0.06)',
         transition: 'box-shadow 0.15s, opacity 0.2s',
         cursor: d.hasChildren ? 'pointer' : 'default',
+        ...severityOutline(severity),
       }}
     >
       {isSubnet ? (

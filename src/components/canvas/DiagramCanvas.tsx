@@ -24,6 +24,7 @@ import { applyElkLayout } from './elkLayout'
 import { EdgeRoutingContext, getAbsolutePosition, getHandlePosition, getEdgeSegments, type Point, type Segment } from './edgeRouting'
 import { LoopEdge } from './LoopEdge'
 import { HighlightContext } from './HighlightContext'
+import type { Severity } from '../../analysis'
 import { KIND_LABEL } from './kindLabels'
 import { ancestorChain, isNodeVisible } from './visibility'
 import { useFileDrop } from '../../hooks/useFileDrop'
@@ -762,9 +763,13 @@ function SemanticZoomController({ enableSemanticZoom }: SemanticZoomControllerPr
 
 interface Props {
   model: GraphModel | null
+  /** Worst validation severity per node id, for the flagged-node outline.
+   *  Findings are computed once in the app shell and shared with the panel,
+   *  so the canvas only renders what it is handed. */
+  severityByNodeId?: Map<string, Severity>
 }
 
-export function DiagramCanvas({ model }: Props) {
+export function DiagramCanvas({ model, severityByNodeId }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [fitViewTrigger, setFitViewTrigger] = useState(0)
@@ -845,6 +850,11 @@ export function DiagramCanvas({ model }: Props) {
     }
     return new Set(nodes.map(n => n.id).filter(id => !withAncestorsOf(visible).has(id)))
   }, [config.selectedNodeId, config.highlightedScp, edges, nodes, config.enableFocusMode])
+
+  const highlightValue = useMemo(
+    () => ({ dimmedNodeIds, severityByNodeId: severityByNodeId ?? new Map() }),
+    [dimmedNodeIds, severityByNodeId],
+  )
 
   const routingContextValue = useMemo(() => {
     if (nodes.length === 0) return null
@@ -1030,7 +1040,7 @@ export function DiagramCanvas({ model }: Props) {
   }
 
   return (
-    <HighlightContext.Provider value={{ dimmedNodeIds }}>
+    <HighlightContext.Provider value={highlightValue}>
       <EdgeRoutingContext.Provider value={routingContextValue}>
         <div className="diagram-canvas-wrapper" style={{ width: '100%', height: '100%' }}>
           <ReactFlow

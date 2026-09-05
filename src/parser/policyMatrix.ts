@@ -1,4 +1,5 @@
 import type { AccountsConfig, OrganizationConfig, OUConfig, SCP } from './types'
+import { accountNodeId, ouNodeId } from './nodeIds'
 
 export type PolicyMatrixCellState = 'direct' | 'inherited' | 'none'
 
@@ -46,7 +47,7 @@ function buildOuTree(ous: OUConfig[], parentPath: string): TreeNode[] {
     .map((ou) => {
       const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
       return {
-        id: `ou:${path}`,
+        id: ouNodeId(path),
         label: ou.name,
         path,
         kind: 'ou' as const,
@@ -66,7 +67,7 @@ function attachAccounts(root: TreeNode, ouChildren: Map<string, TreeNode>, accou
   for (const account of allAccounts) {
     const ouPath = account.organizationalUnit ?? 'Root'
     const parent = ouPath === 'Root' ? root : (ouChildren.get(ouPath) ?? root)
-    parent.children.push({ id: `account:${account.name}`, label: account.name, path: account.name, kind: 'account', children: [] })
+    parent.children.push({ id: accountNodeId(account.name), label: account.name, path: account.name, kind: 'account', children: [] })
   }
 }
 

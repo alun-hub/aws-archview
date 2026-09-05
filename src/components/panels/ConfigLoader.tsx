@@ -4,10 +4,12 @@ import { FILE_MAP, findIncludes, findUnresolvedReplacements, resolveConfigKey } 
 import { SAMPLE_CONFIGS } from '../../parser/sampleConfigs'
 import { useFileDrop } from '../../hooks/useFileDrop'
 
-// Shared style for the parse-error / missing-file / unresolved-token callouts.
-const noticeBase = { borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 11 }
-const noticeError = { ...noticeBase, background: '#fdf0ee', border: '1px solid #f0b5ac', color: '#8b2c1e' }
-const noticeWarn  = { ...noticeBase, background: '#fffbe6', border: '1px solid #ffe58f', color: '#7c5c00' }
+// Callout pointing at the Validation panel, where loading problems are now
+// reported alongside every other finding.
+const noticeWarn = {
+  borderRadius: 6, padding: '8px 10px', marginBottom: 12, fontSize: 11,
+  background: '#fffbe6', border: '1px solid #ffe58f', color: '#7c5c00',
+}
 
 export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, string> }) {
   const dispatch    = useDispatch()
@@ -21,28 +23,23 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
     }
   }
 
-  // Detect !include references that aren't yet loaded
-  const unresolvedIncludes = useMemo(() => {
-    const missing: string[] = []
+  // How many findings concern getting the files in rather than what is in
+  // them — the ones a user fixes right here at the drop zone.
+  const problemCount = useMemo(() => {
+    const missingIncludes = new Set<string>()
     for (const content of Object.values(loadedFiles)) {
       for (const path of findIncludes(content, loadedFiles)) {
         const basename = path.split('/').pop()!
         const found = Object.keys(loadedFiles).some(
           (k) => k === path || k === basename || k.split('/').pop() === basename,
         )
-        if (!found && !missing.includes(basename)) missing.push(basename)
+        if (!found) missingIncludes.add(basename)
       }
     }
-    return missing
-  }, [loadedFiles])
-
-  // {{ TOKEN }} placeholders in !include paths that aren't defined in
-  // replacements-config.yaml — the usual reason a whole batch of includes
-  // shows up as "missing" with templated-looking names.
-  const unresolvedReplacements = useMemo(
-    () => findUnresolvedReplacements(loadedFiles),
-    [loadedFiles],
-  )
+    return Object.keys(parseErrors).length
+      + missingIncludes.size
+      + findUnresolvedReplacements(loadedFiles).length
+  }, [loadedFiles, parseErrors])
 
   const hasFiles = Object.keys(loadedFiles).length > 0
 
@@ -122,40 +119,15 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         </div>
       )}
 
-      {/* Parse errors */}
-      {Object.keys(parseErrors).length > 0 && (
-        <div style={noticeError}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Files that failed to parse:</div>
-          {Object.entries(parseErrors).map(([f, msg]) => (
-            <div key={f} style={{ marginBottom: 4 }}>
-              <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>✗ {f}</div>
-              <div style={{ opacity: 0.85, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Unresolved replacement tokens — explains templated "missing" names */}
-      {unresolvedReplacements.length > 0 && (
+      {/* Parse failures, missing !include files and unresolved {{ }} tokens all
+          surface as findings in the Validation panel now, so they are ranked
+          alongside everything else rather than repeated here in their own
+          boxes. This line is the pointer from where you load files to where
+          the problems are reported. */}
+      {problemCount > 0 && (
         <div style={noticeWarn}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Unresolved replacements:</div>
-          <div style={{ marginBottom: 4, opacity: 0.85 }}>
-            These <code>{'{{ }}'}</code> tokens in <code>!include</code> paths have no value —
-            add them to <code>replacements-config.yaml</code> (and make sure that file is loaded).
-          </div>
-          {unresolvedReplacements.map((k) => (
-            <div key={k} style={{ fontFamily: 'monospace', opacity: 0.85 }}>↳ {'{{ '}{k}{' }}'}</div>
-          ))}
-        </div>
-      )}
-
-      {/* Unresolved include warnings */}
-      {unresolvedIncludes.length > 0 && (
-        <div style={noticeWarn}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Missing included files:</div>
-          {unresolvedIncludes.map((f) => (
-            <div key={f} style={{ fontFamily: 'monospace', opacity: 0.85 }}>↳ {f}</div>
-          ))}
+          {problemCount} loading {problemCount === 1 ? 'problem' : 'problems'} with these files —
+          see <strong>Validation</strong> above.
         </div>
       )}
     </div>

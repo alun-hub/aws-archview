@@ -24,6 +24,9 @@ import { DiagramCanvas } from './components/canvas/DiagramCanvas'
 import { KIND_LABEL } from './components/canvas/kindLabels'
 import { computeDetailLevels, defaultDetailLevel, type DetailLevel } from './components/canvas/detailLevels'
 import { PolicyMatrixView } from './components/panels/PolicyMatrixView'
+import { ValidationPanel, SeverityDot } from './components/panels/ValidationPanel'
+import { runValidation, severityByNode, type Finding, type Severity } from './analysis'
+import { ancestorChain } from './components/canvas/visibility'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
 import type { NodeKind } from './parser/types'
@@ -133,7 +136,13 @@ function DetailLevelControl({ levels }: { levels: DetailLevel[] }) {
   )
 }
 
-function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
+interface LeftPanelProps {
+  activeGraph: GraphModel | null
+  findings: Finding[]
+  onSelectFinding(finding: Finding): void
+}
+
+function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
@@ -151,6 +160,24 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
   // Progressive disclosure: one level per tier of the hierarchy, so a dense
   // view opens readable instead of fully expanded.
   const levels = useMemo(() => computeDetailLevels(activeGraph), [activeGraph])
+
+  // Findings per view, so the nav can say which views have something wrong
+  // without the user opening each one in turn.
+  const findingsByView = useMemo(() => {
+    const map = new Map<ViewKind, { count: number; worst: Severity }>()
+    for (const f of findings) {
+      const entry = map.get(f.view)
+      if (!entry) map.set(f.view, { count: 1, worst: f.severity })
+      else {
+        entry.count++
+        // 'error' outranks 'warning' outranks 'info'
+        if (f.severity === 'error' || (f.severity === 'warning' && entry.worst === 'info')) {
+          entry.worst = f.severity
+        }
+      }
+    }
+    return map
+  }, [findings])
 
   // Node kinds present in the current view, grouped with their individual
   // instances, for the "Node types" filter — lets users hide a whole kind
@@ -224,6 +251,7 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
             {VIEWS.map(({ id, label, requiredConfig }) => {
               const active  = config.activeView === id
               const loaded  = loadedConfigKeys.has(resolveConfigKey(requiredConfig)!)
+              const viewFindings = findingsByView.get(id)
               return (
                 <button
                   key={id}
@@ -252,13 +280,46 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   }}
                 >
                   <span>{label}</span>
-                  {loaded && (
-                    <span style={{ fontSize: 10, color: active ? '#0073bb' : '#248814', opacity: 0.7 }}>✓</span>
-                  )}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {viewFindings && (
+                      <span
+                        title={`${viewFindings.count} validation finding${viewFindings.count === 1 ? '' : 's'} in this view`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#5f6b7a' }}
+                      >
+                        <SeverityDot severity={viewFindings.worst} size={11} />
+                        {viewFindings.count}
+                      </span>
+                    )}
+                    {loaded && (
+                      <span style={{ fontSize: 10, color: active ? '#0073bb' : '#248814', opacity: 0.7 }}>✓</span>
+                    )}
+                  </span>
                 </button>
               )
             })}
           </div>
+        </ExpandableSection>
+
+        {/* Validation — rule findings across every loaded config file.
+            Sits directly under Views because a finding is usually the reason
+            to switch views in the first place. */}
+        <ExpandableSection
+          header={
+            <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              Validation
+              {findings.length > 0 && (
+                <span style={{ fontSize: 11, color: '#5f6b7a', fontWeight: 400 }}>({findings.length})</span>
+              )}
+            </span>
+          }
+          defaultExpanded
+          variant="navigation"
+        >
+          <ValidationPanel
+            findings={findings}
+            hasConfigs={Object.keys(config.loadedFiles).length > 0}
+            onSelect={onSelectFinding}
+          />
         </ExpandableSection>
 
         {/* Configuration */}
@@ -505,6 +566,28 @@ function AppContent() {
   const activeGraph  = activeEntry?.graph ?? null
   const buildError   = activeEntry?.error ?? null
 
+  // Validation runs off the parsed configs alone, so it still produces
+  // findings for a view whose graph failed to build.
+  const findings = useMemo(
+    () => runValidation({
+      configs: config.configs,
+      loadedFiles: config.loadedFiles,
+      parseErrors: config.parseErrors,
+    }),
+    [config.configs, config.loadedFiles, config.parseErrors],
+  )
+  const severityByNodeId = useMemo(() => severityByNode(findings), [findings])
+
+  // Clicking a finding switches views first; the reveal and selection then run
+  // from an effect, because SET_VIEW resets the collapse state and the
+  // default-detail-level effect below would otherwise re-hide the node we just
+  // revealed. Declared after that effect so it settles last.
+  const [pendingFinding, setPendingFinding] = useState<Finding | null>(null)
+  const handleSelectFinding = (finding: Finding) => {
+    if (finding.view !== config.activeView) dispatch({ type: 'SET_VIEW', view: finding.view })
+    setPendingFinding(finding)
+  }
+
   const policyMatrix = useMemo(() => buildPolicyMatrix(config.configs), [config.configs])
   const handleSelectPolicyRow = (nodeId: string) => {
     dispatch({ type: 'SELECT_NODE', id: nodeId })
@@ -530,6 +613,25 @@ function AppContent() {
     if (target) dispatch({ type: 'SET_DETAIL_LEVEL', level, ids: target.collapsedIds })
   }, [activeGraph, config.activeView, dispatch])
 
+  // Reveal and select the node a clicked finding points at. Findings with no
+  // node — an unresolved replacement token, say — only switch views.
+  useEffect(() => {
+    if (!pendingFinding) return
+    const entry = graphs[pendingFinding.view as keyof typeof graphs]
+    const model = entry?.graph ?? null
+    if (model) {
+      const present = pendingFinding.nodeIds.filter((id) => model.nodes.some((n) => n.id === id))
+      if (present.length > 0) {
+        const ids = new Set(present)
+        for (const id of present) for (const a of ancestorChain(model, id)) ids.add(a)
+        dispatch({ type: 'REVEAL_NODES', ids: [...ids] })
+        dispatch({ type: 'SELECT_NODE', id: present[0] })
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPendingFinding(null)
+  }, [pendingFinding, graphs, dispatch])
+
   // Auto-open detail panel when a node is selected
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -545,7 +647,13 @@ function AppContent() {
       onToolsChange={({ detail }) => setToolsOpen(detail.open)}
       navigationWidth={300}
       toolsWidth={280}
-      navigation={<LeftPanel activeGraph={activeGraph} />}
+      navigation={
+        <LeftPanel
+          activeGraph={activeGraph}
+          findings={findings}
+          onSelectFinding={handleSelectFinding}
+        />
+      }
       tools={
         <Container header={<Header variant="h3">Details</Header>}>
           <DetailPanel node={selectedNode} />
@@ -576,7 +684,7 @@ function AppContent() {
               </div>
             ) : (
               <ErrorBoundary>
-                <DiagramCanvas model={activeGraph} />
+                <DiagramCanvas model={activeGraph} severityByNodeId={severityByNodeId} />
               </ErrorBoundary>
             )}
           </div>
