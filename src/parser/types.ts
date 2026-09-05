@@ -43,6 +43,10 @@ export interface SubnetConfig {
   availabilityZone: string
   routeTable: string
   ipv4CidrBlock: string
+  /** RAM sharing: which accounts/OUs this subnet is shared with. A shared
+   *  subnet belongs to the VPC owner but is used by the target accounts, so it
+   *  shows up in both accounts' profiles. */
+  shareTargets?: DeploymentTargets
   tags?: Record<string, string>[]
 }
 

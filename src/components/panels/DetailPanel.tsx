@@ -304,6 +304,8 @@ const MOCK_FIREWALL_RULES: FlattenedRule[] = [
 
 interface Props {
   node: GraphNode | null
+  /** Opens the full account profile. Omitted where there is nowhere to go. */
+  onOpenAccount?: (name: string) => void
 }
 
 function Row({ label, value }: { label: string; value: unknown }) {
@@ -352,6 +354,28 @@ function Row({ label, value }: { label: string; value: unknown }) {
     )
   }
 
+  // A plain object — account `tags` is a map, not a list — would otherwise
+  // stringify to "[object Object]".
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    if (entries.length === 0) return null
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+          {label}
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 16 }}>
+          {entries.map(([k, v]) => (
+            <li key={k} style={{ fontSize: 12, color: '#232F3E', marginBottom: 2 }}>
+              <strong>{k}</strong>: {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
   const display = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)
   return (
     <div style={{ marginBottom: 10 }}>
@@ -365,7 +389,7 @@ function Row({ label, value }: { label: string; value: unknown }) {
   )
 }
 
-export function DetailPanel({ node }: Props) {
+export function DetailPanel({ node, onOpenAccount }: Props) {
   const config = useConfig()
   const dispatch = useDispatch()
   const [modalOpen, setModalOpen] = useState(false)
@@ -754,6 +778,22 @@ export function DetailPanel({ node }: Props) {
       <div style={{ fontSize: 16, fontWeight: 700, color: '#232F3E', marginBottom: 12 }}>
         {node.label}
       </div>
+      {/* The panel shows what this view's config file knows about the account.
+          The profile gathers what all seven files say about it. */}
+      {node.kind === 'account' && onOpenAccount && (
+        <button
+          onClick={() => onOpenAccount(node.label)}
+          style={{
+            display: 'block', width: '100%', marginBottom: 12, padding: '6px 10px',
+            fontSize: 12, fontWeight: 600, textAlign: 'left', cursor: 'pointer',
+            color: '#0073bb', background: 'rgba(0,115,187,0.06)',
+            border: '1px solid rgba(0,115,187,0.25)', borderRadius: 4,
+            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          }}
+        >
+          Open account profile →
+        </button>
+      )}
       {Array.isArray(node.data.scps) && node.data.scps.length > 0 && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>

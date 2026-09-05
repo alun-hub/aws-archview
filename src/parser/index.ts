@@ -22,7 +22,7 @@ export interface LzaConfigs {
   customizations?: CustomizationsConfig
 }
 
-export type ViewKind = 'organization' | 'network' | 'global' | 'customizations' | 'security' | 'iam' | 'policies'
+export type ViewKind = 'organization' | 'network' | 'global' | 'customizations' | 'security' | 'iam' | 'policies' | 'accounts'
 
 export const FILE_MAP: Record<string, keyof LzaConfigs> = {
   'organization-config.yaml':  'organization',

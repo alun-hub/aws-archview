@@ -20,6 +20,10 @@ import {
 export type { Finding, Severity, Rule, ValidationInput } from './types'
 export type { AccountIndex, ResolvedAccount, TargetExpansion } from './accountResolver'
 export { buildAccountIndex, ROOT_OU } from './accountResolver'
+export { buildAccountProfile } from './accountProfile'
+export type {
+  AccountProfile, PolicyAttachment, ProfileVpc, SharedSubnet, ProfileDeployable, ProfileLink,
+} from './accountProfile'
 export { parseCidr, overlaps, contains, formatIp, describeRange } from './cidr'
 export type { CidrRange } from './cidr'
 

@@ -22,6 +22,8 @@ interface State {
   enableFocusMode: boolean
   enableSemanticZoom: boolean
   highlightedScp: string | null
+  /** Account whose profile the Accounts view is showing, or null for the list. */
+  selectedAccount: string | null
 }
 
 export type Action =
@@ -40,6 +42,7 @@ export type Action =
   | { type: 'SET_NODES_HIDDEN'; ids: string[]; hidden: boolean }
   | { type: 'SHOW_ALL_NODES' }
   | { type: 'REVEAL_NODES'; ids: string[] }
+  | { type: 'SELECT_ACCOUNT'; name: string | null }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -91,7 +94,7 @@ const getInitialState = (): State => {
   let activeView: ViewKind = 'organization'
   if (typeof window !== 'undefined') {
     const savedView = localStorage.getItem('aws-archview:activeView')
-    const validViews: ViewKind[] = ['organization', 'policies', 'network', 'global', 'customizations', 'security', 'iam']
+    const validViews: ViewKind[] = ['organization', 'accounts', 'policies', 'network', 'global', 'customizations', 'security', 'iam']
     if (validViews.includes(savedView as ViewKind)) {
       activeView = savedView as ViewKind
     }
@@ -114,6 +117,7 @@ const getInitialState = (): State => {
     enableFocusMode: false,
     enableSemanticZoom: false,
     highlightedScp: null,
+    selectedAccount: null,
   }
 }
 
@@ -136,6 +140,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
+    case 'SELECT_ACCOUNT':
+      return { ...state, selectedAccount: action.name }
     case 'TOGGLE_LAYER':
       return {
         ...state,

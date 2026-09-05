@@ -25,7 +25,11 @@ import { KIND_LABEL } from './components/canvas/kindLabels'
 import { computeDetailLevels, defaultDetailLevel, type DetailLevel } from './components/canvas/detailLevels'
 import { PolicyMatrixView } from './components/panels/PolicyMatrixView'
 import { ValidationPanel, SeverityDot } from './components/panels/ValidationPanel'
-import { runValidation, severityByNode, type Finding, type Severity } from './analysis'
+import {
+  runValidation, severityByNode, buildAccountIndex, buildAccountProfile,
+  type Finding, type Severity, type ProfileLink,
+} from './analysis'
+import { AccountProfileView } from './components/panels/AccountProfileView'
 import { ancestorChain } from './components/canvas/visibility'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
@@ -35,6 +39,7 @@ import type { NodeKind } from './parser/types'
 
 const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'organization',   label: 'Organization',   requiredConfig: 'organization-config.yaml'  },
+  { id: 'accounts',       label: 'Accounts',       requiredConfig: 'accounts-config.yaml'       },
   { id: 'policies',       label: 'Policies',       requiredConfig: 'organization-config.yaml'  },
   { id: 'network',        label: 'Network',        requiredConfig: 'network-config.yaml'        },
   { id: 'security',       label: 'Security',       requiredConfig: 'security-config.yaml'       },
@@ -525,6 +530,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
 
 const VIEW_LABELS: Record<ViewKind, string> = {
   organization:   'Organization',
+  accounts:       'Accounts',
   policies:       'Policies',
   network:        'Network',
   global:         'Global',
@@ -578,14 +584,31 @@ function AppContent() {
   )
   const severityByNodeId = useMemo(() => severityByNode(findings), [findings])
 
-  // Clicking a finding switches views first; the reveal and selection then run
-  // from an effect, because SET_VIEW resets the collapse state and the
-  // default-detail-level effect below would otherwise re-hide the node we just
-  // revealed. Declared after that effect so it settles last.
-  const [pendingFinding, setPendingFinding] = useState<Finding | null>(null)
-  const handleSelectFinding = (finding: Finding) => {
-    if (finding.view !== config.activeView) dispatch({ type: 'SET_VIEW', view: finding.view })
-    setPendingFinding(finding)
+  // Jumping to a node — from a finding, or from a row on an account profile —
+  // switches views first; the reveal and selection then run from an effect,
+  // because SET_VIEW resets the collapse state and the default-detail-level
+  // effect below would otherwise re-hide the node we just revealed. Declared
+  // after that effect so it settles last.
+  const [pendingFocus, setPendingFocus] = useState<ProfileLink | null>(null)
+  const focusNode = (link: ProfileLink) => {
+    if (link.view !== config.activeView) dispatch({ type: 'SET_VIEW', view: link.view })
+    setPendingFocus(link)
+  }
+  const handleSelectFinding = (finding: Finding) =>
+    focusNode({ view: finding.view, nodeIds: finding.nodeIds })
+
+  // Account profiles: the whole config set re-indexed by account, which is the
+  // axis the views themselves don't offer.
+  const accountProfiles = useMemo(() => {
+    const index = buildAccountIndex(config.configs.organization, config.configs.accounts)
+    return index.accounts
+      .map((a) => buildAccountProfile(a.name, config.configs, index, findings))
+      .filter((p) => p != null)
+  }, [config.configs, findings])
+
+  const openAccountProfile = (name: string | null) => {
+    dispatch({ type: 'SELECT_ACCOUNT', name })
+    if (config.activeView !== 'accounts') dispatch({ type: 'SET_VIEW', view: 'accounts' })
   }
 
   const policyMatrix = useMemo(() => buildPolicyMatrix(config.configs), [config.configs])
@@ -613,14 +636,14 @@ function AppContent() {
     if (target) dispatch({ type: 'SET_DETAIL_LEVEL', level, ids: target.collapsedIds })
   }, [activeGraph, config.activeView, dispatch])
 
-  // Reveal and select the node a clicked finding points at. Findings with no
-  // node — an unresolved replacement token, say — only switch views.
+  // Reveal and select the node a pending jump points at. A target with no node
+  // — an unresolved replacement token, say — only switches views.
   useEffect(() => {
-    if (!pendingFinding) return
-    const entry = graphs[pendingFinding.view as keyof typeof graphs]
+    if (!pendingFocus) return
+    const entry = graphs[pendingFocus.view as keyof typeof graphs]
     const model = entry?.graph ?? null
     if (model) {
-      const present = pendingFinding.nodeIds.filter((id) => model.nodes.some((n) => n.id === id))
+      const present = pendingFocus.nodeIds.filter((id) => model.nodes.some((n) => n.id === id))
       if (present.length > 0) {
         const ids = new Set(present)
         for (const id of present) for (const a of ancestorChain(model, id)) ids.add(a)
@@ -629,8 +652,8 @@ function AppContent() {
       }
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPendingFinding(null)
-  }, [pendingFinding, graphs, dispatch])
+    setPendingFocus(null)
+  }, [pendingFocus, graphs, dispatch])
 
   // Auto-open detail panel when a node is selected
   useEffect(() => {
@@ -656,7 +679,7 @@ function AppContent() {
       }
       tools={
         <Container header={<Header variant="h3">Details</Header>}>
-          <DetailPanel node={selectedNode} />
+          <DetailPanel node={selectedNode} onOpenAccount={openAccountProfile} />
         </Container>
       }
       content={
@@ -666,7 +689,15 @@ function AppContent() {
           fitHeight
         >
           <div style={{ height: 'calc(100vh - 160px)' }}>
-            {config.activeView === 'policies' ? (
+            {config.activeView === 'accounts' ? (
+              <AccountProfileView
+                profiles={accountProfiles}
+                selected={config.selectedAccount}
+                onSelectAccount={openAccountProfile}
+                onFocus={focusNode}
+                onSelectFinding={handleSelectFinding}
+              />
+            ) : config.activeView === 'policies' ? (
               <PolicyMatrixView matrix={policyMatrix} selectedId={config.selectedNodeId} onSelect={handleSelectPolicyRow} />
             ) : buildError ? (
               <div style={{ padding: 32, fontFamily: 'sans-serif', color: '#8b2c1e', maxWidth: 760 }}>
