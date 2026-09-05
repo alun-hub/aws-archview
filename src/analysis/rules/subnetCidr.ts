@@ -1,9 +1,11 @@
 import { subnetNodeId, vpcNodeId } from '../../parser/nodeIds'
+import type { SubnetConfig } from '../../parser/types'
 import { contains, describeRange, overlaps, parseCidr, type CidrRange } from '../cidr'
 import type { Rule, RuleFinding } from '../types'
 
 interface ParsedSubnet {
   name: string
+  /** Normalised to a string: LZA accepts an AZ letter or a physical id. */
   az: string
   cidr: CidrRange
 }
@@ -11,11 +13,11 @@ interface ParsedSubnet {
 /** Subnets whose CIDR parses; ones that don't (IPv6, or a malformed string)
  *  are skipped rather than reported — a range this module cannot read is not
  *  evidence that the range is wrong. */
-function parsedSubnets(subnets: { name: string; availabilityZone: string; ipv4CidrBlock: string }[] = []) {
+function parsedSubnets(subnets: SubnetConfig[] = []) {
   const parsed: ParsedSubnet[] = []
   for (const s of subnets) {
     const cidr = parseCidr(s.ipv4CidrBlock)
-    if (cidr) parsed.push({ name: s.name, az: s.availabilityZone, cidr })
+    if (cidr) parsed.push({ name: s.name, az: String(s.availabilityZone ?? '—'), cidr })
   }
   return parsed
 }

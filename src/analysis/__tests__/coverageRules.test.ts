@@ -70,47 +70,131 @@ describe('unused-vpc-route-table', () => {
   })
 })
 
-// ── NAT coverage ─────────────────────────────────────────────────────────────
+// ── Routing reachability ────────────────────────────────────────────────────
+//
+// These rules read route tables, never subnet names. LZA has no notion of a
+// "private" subnet — a subnet is public exactly when its route table sends the
+// default route to an internet gateway — so a rule keyed on naming convention
+// would be right only for configs that happen to name things the way our
+// samples do.
 
-describe('private-subnet-without-nat', () => {
-  const build = (natSubnets: string[]): LzaConfigs => ({
-    network: {
-      vpcFlowLogs: { trafficType: 'ALL' },
-      vpcs: [{
-        name: 'App-VPC', account: 'Prod', region: 'eu-west-1', cidrs: ['10.0.0.0/21'],
-        natGateways: natSubnets.map((s, i) => ({ name: `NAT-${i}`, subnet: s })),
-        subnets: [
-          { name: 'NAT-Public-A', availabilityZone: 'a', routeTable: 'RT', ipv4CidrBlock: '10.0.0.0/24' },
-          { name: 'NAT-Public-B', availabilityZone: 'b', routeTable: 'RT', ipv4CidrBlock: '10.0.1.0/24' },
-          { name: 'App-Private-A', availabilityZone: 'a', routeTable: 'RT', ipv4CidrBlock: '10.0.2.0/24' },
-          { name: 'App-Private-B', availabilityZone: 'b', routeTable: 'RT', ipv4CidrBlock: '10.0.3.0/24' },
-          { name: 'TGW-Attach-B',  availabilityZone: 'b', routeTable: 'RT', ipv4CidrBlock: '10.0.4.0/28' },
-        ],
-      }],
-    },
-  })
+const routed = (
+  routes: Record<string, { name: string; destination?: string; type?: string; target?: string }[]>,
+  subnets: { name: string; availabilityZone?: string | number; routeTable?: string; mapPublicIpOnLaunch?: boolean }[],
+  natGateways: { name: string; subnet: string }[] = [],
+): LzaConfigs => ({
+  network: {
+    vpcFlowLogs: { trafficType: 'ALL' },
+    vpcs: [{
+      name: 'App-VPC', account: 'Prod', region: 'eu-west-1', cidrs: ['10.0.0.0/21'],
+      natGateways,
+      routeTables: Object.entries(routes).map(([name, r]) => ({ name, routes: r })),
+      subnets: subnets.map((s) => ({ ipv4CidrBlock: '10.0.9.0/24', ...s })),
+    }],
+  },
+})
 
-  it('flags a private subnet in an AZ the NAT Gateways do not cover', () => {
-    const findings = of(build(['NAT-Public-A']), 'private-subnet-without-nat')
+describe('nat-gateway-crosses-az', () => {
+  const routes = {
+    'Public-RT':  [{ name: 'Igw', destination: '0.0.0.0/0', type: 'internetGateway' }],
+    'App-RT-A':   [{ name: 'Nat', destination: '0.0.0.0/0', type: 'natGateway', target: 'Nat-A' }],
+    'App-RT-B':   [{ name: 'Nat', destination: '0.0.0.0/0', type: 'natGateway', target: 'Nat-B' }],
+  }
+  const subnets = [
+    { name: 'Public-A', availabilityZone: 'a', routeTable: 'Public-RT' },
+    { name: 'Public-B', availabilityZone: 'b', routeTable: 'Public-RT' },
+    { name: 'Workload-A', availabilityZone: 'a', routeTable: 'App-RT-A' },
+    { name: 'Workload-B', availabilityZone: 'b', routeTable: 'App-RT-A' },
+  ]
+
+  it('flags a subnet whose default route targets a NAT in another AZ', () => {
+    const findings = of(routed(routes, subnets, [{ name: 'Nat-A', subnet: 'Public-A' }]), 'nat-gateway-crosses-az')
     expect(findings).toHaveLength(1)
     expect(findings[0].severity).toBe('warning')
-    expect(findings[0].detail).toContain('App-Private-B is in AZ b')
-    expect(findings[0].nodeIds[0]).toBe(subnetNodeId('App-VPC', 'Prod', 'App-Private-B'))
+    expect(findings[0].detail).toContain('Workload-B is in AZ b')
+    expect(findings[0].detail).toContain('"Nat-A" in AZ a')
+    expect(findings[0].nodeIds[0]).toBe(subnetNodeId('App-VPC', 'Prod', 'Workload-B'))
   })
 
-  it('does not flag TGW attachment subnets, which have no egress by design', () => {
-    const findings = of(build(['NAT-Public-A']), 'private-subnet-without-nat')
-    expect(findings.map((f) => f.detail).join(' ')).not.toContain('TGW-Attach-B')
+  it('stays quiet when each AZ routes to its own NAT Gateway', () => {
+    const perAz = subnets.map((s) => s.name === 'Workload-B' ? { ...s, routeTable: 'App-RT-B' } : s)
+    const findings = of(
+      routed(routes, perAz, [{ name: 'Nat-A', subnet: 'Public-A' }, { name: 'Nat-B', subnet: 'Public-B' }]),
+      'nat-gateway-crosses-az',
+    )
+    expect(findings).toHaveLength(0)
   })
 
-  it('stays quiet when every AZ has a NAT Gateway', () => {
-    expect(of(build(['NAT-Public-A', 'NAT-Public-B']), 'private-subnet-without-nat')).toHaveLength(0)
+  it('does not judge a subnet by its name', () => {
+    // Named "Private" but routed to an internet gateway: a name-based rule
+    // would report it, a route-based one correctly says nothing.
+    const findings = of(routed(routes, [
+      { name: 'Private-Looking-Subnet', availabilityZone: 'b', routeTable: 'Public-RT' },
+    ], [{ name: 'Nat-A', subnet: 'Public-A' }]), 'nat-gateway-crosses-az')
+    expect(findings).toHaveLength(0)
   })
 
-  it('stays quiet for a VPC with no NAT Gateways at all', () => {
-    // Egress is handled elsewhere — a central inspection VPC, or not at all.
-    // That is one design decision, not one finding per private subnet.
-    expect(of(build([]), 'private-subnet-without-nat')).toHaveLength(0)
+  it('says nothing when the NAT target does not resolve', () => {
+    // A dangling target is a reference problem, not an AZ problem — guessing
+    // at the AZ would invent a finding.
+    expect(of(routed(routes, subnets, [{ name: 'Nat-Z', subnet: 'Public-A' }]), 'nat-gateway-crosses-az'))
+      .toHaveLength(0)
+  })
+})
+
+describe('subnet-without-default-route', () => {
+  it('flags a subnet whose route table has no default route', () => {
+    const findings = of(routed({
+      'App-RT':      [{ name: 'Nat', destination: '0.0.0.0/0', type: 'natGateway', target: 'Nat-A' }],
+      'Isolated-RT': [{ name: 'Local', destination: '10.1.0.0/16', type: 'transitGateway', target: 'Tgw' }],
+    }, [
+      { name: 'Workload-A', availabilityZone: 'a', routeTable: 'App-RT' },
+      { name: 'Data-A', availabilityZone: 'a', routeTable: 'Isolated-RT' },
+    ]), 'subnet-without-default-route')
+    expect(findings).toHaveLength(1)
+    expect(findings[0].severity).toBe('info')
+    expect(findings[0].detail).toContain('Data-A')
+  })
+
+  it('counts a Transit Gateway default route as a way out', () => {
+    expect(of(routed({
+      'Tgw-RT': [{ name: 'Tgw', destination: '0.0.0.0/0', type: 'transitGateway', target: 'Main' }],
+    }, [{ name: 'Workload-A', availabilityZone: 'a', routeTable: 'Tgw-RT' }]),
+      'subnet-without-default-route')).toHaveLength(0)
+  })
+
+  it('does not count a gateway endpoint as general egress', () => {
+    const findings = of(routed({
+      'S3-RT': [{ name: 'S3', type: 'gatewayEndpoint', target: 's3' },
+                { name: 'Local', destination: '10.1.0.0/16', type: 'transitGateway', target: 'Tgw' }],
+    }, [{ name: 'Workload-A', availabilityZone: 'a', routeTable: 'S3-RT' }]),
+      'subnet-without-default-route')
+    expect(findings).toHaveLength(1)
+  })
+
+  it('says nothing when no route table carries routes', () => {
+    // No evidence either way — and guessing from names is what this replaced.
+    expect(of(routed({ 'App-RT': [] }, [
+      { name: 'Workload-A', availabilityZone: 'a', routeTable: 'App-RT' },
+    ]), 'subnet-without-default-route')).toHaveLength(0)
+  })
+})
+
+describe('public-subnet-auto-assigns-ips', () => {
+  it('flags a subnet that both routes to an IGW and auto-assigns public IPs', () => {
+    const findings = of(routed({
+      'Public-RT': [{ name: 'Igw', destination: '0.0.0.0/0', type: 'internetGateway' }],
+    }, [{ name: 'Edge-A', availabilityZone: 'a', routeTable: 'Public-RT', mapPublicIpOnLaunch: true }]),
+      'public-subnet-auto-assigns-ips')
+    expect(findings).toHaveLength(1)
+    expect(findings[0].severity).toBe('info')
+  })
+
+  it('ignores mapPublicIpOnLaunch on a subnet with no route to an IGW', () => {
+    expect(of(routed({
+      'App-RT': [{ name: 'Nat', destination: '0.0.0.0/0', type: 'natGateway', target: 'Nat-A' }],
+    }, [{ name: 'Edge-A', availabilityZone: 'a', routeTable: 'App-RT', mapPublicIpOnLaunch: true }]),
+      'public-subnet-auto-assigns-ips')).toHaveLength(0)
   })
 })
 

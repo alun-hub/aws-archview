@@ -40,9 +40,12 @@ export interface OrganizationConfig {
 
 export interface SubnetConfig {
   name: string
-  availabilityZone: string
-  routeTable: string
-  ipv4CidrBlock: string
+  availabilityZone?: string | number
+  routeTable?: string
+  ipv4CidrBlock?: string
+  ipv6CidrBlock?: string
+  localZone?: string
+  mapPublicIpOnLaunch?: boolean
   /** RAM sharing: which accounts/OUs this subnet is shared with. A shared
    *  subnet belongs to the VPC owner but is used by the target accounts, so it
    *  shows up in both accounts' profiles. */
@@ -52,16 +55,26 @@ export interface SubnetConfig {
 
 /** Route table a subnet points at by name, and the routes it carries. LZA
  *  defines these per VPC; `subnet.routeTable` is a reference into this list. */
+export type RouteTableEntryType =
+  | 'transitGateway' | 'natGateway' | 'internetGateway' | 'egressOnlyIgw'
+  | 'virtualPrivateGateway' | 'vpcPeering' | 'networkFirewall'
+  | 'gatewayLoadBalancerEndpoint' | 'networkInterface' | 'localGateway'
+  | 'gatewayEndpoint'
+
+export interface RouteTableEntryConfig {
+  name: string
+  destination?: string
+  ipv6Destination?: string
+  destinationPrefixList?: string
+  type?: RouteTableEntryType | string
+  target?: string
+  targetAvailabilityZone?: string | number
+}
+
 export interface RouteTableConfig {
   name: string
   gatewayAssociation?: string
-  routes?: {
-    name: string
-    destination?: string
-    type?: string
-    target?: string
-    targetAvailabilityZone?: string
-  }[]
+  routes?: RouteTableEntryConfig[]
   tags?: Record<string, string>[]
 }
 
@@ -335,7 +348,9 @@ export interface SecurityConfig {
   centralSecurityServices?: {
     delegatedAdminAccount?: string
     macie?: SecurityService & { policyFindingsPublishingFrequency?: string }
-    guardDuty?: SecurityService & { s3Protection?: { enable: boolean } }
+    guardduty?: SecurityService & { s3Protection?: SecurityService }
+    /** Tolerated misspelling of `guardduty`; LZA itself uses the lowercase d. */
+    guardDuty?: SecurityService & { s3Protection?: SecurityService }
     securityHub?: SecurityService & { standards?: (string | { name: string })[] }
     config?: SecurityService & { enableConfigurationRecorder?: boolean; enableDeliveryChannel?: boolean }
     inspector?: SecurityService & { enableScanTypes?: string[] }

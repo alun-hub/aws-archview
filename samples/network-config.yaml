@@ -106,8 +106,26 @@ vpcs:
       - Block-Malicious-Domains
     routeTables:
       - name: Public-RT
+        routes:
+          - name: Igw-Default
+            destination: 0.0.0.0/0
+            type: internetGateway
       - name: NLB-RT
+        routes:
+          - name: Tgw-Spokes
+            destination: 10.0.0.0/8
+            type: transitGateway
+            target: Main-TGW
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: Public-Subnet-A
         availabilityZone: a
@@ -161,8 +179,22 @@ vpcs:
     enableDnsSupport: true
     routeTables:
       - name: Firewall-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: NAT-RT
+        routes:
+          - name: Igw-Default
+            destination: 0.0.0.0/0
+            type: internetGateway
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: Firewall-Subnet-A
         availabilityZone: a
@@ -214,8 +246,23 @@ vpcs:
     enableDnsSupport: true
     routeTables:
       - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: Endpoint-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -264,8 +311,23 @@ vpcs:
     enableDnsSupport: true
     routeTables:
       - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: Data-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -312,8 +374,23 @@ vpcs:
       - 10.11.0.0/21
     routeTables:
       - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: Data-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -362,8 +439,23 @@ vpcs:
     enableDnsSupport: true
     routeTables:
       - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: Data-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
       - name: TGW-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a

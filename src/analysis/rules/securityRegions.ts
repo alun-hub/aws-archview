@@ -6,7 +6,9 @@ import type { Rule, RuleFinding } from '../types'
 function services(security: SecurityConfig): { label: string; service?: SecurityService }[] {
   const central = security.centralSecurityServices
   return [
-    { label: 'GuardDuty',       service: central?.guardDuty     ?? security.guardduty },
+    // LZA's own key is `guardduty`; accept the camelCase spelling too rather
+    // than silently skipping a config that uses it.
+    { label: 'GuardDuty',       service: central?.guardduty ?? central?.guardDuty ?? security.guardduty },
     { label: 'Security Hub',    service: central?.securityHub   ?? security.securityHub },
     { label: 'Macie',           service: central?.macie         ?? security.macie },
     { label: 'AWS Config',      service: central?.config        ?? security.awsConfig },

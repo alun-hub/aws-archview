@@ -151,7 +151,14 @@ export function buildAccountProfile(
 
   for (const vpc of configs.network?.vpcs ?? []) {
     if (vpc.account === accountName) {
-      const azs = [...new Set((vpc.subnets ?? []).map((s) => s.availabilityZone).filter(Boolean))].sort()
+      // LZA allows an AZ letter ("a") or a physical id (1), so normalise to
+      // strings before de-duplicating and sorting.
+      const azs = [...new Set(
+        (vpc.subnets ?? [])
+          .map((s) => s.availabilityZone)
+          .filter((az) => az != null)
+          .map(String),
+      )].sort()
       vpcs.push({
         name: vpc.name,
         region: vpc.region,

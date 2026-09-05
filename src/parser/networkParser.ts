@@ -6,9 +6,11 @@ import {
 } from './nodeIds'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
-// Exported so the analysis rules classify subnets exactly as the diagram does;
-// a rule that disagreed with the picture would be worse than no rule.
-export function subnetKind(name: string): NodeKind {
+// A guess from the subnet's name, used only to pick a diagram icon. LZA has no
+// notion of a "public" or "private" subnet — that follows from the subnet's
+// route table — so this must not drive validation. The analysis rules read
+// `routeTables` instead; see `analysis/rules/natCoverage.ts`.
+function subnetKind(name: string): NodeKind {
   const n = name.toLowerCase()
   if (n.includes('firewall') || n.includes('anfw'))                       return 'subnet-firewall'
   if (n.includes('tgw') || n.includes('transit'))                         return 'subnet-tgw'

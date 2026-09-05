@@ -7,7 +7,7 @@ import { subnetCidrOutsideVpc, subnetCidrOverlap } from './rules/subnetCidr'
 import { tgwAttachmentNoPropagation, unknownTgwRouteTable } from './rules/tgwRouting'
 import { missingInclude, yamlParseFailure } from './rules/fileIntegrity'
 import { vpcWithoutFlowLogs } from './rules/flowLogs'
-import { privateSubnetWithoutNat } from './rules/natCoverage'
+import { natGatewayCrossesAz, publicSubnetAutoAssignsIps, subnetWithoutDefaultRoute } from './rules/natCoverage'
 import { ouWithoutScp } from './rules/ouCoverage'
 import { securityServiceExcludedRegion, staleRegionExclusion } from './rules/securityRegions'
 import { unknownSubnetRouteTable, unusedVpcRouteTable } from './rules/subnetRouteTable'
@@ -49,7 +49,9 @@ export const RULES: Rule[] = [
   tgwAttachmentNoPropagation,
   unknownSubnetRouteTable,
   unusedVpcRouteTable,
-  privateSubnetWithoutNat,
+  natGatewayCrossesAz,
+  subnetWithoutDefaultRoute,
+  publicSubnetAutoAssignsIps,
   vpcWithoutFlowLogs,
   securityServiceExcludedRegion,
   staleRegionExclusion,

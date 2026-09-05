@@ -45,7 +45,7 @@ const subnet: Shape = {
   keys: [
     'name', 'availabilityZone', 'routeTable', 'ipv4CidrBlock', 'ipamAllocation',
     'mapPublicIpOnLaunch', 'shareTargets', 'tags', 'outpost', 'assignIpv6OnCreation',
-    'ipv6CidrBlock', 'enableDns64', 'privateDnsOptions',
+    'ipv6CidrBlock', 'enableDns64', 'privateDnsOptions', 'localZone',
   ],
   required: ['name'],
 }
