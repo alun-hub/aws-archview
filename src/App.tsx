@@ -48,6 +48,12 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
+/** Left gutter for the navigation panel. Cloudscape's `variant="navigation"`
+ *  ExpandableSection renders its header text at 20px with the disclosure
+ *  triangle in the gutter to its left, so matching it puts every label in the
+ *  panel on one column instead of the three it used to sit on. */
+const GUTTER = 20
+
 // ── Detail level control ─────────────────────────────────────────────────────
 
 /** Segmented control stepping through the hierarchy: each button expands the
@@ -235,7 +241,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
     <div>
       {/* App header */}
       <div style={{
-        padding: '14px 16px 12px',
+        padding: `14px ${GUTTER}px 12px`,
         borderBottom: '1px solid #e9ebed',
         fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
       }}>
@@ -268,7 +274,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
                   style={{
                     width: '100%',
                     textAlign: 'left',
-                    padding: '7px 12px',
+                    padding: `7px ${GUTTER}px 7px ${GUTTER - 3}px`,
                     background: active ? 'rgba(0, 115, 187, 0.10)' : 'transparent',
                     border: 'none',
                     borderLeft: active ? '3px solid #0073bb' : '3px solid transparent',
@@ -330,7 +336,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
         {/* Configuration */}
         <div ref={configSectionRef}>
           <ExpandableSection header="Configuration" defaultExpanded variant="navigation">
-            <div style={{ padding: '4px 0 8px' }}>
+            <div style={{ padding: `4px ${GUTTER}px 8px` }}>
               <ConfigLoader loadedFiles={config.loadedFiles} />
             </div>
           </ExpandableSection>
@@ -339,7 +345,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
         {/* Diagram Tools */}
         {levels.length > 0 && (
           <ExpandableSection header="Diagram Tools" defaultExpanded variant="navigation">
-            <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ padding: `8px ${GUTTER}px`, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <DetailLevelControl levels={levels} />
               <div style={{ fontSize: 11, color: '#888', lineHeight: 1.4 }}>
                 {config.detailLevel === null
@@ -379,7 +385,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
             individual instances (e.g. specific accounts). */}
         {kindGroups.length > 0 && (
           <ExpandableSection header="Node types" variant="navigation">
-            <div style={{ padding: '4px 12px 8px' }}>
+            <div style={{ padding: `4px ${GUTTER}px 8px` }}>
               {totalNodeInstances > 12 && (
                 <input
                   value={nodeFilterQuery}
@@ -483,7 +489,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
         {/* Show / Hide connections — only in network view */}
         {config.activeView === 'network' && (
           <ExpandableSection header="Show / Hide connections" defaultExpanded variant="navigation">
-            <div style={{ padding: '4px 0 8px' }}>
+            <div style={{ padding: `4px ${GUTTER}px 8px` }}>
               <SpaceBetween size="s">
                 <Checkbox
                   checked={config.showTgwAttachments}
@@ -517,7 +523,7 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
         {/* Files — expected/loaded config file status, moved to the bottom
             so it doesn't push the more frequently used tools down */}
         <ExpandableSection header="Files" variant="navigation">
-          <div style={{ padding: '4px 12px 8px' }}>
+          <div style={{ padding: `4px ${GUTTER}px 8px` }}>
             <ConfigFileList loadedFiles={config.loadedFiles} />
           </div>
         </ExpandableSection>

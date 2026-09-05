@@ -53,7 +53,7 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         style={{
           border: '2px dashed #ccc',
           borderRadius: 8,
-          padding: '20px 16px',
+          padding: '18px 10px',
           textAlign: 'center',
           cursor: 'pointer',
           background: '#fafafa',
@@ -63,25 +63,29 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Drop YAML files or folder here</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, fontSize: 11, color: '#aaa' }}>
+        {/* The panel gutter leaves this box around 220px wide, so the three
+            links wrap as a group rather than breaking mid-phrase. Spacing does
+            the separating: a middot would be left dangling at a line end. */}
+        <div style={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          flexWrap: 'wrap', columnGap: 12, rowGap: 3, fontSize: 11, color: '#aaa',
+        }}>
           <span
             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            style={{ textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Select files
           </span>
-          <span>·</span>
           <span
             onClick={handleFolderSelect}
-            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            style={{ textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Select folder
           </span>
-          <span>·</span>
           <span
             onClick={(e) => { e.stopPropagation(); loadSample() }}
             title="Load a small built-in LZA config so you can try every view without your own files"
-            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            style={{ textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Try a sample config
           </span>

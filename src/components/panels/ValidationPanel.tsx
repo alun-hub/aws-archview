@@ -16,6 +16,12 @@ const SEVERITY_GLYPH: Record<Severity, string> = {
 
 const SEVERITIES: Severity[] = ['error', 'warning', 'info']
 
+/** Matches the navigation panel's text column in App.tsx, so the severity
+ *  groups and findings line up with every other label around them. Finding
+ *  rows are full-bleed like the view buttons, with their severity accent
+ *  sitting in the gutter. */
+const GUTTER = 20
+
 const FONT = '"Amazon Ember", "Helvetica Neue", Arial, sans-serif'
 
 /** Small round severity marker, reused for the group headers and each row. */
@@ -64,7 +70,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
 
   if (!hasConfigs) {
     return (
-      <div style={{ padding: '6px 12px 10px', fontSize: 12, color: '#888', fontFamily: FONT }}>
+      <div style={{ padding: `6px ${GUTTER}px 10px`, fontSize: 12, color: '#888', fontFamily: FONT }}>
         Load configuration files to run validation.
       </div>
     )
@@ -72,7 +78,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
 
   if (findings.length === 0) {
     return (
-      <div style={{ padding: '6px 12px 10px', fontSize: 12, color: '#248814', fontFamily: FONT }}>
+      <div style={{ padding: `6px ${GUTTER}px 10px`, fontSize: 12, color: '#248814', fontFamily: FONT }}>
         ✓ No issues found in the loaded configuration.
       </div>
     )
@@ -87,7 +93,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
     })
 
   return (
-    <div style={{ padding: '2px 8px 10px', fontFamily: FONT }}>
+    <div style={{ padding: '2px 0 10px', fontFamily: FONT }}>
       {SEVERITIES.map((severity) => {
         const list = grouped.get(severity)!
         if (list.length === 0) return null
@@ -102,7 +108,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
                 alignItems: 'center',
                 gap: 7,
                 width: '100%',
-                padding: '5px 4px',
+                padding: `5px ${GUTTER}px`,
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -120,7 +126,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
             </button>
 
             {open && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {list.map((f) => (
                   <button
                     key={f.id}
@@ -130,7 +136,7 @@ export function ValidationPanel({ findings, hasConfigs, onSelect }: Props) {
                       display: 'block',
                       width: '100%',
                       textAlign: 'left',
-                      padding: '6px 8px',
+                      padding: `6px ${GUTTER}px 6px ${GUTTER - 3}px`,
                       background: 'transparent',
                       border: 'none',
                       borderLeft: `3px solid ${SEVERITY_COLOR[f.severity]}`,
