@@ -76,10 +76,14 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       >
         <AwsIcon kind={d.kind as IconKind} size={18} style={{ flexShrink: 0 }} />
         {findings && (
-          <span
-            title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'}`}
+          <button
+            className="nodrag"
+            onClick={(e) => { e.stopPropagation(); dispatch({ type: 'SET_VALIDATION_FOCUS', id }) }}
+            title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'} — click to list them`}
+            aria-label={`${findings.count} validation findings`}
             style={{
-              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+              width: 10, height: 10, padding: 0, borderRadius: '50%', flexShrink: 0,
+              border: 'none', cursor: 'pointer',
               background: SEVERITY_COLOR[findings.severity],
             }}
           />
@@ -277,8 +281,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               {getHeaderText()}
             </div>
             {findings && (
-              <div
+              <button
+                className="nodrag"
+                onClick={(e) => { e.stopPropagation(); dispatch({ type: 'SET_VALIDATION_FOCUS', id }) }}
                 style={{
+                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 3,
@@ -291,11 +298,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                   border: '1px solid rgba(255,255,255,0.25)',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
                 }}
-                title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'} — see the Validation panel`}
+                title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'} — click to list them`}
               >
                 <span>{SEVERITY_GLYPH[findings.severity]}</span>
                 <span>{findings.count > 1 ? `${findings.count} ` : ''}{SEVERITY_WORD[findings.severity]}</span>
-              </div>
+              </button>
             )}
             {Array.isArray(d.scps) && d.scps.length > 0 && (
               <div

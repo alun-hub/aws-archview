@@ -48,6 +48,17 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
   { id: 'customizations', label: 'Customizations', requiredConfig: 'customizations-config.yaml' },
 ]
 
+const VIEW_LABELS: Record<ViewKind, string> = {
+  organization:   'Organization',
+  accounts:       'Accounts',
+  policies:       'Policies',
+  network:        'Network',
+  global:         'Global',
+  customizations: 'Customizations',
+  security:       'Security',
+  iam:            'IAM',
+}
+
 /** Left gutter for the navigation panel. Cloudscape's `variant="navigation"`
  *  ExpandableSection renders its header text at 20px with the disclosure
  *  triangle in the gutter to its left, so matching it puts every label in the
@@ -150,10 +161,12 @@ function DetailLevelControl({ levels }: { levels: DetailLevel[] }) {
 interface LeftPanelProps {
   activeGraph: GraphModel | null
   findings: Finding[]
+  /** Label of the node the panel is narrowed to, for the clearable chip. */
+  focusNodeLabel: string | null
   onSelectFinding(finding: Finding): void
 }
 
-function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
+function LeftPanel({ activeGraph, findings, focusNodeLabel, onSelectFinding }: LeftPanelProps) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
@@ -328,7 +341,12 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
         >
           <ValidationPanel
             findings={findings}
+            activeView={config.activeView}
+            viewLabels={VIEW_LABELS}
             hasConfigs={Object.keys(config.loadedFiles).length > 0}
+            focusNodeId={config.validationFocusNodeId}
+            focusNodeLabel={focusNodeLabel}
+            onClearFocus={() => dispatch({ type: 'SET_VALIDATION_FOCUS', id: null })}
             onSelect={onSelectFinding}
           />
         </ExpandableSection>
@@ -534,16 +552,6 @@ function LeftPanel({ activeGraph, findings, onSelectFinding }: LeftPanelProps) {
 
 // ── App shell ────────────────────────────────────────────────────────────────
 
-const VIEW_LABELS: Record<ViewKind, string> = {
-  organization:   'Organization',
-  accounts:       'Accounts',
-  policies:       'Policies',
-  network:        'Network',
-  global:         'Global',
-  customizations: 'Customizations',
-  security:       'Security',
-  iam:            'IAM',
-}
 
 function AppContent() {
   const config   = useConfig()
@@ -617,6 +625,16 @@ function AppContent() {
     if (config.activeView !== 'accounts') dispatch({ type: 'SET_VIEW', view: 'accounts' })
   }
 
+  const validationFocusLabel = useMemo(() => {
+    const id = config.validationFocusNodeId
+    if (!id) return null
+    for (const entry of Object.values(graphs)) {
+      const node = entry.graph?.nodes.find((n) => n.id === id)
+      if (node) return node.label
+    }
+    return null
+  }, [config.validationFocusNodeId, graphs])
+
   const policyMatrix = useMemo(() => buildPolicyMatrix(config.configs), [config.configs])
   const handleSelectPolicyRow = (nodeId: string) => {
     dispatch({ type: 'SELECT_NODE', id: nodeId })
@@ -680,6 +698,7 @@ function AppContent() {
         <LeftPanel
           activeGraph={activeGraph}
           findings={findings}
+          focusNodeLabel={validationFocusLabel}
           onSelectFinding={handleSelectFinding}
         />
       }

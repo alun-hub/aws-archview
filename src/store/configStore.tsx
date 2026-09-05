@@ -24,6 +24,9 @@ interface State {
   highlightedScp: string | null
   /** Account whose profile the Accounts view is showing, or null for the list. */
   selectedAccount: string | null
+  /** Node whose findings the Validation panel is narrowed to, set by clicking
+   *  that node's badge on the diagram. */
+  validationFocusNodeId: string | null
 }
 
 export type Action =
@@ -43,6 +46,7 @@ export type Action =
   | { type: 'SHOW_ALL_NODES' }
   | { type: 'REVEAL_NODES'; ids: string[] }
   | { type: 'SELECT_ACCOUNT'; name: string | null }
+  | { type: 'SET_VALIDATION_FOCUS'; id: string | null }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -118,6 +122,7 @@ const getInitialState = (): State => {
     enableSemanticZoom: false,
     highlightedScp: null,
     selectedAccount: null,
+    validationFocusNodeId: null,
   }
 }
 
@@ -137,11 +142,13 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null, validationFocusNodeId: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'SELECT_ACCOUNT':
       return { ...state, selectedAccount: action.name }
+    case 'SET_VALIDATION_FOCUS':
+      return { ...state, validationFocusNodeId: action.id }
     case 'TOGGLE_LAYER':
       return {
         ...state,

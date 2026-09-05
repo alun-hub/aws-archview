@@ -1,7 +1,8 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { useHighlight } from '../canvas/HighlightContext'
-import { severityOutline } from '../canvas/severityStyle'
+import { SEVERITY_COLOR, severityOutline } from '../canvas/severityStyle'
+import { useDispatch } from '../../store/configStore'
 
 export interface ServiceNodeData {
   label: string
@@ -15,7 +16,9 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
   const d = data as ServiceNodeData
   const { dimmedNodeIds, severityByNodeId } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
-  const severity = severityByNodeId.get(id)?.severity
+  const findings = severityByNodeId.get(id)
+  const severity = findings?.severity
+  const dispatch = useDispatch()
 
   return (
     <div
@@ -45,10 +48,33 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
           transition: 'all 0.15s',
           boxSizing: 'border-box' as const,
           flexShrink: 0,
+          position: 'relative',
           ...severityOutline(severity),
         }}
       >
         <AwsIcon kind={d.kind as IconKind} service={d.service as string} size={52} />
+        {/* The ring says something is wrong; this says what. */}
+        {findings && (
+          <button
+            className="nodrag"
+            onClick={(e) => { e.stopPropagation(); dispatch({ type: 'SET_VALIDATION_FOCUS', id }) }}
+            title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'} — click to list them`}
+            aria-label={`${findings.count} validation findings`}
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              width: 14,
+              height: 14,
+              padding: 0,
+              borderRadius: '50%',
+              border: '1.5px solid #fff',
+              cursor: 'pointer',
+              background: SEVERITY_COLOR[findings.severity],
+              boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+            }}
+          />
+        )}
       </div>
 
       {/* Main Label below the icon */}
