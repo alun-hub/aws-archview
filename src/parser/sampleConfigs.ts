@@ -9,6 +9,7 @@ import security from '../../samples/security-config.yaml?raw'
 import iam from '../../samples/iam-config.yaml?raw'
 import global_ from '../../samples/global-config.yaml?raw'
 import customizations from '../../samples/customizations-config.yaml?raw'
+import denyRootUser from '../../samples/service-control-policies/deny-root-user.json?raw'
 
 export const SAMPLE_CONFIGS: Record<string, string> = {
   'organization-config.yaml': organization,
@@ -18,4 +19,7 @@ export const SAMPLE_CONFIGS: Record<string, string> = {
   'iam-config.yaml': iam,
   'global-config.yaml': global_,
   'customizations-config.yaml': customizations,
+  // Policy documents the configs point at. Without these an SCP shows as
+  // attached with nothing behind it, which is not what a real config looks like.
+  'service-control-policies/deny-root-user.json': denyRootUser,
 }

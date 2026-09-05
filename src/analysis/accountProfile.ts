@@ -9,9 +9,11 @@
 
 import type { LzaConfigs, ViewKind } from '../parser'
 import { accountNodeId, subnetNodeId, vpcNodeId } from '../parser/nodeIds'
+import { findFileContent } from '../parser/fileResolve'
+import { parsePolicyStatements, type PolicyStatementEntry } from '../parser/policyParse'
 import { routeTableNames } from '../parser/routeTableRefs'
-import { allVpcs } from '../parser/vpcTemplates'
-import type { SCP } from '../parser/types'
+import { allVpcs, resolveVpcs } from '../parser/vpcTemplates'
+import type { IamPolicyAttachments, SCP } from '../parser/types'
 import { ROOT_OU, type AccountIndex } from '../parser/accountResolver'
 import type { Finding } from './types'
 
@@ -28,14 +30,28 @@ export interface PolicyAttachment {
   /** 'direct' when the account is named outright, otherwise the OU path the
    *  attachment is inherited from. */
   source: 'direct' | string
+  /** Path to the policy document, as written in organization-config. */
+  policyFile?: string
+  /** The document's statements, when the file is loaded. Knowing a policy is
+   *  attached is much less useful than seeing what it actually denies. */
+  statements?: PolicyStatementEntry[]
+}
+
+export interface ProfileSubnet {
+  name: string
+  cidr?: string
+  availabilityZone?: string
+  routeTable?: string
 }
 
 export interface ProfileVpc {
   name: string
   region: string
   cidrs: string[]
-  subnetCount: number
+  subnets: ProfileSubnet[]
   availabilityZones: string[]
+  /** Set when this VPC comes from a `vpcTemplates` entry. */
+  fromTemplate?: string
   attachments: { name: string; tgw?: string; associations: string[]; propagations: string[] }[]
   link: ProfileLink
 }
@@ -55,6 +71,19 @@ export interface ProfileDeployable {
   kind: 'CloudFormation stack' | 'CloudFormation stack set' | 'Service Catalog portfolio'
   regions?: string[]
   via: 'direct' | string
+  description?: string
+  template?: string
+  parameters?: { name: string; value: string }[]
+  terminationProtection?: boolean
+}
+
+export interface ProfileIamPrincipal {
+  name: string
+  awsManagedPolicies?: string[]
+  customerManagedPolicies?: string[]
+  boundaryPolicy?: string
+  /** For users: the group they belong to. */
+  group?: string
 }
 
 export interface AccountProfile {
@@ -69,10 +98,10 @@ export interface AccountProfile {
   vpcs: ProfileVpc[]
   sharedSubnets: SharedSubnet[]
   iam: {
-    roles: string[]
-    groups: string[]
-    users: string[]
-    policies: string[]
+    roles: ProfileIamPrincipal[]
+    groups: ProfileIamPrincipal[]
+    users: ProfileIamPrincipal[]
+    policies: { name: string; policyFile?: string; statements?: PolicyStatementEntry[] }[]
     ssoAssignments: { principal: string; principalType: string; permissionSet: string }[]
   }
   deployables: ProfileDeployable[]
@@ -118,14 +147,34 @@ function policyAttachments(
   type: PolicyAttachment['type'],
   accountName: string,
   ouChain: string[],
+  loadedFiles: Record<string, string>,
 ): PolicyAttachment[] {
   const out: PolicyAttachment[] = []
   for (const p of policies ?? []) {
     const source = reachedVia(p.deploymentTargets, accountName, ouChain)
     if (source == null) continue
-    out.push({ name: p.name, description: p.description, type, source })
+    // Knowing a policy is attached is much less useful than seeing what it
+    // denies, and the document is usually a file sitting right next to the
+    // config that names it.
+    const content = p.policy ? findFileContent(p.policy, loadedFiles) : undefined
+    out.push({
+      name: p.name,
+      description: p.description,
+      type,
+      source,
+      policyFile: p.policy,
+      statements: content ? parsePolicyStatements(p.name, content) : undefined,
+    })
   }
   return out
+}
+
+/** Flattens LZA's `{ awsManaged, customerManaged }` attachment block. */
+function attachedPolicies(policies: IamPolicyAttachments | undefined) {
+  return {
+    awsManagedPolicies: policies?.awsManaged?.length ? policies.awsManaged : undefined,
+    customerManagedPolicies: policies?.customerManaged?.length ? policies.customerManaged : undefined,
+  }
 }
 
 export function buildAccountProfile(
@@ -133,6 +182,8 @@ export function buildAccountProfile(
   configs: LzaConfigs,
   accounts: AccountIndex,
   findings: Finding[] = [],
+  /** Needed to read the policy documents the configs point at. */
+  loadedFiles: Record<string, string> = {},
 ): AccountProfile | null {
   const account = accounts.byName.get(accountName)
   if (!account) return null
@@ -142,10 +193,10 @@ export function buildAccountProfile(
 
   // ── Policies ──────────────────────────────────────────────────────────────
   const policies = [
-    ...policyAttachments(org?.serviceControlPolicies, 'scp', accountName, ouChain),
-    ...policyAttachments(org?.resourceControlPolicies, 'rcp', accountName, ouChain),
-    ...policyAttachments(org?.taggingPolicies, 'tagging', accountName, ouChain),
-    ...policyAttachments(org?.backupPolicies, 'backup', accountName, ouChain),
+    ...policyAttachments(org?.serviceControlPolicies, 'scp', accountName, ouChain, loadedFiles),
+    ...policyAttachments(org?.resourceControlPolicies, 'rcp', accountName, ouChain, loadedFiles),
+    ...policyAttachments(org?.taggingPolicies, 'tagging', accountName, ouChain, loadedFiles),
+    ...policyAttachments(org?.backupPolicies, 'backup', accountName, ouChain, loadedFiles),
   ]
 
   // ── Network ───────────────────────────────────────────────────────────────
@@ -156,7 +207,7 @@ export function buildAccountProfile(
   // read only `vpcs` would show none of a workload account's networking.
   const networkVpcs = allVpcs(configs.network, accounts)
 
-  for (const vpc of networkVpcs) {
+  for (const { vpc, templateName } of resolveVpcs(configs.network, accounts)) {
     if (vpc.account === accountName) {
       // LZA allows an AZ letter ("a") or a physical id (1), so normalise to
       // strings before de-duplicating and sorting.
@@ -170,7 +221,12 @@ export function buildAccountProfile(
         name: vpc.name,
         region: vpc.region,
         cidrs: vpc.cidrs ?? [],
-        subnetCount: vpc.subnets?.length ?? 0,
+        subnets: (vpc.subnets ?? []).map((s) => ({
+          name: s.name,
+          cidr: s.ipv4CidrBlock ?? s.ipv6CidrBlock,
+          availabilityZone: s.availabilityZone == null ? undefined : String(s.availabilityZone),
+          routeTable: s.routeTable,
+        })),
         availabilityZones: azs,
         attachments: (vpc.transitGatewayAttachments ?? []).map((att) => ({
           name: att.name,
@@ -178,6 +234,7 @@ export function buildAccountProfile(
           associations: routeTableNames(att.routeTableAssociations),
           propagations: routeTableNames(att.routeTablePropagations),
         })),
+        fromTemplate: templateName,
         link: { view: 'network', nodeIds: [vpcNodeId(vpc.name, vpc.account)] },
       })
       continue
@@ -199,25 +256,36 @@ export function buildAccountProfile(
   }
 
   // ── IAM ───────────────────────────────────────────────────────────────────
-  const roles: string[] = []
+  const roles: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.roleSets ?? []) {
     if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
-    for (const r of set.roles ?? []) roles.push(r.name)
+    for (const r of set.roles ?? []) {
+      roles.push({ name: r.name, boundaryPolicy: r.boundaryPolicy, ...attachedPolicies(r.policies) })
+    }
   }
-  const groups: string[] = []
+  const groups: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.groupSets ?? []) {
     if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
-    for (const g of set.groups ?? []) groups.push(g.name)
+    for (const g of set.groups ?? []) groups.push({ name: g.name, ...attachedPolicies(g.policies) })
   }
-  const users: string[] = []
+  const users: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.userSets ?? []) {
     if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
-    for (const u of set.users ?? []) users.push(u.username)
+    for (const u of set.users ?? []) {
+      users.push({ name: u.username, group: u.group, boundaryPolicy: u.boundaryPolicy })
+    }
   }
-  const iamPolicies: string[] = []
+  const iamPolicies: AccountProfile['iam']['policies'] = []
   for (const set of configs.iam?.policySets ?? []) {
     if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
-    for (const p of set.policies ?? []) iamPolicies.push(p.name)
+    for (const p of set.policies ?? []) {
+      const content = p.policy ? findFileContent(p.policy, loadedFiles) : undefined
+      iamPolicies.push({
+        name: p.name,
+        policyFile: p.policy,
+        statements: content ? parsePolicyStatements(p.name, content) : undefined,
+      })
+    }
   }
   const ssoAssignments = (configs.iam?.identityCenterAssignments ?? [])
     .filter((a) => reachedVia(a.deploymentTargets, accountName, ouChain) != null)
@@ -235,7 +303,20 @@ export function buildAccountProfile(
     for (const item of list ?? []) {
       const via = reachedVia(item.deploymentTargets, accountName, ouChain)
       if (via == null) continue
-      deployables.push({ name: item.name, kind, regions: item.regions, via })
+      deployables.push({
+        name: item.name,
+        kind,
+        regions: item.regions,
+        via,
+        description: item.description,
+        // Only stacks and stack sets carry these; a portfolio has products
+        // instead, which the `products` list on its own config covers.
+        ...('template' in item ? {
+          template: item.template,
+          parameters: item.parameters,
+          terminationProtection: item.terminationProtection,
+        } : {}),
+      })
     }
   }
 

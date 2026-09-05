@@ -20,6 +20,7 @@ organizationalUnits:
 serviceControlPolicies:
   - name: DenyRootUser
     description: Deny root user actions
+    policy: service-control-policies/deny-root-user.json
     deploymentTargets:
       organizationalUnits:
         - Security

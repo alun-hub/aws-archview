@@ -28,7 +28,8 @@ export type { AccountIndex, ResolvedAccount, TargetExpansion } from '../parser/a
 export { buildAccountIndex, ROOT_OU } from '../parser/accountResolver'
 export { buildAccountProfile } from './accountProfile'
 export type {
-  AccountProfile, PolicyAttachment, ProfileVpc, SharedSubnet, ProfileDeployable, ProfileLink,
+  AccountProfile, PolicyAttachment, ProfileVpc, ProfileSubnet, ProfileIamPrincipal,
+  SharedSubnet, ProfileDeployable, ProfileLink,
 } from './accountProfile'
 export { parseCidr, overlaps, contains, formatIp, describeRange } from './cidr'
 export type { CidrRange } from './cidr'

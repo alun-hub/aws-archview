@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { AccountProfile, Finding, ProfileLink } from '../../analysis'
+import type { AccountProfile, Finding, ProfileLink, ProfileSubnet } from '../../analysis'
+import type { PolicyStatementEntry } from '../../parser/policyParse'
 import { SEVERITY_COLOR } from '../canvas/severityStyle'
 import { SeverityDot } from './ValidationPanel'
 
@@ -73,6 +74,160 @@ function LinkRow({ onClick, children }: { onClick?: () => void; children: React.
       onMouseLeave={interactive ? (e) => { e.currentTarget.style.background = '#fff' } : undefined}
     >
       {children}
+    </div>
+  )
+}
+
+/**
+ * A row that opens to show what it is actually made of.
+ *
+ * Knowing that "SCP-DenyRootAccess" is attached is the start of the question,
+ * not the answer — the row's `detail` carries the statements, subnets or
+ * parameters behind the name. Rows with nothing to show stay plain, so a
+ * chevron always means there is something under it.
+ */
+function ExpandableRow({ summary, detail, onFocus }: {
+  summary: React.ReactNode
+  detail?: React.ReactNode
+  onFocus?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const expandable = detail != null
+
+  return (
+    <div
+      style={{
+        borderRadius: 5,
+        border: '1px solid #e9ebed',
+        marginBottom: 5,
+        background: '#fff',
+        fontFamily: FONT,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 9px' }}>
+        {expandable ? (
+          <button
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-label={open ? 'Hide details' : 'Show details'}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0',
+              fontSize: 9, color: '#888', lineHeight: 1, flexShrink: 0, width: 10,
+            }}
+          >
+            {open ? '▼' : '▶'}
+          </button>
+        ) : (
+          <span style={{ width: 10, flexShrink: 0 }} />
+        )}
+        <div
+          onClick={expandable ? () => setOpen((v) => !v) : onFocus}
+          role={expandable || onFocus ? 'button' : undefined}
+          tabIndex={expandable || onFocus ? 0 : undefined}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            e.preventDefault()
+            if (expandable) setOpen((v) => !v)
+            else onFocus?.()
+          }}
+          style={{ flex: 1, minWidth: 0, cursor: expandable || onFocus ? 'pointer' : 'default' }}
+        >
+          {summary}
+        </div>
+        {onFocus && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onFocus() }}
+            title="Show on the diagram"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: '#0073bb', fontSize: 12, flexShrink: 0,
+            }}
+          >
+            ↗
+          </button>
+        )}
+      </div>
+      {expandable && open && (
+        <div style={{ padding: '0 9px 9px 27px', borderTop: '1px solid #f2f3f3', paddingTop: 8 }}>
+          {detail}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Key/value lines used inside an expanded row. */
+function DetailLines({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+          <span style={{ color: '#8b95a1', minWidth: 96, flexShrink: 0 }}>{k}</span>
+          <span style={{ color: '#414d5c', wordBreak: 'break-word' }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const cellStyle: React.CSSProperties = {
+  padding: '3px 6px', fontSize: 11, textAlign: 'left', verticalAlign: 'top',
+  borderBottom: '1px solid #f2f3f3', color: '#414d5c', wordBreak: 'break-word',
+}
+const headStyle: React.CSSProperties = { ...cellStyle, color: '#8b95a1', fontWeight: 600 }
+
+/** The statements a policy document actually contains — the answer to "what
+ *  does this SCP deny?", which the policy's name only hints at. */
+function StatementTable({ statements }: { statements: PolicyStatementEntry[] }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 340 }}>
+        <thead>
+          <tr>
+            <th style={{ ...headStyle, width: 70 }}>Effect</th>
+            <th style={headStyle}>Action</th>
+            <th style={headStyle}>Resource</th>
+          </tr>
+        </thead>
+        <tbody>
+          {statements.map((st, i) => (
+            <tr key={`${st.name}:${i}`}>
+              <td style={{ ...cellStyle, color: st.effect === 'Deny' ? '#d13212' : '#248814', fontWeight: 700 }}>
+                {st.effect || '—'}
+              </td>
+              <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{st.action}</td>
+              <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{st.resource}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SubnetTable({ subnets }: { subnets: ProfileSubnet[] }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 340 }}>
+        <thead>
+          <tr>
+            <th style={headStyle}>Subnet</th>
+            <th style={{ ...headStyle, width: 120 }}>CIDR</th>
+            <th style={{ ...headStyle, width: 40 }}>AZ</th>
+            <th style={headStyle}>Route table</th>
+          </tr>
+        </thead>
+        <tbody>
+          {subnets.map((sub) => (
+            <tr key={sub.name}>
+              <td style={cellStyle}>{sub.name}</td>
+              <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{sub.cidr ?? '—'}</td>
+              <td style={cellStyle}>{sub.availabilityZone ?? '—'}</td>
+              <td style={cellStyle}>{sub.routeTable ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -166,18 +321,39 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
           <Empty>No service control, tagging or backup policy reaches this account.</Empty>
         ) : (
           profile.policies.map((p) => (
-            <LinkRow key={`${p.type}:${p.name}`}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>
-                  {p.name}
-                  <span style={{ fontWeight: 400, color: '#8b95a1', marginLeft: 8, fontSize: 11 }}>{p.type}</span>
-                </span>
-                <SourceTag source={p.source} />
-              </div>
-              {p.description && (
-                <div style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3 }}>{p.description}</div>
-              )}
-            </LinkRow>
+            <ExpandableRow
+              key={`${p.type}:${p.name}`}
+              summary={
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>
+                      {p.name}
+                      <span style={{ fontWeight: 400, color: '#8b95a1', marginLeft: 8, fontSize: 11 }}>
+                        {p.type.toUpperCase()}
+                      </span>
+                    </span>
+                    <SourceTag source={p.source} />
+                  </div>
+                  {p.description && (
+                    <div style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3 }}>{p.description}</div>
+                  )}
+                </>
+              }
+              detail={p.statements?.length || p.policyFile ? (
+                <>
+                  {p.policyFile && (
+                    <div style={{ fontSize: 10, color: '#8b95a1', fontFamily: 'monospace', marginBottom: 6 }}>
+                      {p.policyFile}
+                    </div>
+                  )}
+                  {p.statements?.length ? (
+                    <StatementTable statements={p.statements} />
+                  ) : (
+                    <Empty>Load {p.policyFile} to see what this policy contains.</Empty>
+                  )}
+                </>
+              ) : undefined}
+            />
           ))
         )}
       </Section>
@@ -187,27 +363,35 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
           <Empty>This account owns no VPCs.</Empty>
         ) : (
           profile.vpcs.map((v) => (
-            <LinkRow key={v.name} onClick={() => onFocus(v.link)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>{v.name}</span>
-                <span style={{ fontSize: 11, color: '#5f6b7a', fontFamily: 'monospace' }}>
-                  {v.cidrs.join(', ') || '—'} · {v.region}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3 }}>
-                {v.subnetCount} subnet{v.subnetCount === 1 ? '' : 's'}
-                {v.availabilityZones.length > 0 && ` across ${v.availabilityZones.length} AZ (${v.availabilityZones.join(', ')})`}
-              </div>
-              {v.attachments.map((a) => (
-                <div key={a.name} style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3, paddingLeft: 10 }}>
-                  ↳ TGW <strong>{a.tgw ?? '—'}</strong>
-                  {a.associations.length > 0 && ` · associates ${a.associations.join(', ')}`}
-                  {a.propagations.length > 0
-                    ? ` · propagates ${a.propagations.join(', ')}`
-                    : <span style={{ color: '#b7791f' }}> · propagates nowhere</span>}
-                </div>
-              ))}
-            </LinkRow>
+            <ExpandableRow
+              key={`${v.name}:${v.region}`}
+              onFocus={() => onFocus(v.link)}
+              summary={
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>{v.name}</span>
+                    <span style={{ fontSize: 11, color: '#5f6b7a', fontFamily: 'monospace' }}>
+                      {v.cidrs.join(', ') || '—'} · {v.region}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3 }}>
+                    {v.subnets.length} subnet{v.subnets.length === 1 ? '' : 's'}
+                    {v.availabilityZones.length > 0 && ` across ${v.availabilityZones.length} AZ (${v.availabilityZones.join(', ')})`}
+                    {v.fromTemplate && ` · from template ${v.fromTemplate}`}
+                  </div>
+                  {v.attachments.map((a) => (
+                    <div key={a.name} style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3, paddingLeft: 10 }}>
+                      ↳ TGW <strong>{a.tgw ?? '—'}</strong>
+                      {a.associations.length > 0 && ` · associates ${a.associations.join(', ')}`}
+                      {a.propagations.length > 0
+                        ? ` · propagates ${a.propagations.join(', ')}`
+                        : <span style={{ color: '#b7791f' }}> · propagates nowhere</span>}
+                    </div>
+                  ))}
+                </>
+              }
+              detail={v.subnets.length > 0 ? <SubnetTable subnets={v.subnets} /> : undefined}
+            />
           ))
         )}
       </Section>
@@ -239,13 +423,48 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
               ['Roles', profile.iam.roles],
               ['Groups', profile.iam.groups],
               ['Users', profile.iam.users],
-              ['Customer-managed policies', profile.iam.policies],
             ] as const).filter(([, items]) => items.length > 0).map(([label, items]) => (
               <div key={label}>
                 <div style={{ fontSize: 11, color: '#8b95a1', marginBottom: 4 }}>{label}</div>
-                <Chips items={items} />
+                {items.map((item) => {
+                  const rows: [string, React.ReactNode][] = []
+                  if (item.awsManagedPolicies) rows.push(['AWS managed', <Chips items={item.awsManagedPolicies} />])
+                  if (item.customerManagedPolicies) rows.push(['Customer managed', <Chips items={item.customerManagedPolicies} />])
+                  if (item.boundaryPolicy) rows.push(['Permissions boundary', item.boundaryPolicy])
+                  if (item.group) rows.push(['Group', item.group])
+                  return (
+                    <ExpandableRow
+                      key={item.name}
+                      summary={<span style={{ fontSize: 12, color: '#232F3E' }}>{item.name}</span>}
+                      detail={rows.length > 0 ? <DetailLines rows={rows} /> : undefined}
+                    />
+                  )
+                })}
               </div>
             ))}
+            {profile.iam.policies.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: '#8b95a1', marginBottom: 4 }}>Customer-managed policies</div>
+                {profile.iam.policies.map((p) => (
+                  <ExpandableRow
+                    key={p.name}
+                    summary={<span style={{ fontSize: 12, color: '#232F3E' }}>{p.name}</span>}
+                    detail={p.statements?.length || p.policyFile ? (
+                      <>
+                        {p.policyFile && (
+                          <div style={{ fontSize: 10, color: '#8b95a1', fontFamily: 'monospace', marginBottom: 6 }}>
+                            {p.policyFile}
+                          </div>
+                        )}
+                        {p.statements?.length
+                          ? <StatementTable statements={p.statements} />
+                          : <Empty>Load {p.policyFile} to see what this policy contains.</Empty>}
+                      </>
+                    ) : undefined}
+                  />
+                ))}
+              </div>
+            )}
             {profile.iam.ssoAssignments.length > 0 && (
               <div>
                 <div style={{ fontSize: 11, color: '#8b95a1', marginBottom: 4 }}>Identity Center</div>
@@ -266,22 +485,35 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
           <Empty>No customizations or backup vaults target this account.</Empty>
         ) : (
           <>
-            {profile.deployables.map((d) => (
-              <LinkRow key={`${d.kind}:${d.name}`}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: '#232F3E' }}>
-                    <strong>{d.name}</strong>
-                    <span style={{ color: '#8b95a1', marginLeft: 8, fontSize: 11 }}>{d.kind}</span>
-                  </span>
-                  <SourceTag source={d.via} />
-                </div>
-                {d.regions && d.regions.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#5f6b7a', marginTop: 3, fontFamily: 'monospace' }}>
-                    {d.regions.join(', ')}
-                  </div>
-                )}
-              </LinkRow>
-            ))}
+            {profile.deployables.map((d) => {
+              const rows: [string, React.ReactNode][] = []
+              if (d.description) rows.push(['Description', d.description])
+              if (d.template) rows.push(['Template', <code style={{ fontSize: 10 }}>{d.template}</code>])
+              if (d.regions?.length) rows.push(['Regions', d.regions.join(', ')])
+              if (d.terminationProtection != null) {
+                rows.push(['Termination protection', d.terminationProtection ? 'On' : 'Off'])
+              }
+              if (d.parameters?.length) {
+                rows.push(['Parameters', (
+                  <Chips items={d.parameters.map((param) => `${param.name}: ${param.value}`)} />
+                )])
+              }
+              return (
+                <ExpandableRow
+                  key={`${d.kind}:${d.name}`}
+                  summary={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: '#232F3E' }}>
+                        <strong>{d.name}</strong>
+                        <span style={{ color: '#8b95a1', marginLeft: 8, fontSize: 11 }}>{d.kind}</span>
+                      </span>
+                      <SourceTag source={d.via} />
+                    </div>
+                  }
+                  detail={rows.length > 0 ? <DetailLines rows={rows} /> : undefined}
+                />
+              )
+            })}
             {profile.backupVaults.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, color: '#8b95a1', marginBottom: 4 }}>Backup vaults</div>

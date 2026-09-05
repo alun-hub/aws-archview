@@ -616,9 +616,9 @@ function AppContent() {
   const accountProfiles = useMemo(() => {
     const index = buildAccountIndex(config.configs.organization, config.configs.accounts)
     return index.accounts
-      .map((a) => buildAccountProfile(a.name, config.configs, index, findings))
+      .map((a) => buildAccountProfile(a.name, config.configs, index, findings, config.loadedFiles))
       .filter((p) => p != null)
-  }, [config.configs, findings])
+  }, [config.configs, config.loadedFiles, findings])
 
   const openAccountProfile = (name: string | null) => {
     dispatch({ type: 'SELECT_ACCOUNT', name })

@@ -138,7 +138,7 @@ describe('network', () => {
     const vpc = profile.vpcs[0]
     expect(vpc.name).toBe('Aurora-Prod-VPC')
     expect(vpc.cidrs).toEqual(['10.24.0.0/20'])
-    expect(vpc.subnetCount).toBe(2)
+    expect(vpc.subnets.map((s) => s.name)).toEqual(['App-A', 'App-B'])
     expect(vpc.availabilityZones).toEqual(['a', 'b'])
     expect(vpc.attachments[0]).toMatchObject({ tgw: 'Main-TGW', propagations: ['Spoke-RT'] })
     expect(vpc.link).toEqual({ view: 'network', nodeIds: ['vpc:Aurora-Prod-VPC:Aurora-Prod'] })
@@ -161,9 +161,60 @@ describe('network', () => {
 
 describe('IAM and deployables', () => {
   it('resolves role sets through the OU chain', () => {
-    expect(profile.iam.roles).toEqual(['BreakGlassRole'])
-    expect(buildAccountProfile('Network', configs, index)!.iam.roles.sort())
+    expect(profile.iam.roles.map((r) => r.name)).toEqual(['BreakGlassRole'])
+    expect(buildAccountProfile('Network', configs, index)!.iam.roles.map((r) => r.name).sort())
       .toEqual(['BreakGlassRole', 'NetworkAdminRole'])
+  })
+
+  it('carries what each role actually grants', () => {
+    const withPolicies = buildAccountProfile('Aurora-Prod', {
+      ...configs,
+      iam: {
+        roleSets: [{
+          deploymentTargets: { organizationalUnits: ['Root'] },
+          roles: [{
+            name: 'DeploymentRole',
+            boundaryPolicy: 'Boundary',
+            policies: { awsManaged: ['ReadOnlyAccess'], customerManaged: ['DeployPolicy'] },
+          }],
+        }],
+      },
+    }, index)!
+    expect(withPolicies.iam.roles[0]).toEqual({
+      name: 'DeploymentRole',
+      boundaryPolicy: 'Boundary',
+      awsManagedPolicies: ['ReadOnlyAccess'],
+      customerManagedPolicies: ['DeployPolicy'],
+    })
+  })
+
+  it('parses the policy document a policy points at', () => {
+    // The name only hints at what a policy does; the statements are the answer.
+    const withDoc = buildAccountProfile('Aurora-Prod', {
+      ...configs,
+      organization: {
+        ...configs.organization!,
+        serviceControlPolicies: [
+          { name: 'DenyRoot', policy: 'policies/deny-root.json', deploymentTargets: { organizationalUnits: ['Root'] } },
+        ],
+        backupPolicies: [],
+      },
+    }, index, [], {
+      'policies/deny-root.json': JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [{ Sid: 'DenyRoot', Effect: 'Deny', Action: '*', Resource: '*' }],
+      }),
+    })!
+    const scp = withDoc.policies.find((p) => p.name === 'DenyRoot')!
+    expect(scp.policyFile).toBe('policies/deny-root.json')
+    expect(scp.statements).toEqual([
+      { name: 'DenyRoot [DenyRoot]', effect: 'Deny', action: '*', resource: '*' },
+    ])
+  })
+
+  it('leaves statements undefined when the document is not loaded', () => {
+    const scp = profile.policies.find((p) => p.name === 'DenyRoot')!
+    expect(scp.statements).toBeUndefined()
   })
 
   it('resolves Identity Center assignments', () => {
