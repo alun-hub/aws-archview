@@ -4,9 +4,12 @@ import type { Rule, RuleFinding } from '../types'
 /**
  * A VPC with no flow logs.
  *
- * Compliance rather than correctness: the VPC deploys fine and the diagram
- * looks identical, but the traffic is invisible during an incident. It is
- * almost always an oversight rather than a decision.
+ * `info`, not a warning. Nothing here is broken or self-contradictory — an
+ * option simply isn't switched on, and this app only sees LZA's own configs. A
+ * team may well enable flow logs elsewhere: an org-wide AWS Config rule, an
+ * account-factory baseline, a CloudFormation stack in customizations. Calling
+ * that a warning would be confidently wrong, and on a real config it fired
+ * against most VPCs at once, drowning the findings that report actual breakage.
  *
  * `network-config.yaml` can set `vpcFlowLogs` once at the top level for every
  * VPC, so a config using that central default must not produce one finding per
@@ -25,9 +28,9 @@ export const vpcWithoutFlowLogs: Rule = {
       if (vpc.vpcFlowLogs) continue
       findings.push({
         ruleId: 'vpc-without-flow-logs',
-        severity: 'warning',
+        severity: 'info',
         title: 'VPC has no flow logs',
-        detail: `${vpc.name} (account ${vpc.account}) sets no vpcFlowLogs, and network-config.yaml declares no default for all VPCs — its traffic will not be recorded anywhere.`,
+        detail: `${vpc.name} (account ${vpc.account}) sets no vpcFlowLogs, and network-config.yaml declares no default for all VPCs. Its traffic will not be recorded by LZA — check whether something outside these configs covers it.`,
         view: 'network',
         nodeIds: [vpcNodeId(vpc.name, vpc.account)],
         configFile: 'network-config.yaml',

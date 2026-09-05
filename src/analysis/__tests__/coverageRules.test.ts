@@ -209,7 +209,9 @@ describe('vpc-without-flow-logs', () => {
   it('flags every VPC when nothing configures flow logs', () => {
     const findings = of({ network: { vpcs } }, 'vpc-without-flow-logs')
     expect(findings).toHaveLength(2)
-    expect(findings[0].severity).toBe('warning')
+    // Info, not a warning: nothing is broken, an option is simply not on, and
+    // it may well be handled outside the LZA configs this app can see.
+    expect(findings[0].severity).toBe('info')
     expect(findings[0].nodeIds).toEqual([vpcNodeId('A-VPC', 'Prod')])
   })
 
