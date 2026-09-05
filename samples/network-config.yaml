@@ -42,6 +42,23 @@ transitGateways:
     defaultRouteTableAssociation: disable
     defaultRouteTablePropagation: disable
     autoAcceptSharingAttachments: enable
+    routeTables:
+      - name: Ingress-RT
+        routes: []
+      - name: Spoke-RT
+        routes:
+          # East-west and outbound traffic is steered to the inspection VPC by
+          # a static route. That is why the inspection attachment associates a
+          # route table but propagates into none — it is reached deliberately,
+          # not by learning its prefixes.
+          - destinationCidrBlock: 0.0.0.0/0
+            attachment:
+              vpcName: Inspection-VPC
+              account: Network
+      - name: Inspection-RT
+        routes: []
+      - name: VPN-RT
+        routes: []
     shareTargets:
       organizationalUnits:
         - Infrastructure
@@ -61,9 +78,9 @@ customerGateways:
       - name: OnPrem-VPN
         transitGateway: Main-TGW
         routeTableAssociations:
-          - routeTableName: VPN-RT
+          - VPN-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         staticRoutesOnly: false
         tunnelSpecifications:
           - tunnelInsideCidr: 169.254.100.0/30
@@ -157,9 +174,9 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Ingress-RT
+          - Ingress-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
@@ -226,7 +243,7 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Inspection-RT
+          - Inspection-RT
         routeTablePropagations: []    # Inspection VPC does NOT propagate routes
         subnets:
           - TGW-Attach-Subnet-A
@@ -294,9 +311,9 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
@@ -359,9 +376,9 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
@@ -422,9 +439,9 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
@@ -499,9 +516,9 @@ vpcs:
           name: Main-TGW
           account: Network
         routeTableAssociations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         routeTablePropagations:
-          - routeTableName: Spoke-RT
+          - Spoke-RT
         subnets:
           - TGW-Attach-Subnet-A
           - TGW-Attach-Subnet-B
@@ -512,23 +529,6 @@ vpcs:
 # Spoke-RT:      spoke → spoke goes via Inspection VPC (default route to Inspection)
 # Inspection-RT: Inspection VPC attachment
 # VPN-RT:        on-premises VPN → Inspection VPC then onwards
-transitGatewayRouteTables:
-  - name: Ingress-RT
-    transitGateway:
-      name: Main-TGW
-      account: Network
-  - name: Spoke-RT
-    transitGateway:
-      name: Main-TGW
-      account: Network
-  - name: Inspection-RT
-    transitGateway:
-      name: Main-TGW
-      account: Network
-  - name: VPN-RT
-    transitGateway:
-      name: Main-TGW
-      account: Network
 
 # ─── Central Network Services ──────────────────────────────────────────────────
 centralNetworkServices:

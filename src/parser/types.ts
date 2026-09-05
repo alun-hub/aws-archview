@@ -31,6 +31,9 @@ export interface SCP {
 export interface OrganizationConfig {
   enable: boolean
   organizationalUnits?: OUConfig[]
+  /** LZA attaches `scpPolicyName` to newly created accounts automatically, so
+   *  that policy legitimately has no deploymentTargets of its own. */
+  quarantineNewAccounts?: { enable?: boolean; scpPolicyName?: string }
   serviceControlPolicies?: SCP[]
   // Tagging and backup policies use the same {name, description, policy,
   // deploymentTargets} shape as SCPs in LZA's organization-config.yaml.
@@ -89,11 +92,19 @@ export interface VpcFlowLogsConfig {
   customFields?: string[]
 }
 
+/**
+ * LZA declares route table associations and propagations as plain arrays of
+ * route table names (`ITransitGatewayAttachmentConfig.routeTableAssociations:
+ * string[]`). Some hand-written configs use `- routeTableName: X` objects
+ * instead, so both are accepted and normalised by `routeTableNames()`.
+ */
+export type RouteTableRef = string | { routeTableName?: string }
+
 export interface TgwAttachmentConfig {
   name: string
   transitGateway: { name: string; account: string }
-  routeTableAssociations?: { routeTableName: string }[]
-  routeTablePropagations?: { routeTableName: string }[]
+  routeTableAssociations?: RouteTableRef[]
+  routeTablePropagations?: RouteTableRef[]
   subnets?: string[]
 }
 
@@ -130,13 +141,36 @@ export interface TgwConfig {
   defaultRouteTableAssociation?: string
   defaultRouteTablePropagation?: string
   autoAcceptSharingAttachments?: string
+  /** LZA nests route tables under their Transit Gateway. The top-level
+   *  `transitGatewayRouteTables` list is accepted too, but this is canonical. */
+  routeTables?: TgwRouteTableConfig[]
   shareTargets?: { organizationalUnits?: string[]; accounts?: string[] }
   tags?: Record<string, string>[]
 }
 
+/** A static route on a Transit Gateway route table. `attachment` names the VPC
+ *  (or VPN/DX) the traffic is steered to — the mechanism a hub-and-spoke
+ *  inspection design uses instead of propagation. */
+export interface TgwRouteEntryConfig {
+  destinationCidrBlock?: string
+  destinationPrefixList?: string
+  blackhole?: boolean
+  attachment?: {
+    vpcName?: string
+    account?: string
+    vpnConnectionName?: string
+    directConnectGatewayName?: string
+    transitGatewayPeeringName?: string
+  }
+}
+
 export interface TgwRouteTableConfig {
   name: string
-  transitGateway: { name: string; account: string }
+  /** Present when the route table is declared at the top level rather than
+   *  nested under its Transit Gateway. */
+  transitGateway?: { name: string; account: string }
+  routes?: TgwRouteEntryConfig[]
+  tags?: Record<string, string>[]
 }
 
 export interface VpnTunnelSpec {
@@ -146,8 +180,8 @@ export interface VpnTunnelSpec {
 export interface VpnConnectionConfig {
   name: string
   transitGateway: string
-  routeTableAssociations?: { routeTableName: string }[]
-  routeTablePropagations?: { routeTableName: string }[]
+  routeTableAssociations?: RouteTableRef[]
+  routeTablePropagations?: RouteTableRef[]
   staticRoutesOnly?: boolean
   tunnelSpecifications?: VpnTunnelSpec[]
 }

@@ -467,3 +467,70 @@ describe('networkParser', () => {
   })
 })
 
+
+describe('LZA schema shapes', () => {
+  const tgw = { name: 'Main-TGW', account: 'Network', region: 'eu-west-1' }
+
+  // LZA declares these as string[]. The object form appears in hand-written
+  // configs (and in this project's own samples, before that was checked), and
+  // reading only one shape made the other silently resolve to nothing — which
+  // is how a propagation edge used to vanish from the diagram.
+  it('reads route table associations given as plain names', () => {
+    const model = parseNetwork({
+      transitGateways: [{ ...tgw, routeTables: [{ name: 'Spoke-RT' }] }],
+      vpcs: [{
+        name: 'Prod-VPC', account: 'Prod', region: 'eu-west-1', cidrs: ['10.0.0.0/16'],
+        transitGatewayAttachments: [{
+          name: 'Att', transitGateway: { name: 'Main-TGW', account: 'Network' },
+          routeTableAssociations: ['Spoke-RT'],
+          routeTablePropagations: ['Spoke-RT'],
+        }],
+      }],
+    })
+    const rt = model.nodes.find((n) => n.id === 'tgw-rt:Spoke-RT')
+    expect(rt?.data.associations).toEqual(['Prod-VPC'])
+    expect(rt?.data.propagatesFrom).toEqual(['Prod-VPC'])
+    expect(model.edges.some((e) => e.target === 'tgw-rt:Spoke-RT' && e.kind === 'propagation')).toBe(true)
+  })
+
+  it('still reads the object form', () => {
+    const model = parseNetwork({
+      transitGateways: [{ ...tgw, routeTables: [{ name: 'Spoke-RT' }] }],
+      vpcs: [{
+        name: 'Prod-VPC', account: 'Prod', region: 'eu-west-1', cidrs: ['10.0.0.0/16'],
+        transitGatewayAttachments: [{
+          name: 'Att', transitGateway: { name: 'Main-TGW', account: 'Network' },
+          routeTableAssociations: [{ routeTableName: 'Spoke-RT' }],
+          routeTablePropagations: [{ routeTableName: 'Spoke-RT' }],
+        }],
+      }],
+    })
+    expect(model.nodes.find((n) => n.id === 'tgw-rt:Spoke-RT')?.data.associations).toEqual(['Prod-VPC'])
+  })
+
+  // LZA nests route tables under their Transit Gateway; a top-level
+  // `transitGatewayRouteTables` list is a shape some configs use instead.
+  // Reading only the latter left a real LZA config with no route tables drawn.
+  it('finds route tables nested under the Transit Gateway', () => {
+    const model = parseNetwork({
+      transitGateways: [{ ...tgw, routeTables: [{ name: 'Nested-RT' }] }],
+    })
+    expect(model.nodes.some((n) => n.id === 'tgw-rt:Nested-RT')).toBe(true)
+  })
+
+  it('finds route tables declared at the top level', () => {
+    const model = parseNetwork({
+      transitGateways: [tgw],
+      transitGatewayRouteTables: [{ name: 'TopLevel-RT', transitGateway: { name: 'Main-TGW', account: 'Network' } }],
+    })
+    expect(model.nodes.some((n) => n.id === 'tgw-rt:TopLevel-RT')).toBe(true)
+  })
+
+  it('does not duplicate a route table declared in both places', () => {
+    const model = parseNetwork({
+      transitGateways: [{ ...tgw, routeTables: [{ name: 'Both-RT' }] }],
+      transitGatewayRouteTables: [{ name: 'Both-RT', transitGateway: { name: 'Main-TGW', account: 'Network' } }],
+    })
+    expect(model.nodes.filter((n) => n.id === 'tgw-rt:Both-RT')).toHaveLength(1)
+  })
+})

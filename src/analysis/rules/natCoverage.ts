@@ -71,8 +71,17 @@ export const subnetWithoutDefaultRoute: Rule = {
       const hasRoutes = (vpc.routeTables ?? []).some((rt) => (rt.routes ?? []).length > 0)
       if (!hasRoutes) continue
 
+      // Subnets hosting a Transit Gateway attachment hold the attachment's
+      // network interfaces and nothing else, so they are not supposed to route
+      // anywhere. Taken from `transitGatewayAttachments[].subnets` — a fact in
+      // the config, not an inference from the subnet's name.
+      const attachmentSubnets = new Set(
+        (vpc.transitGatewayAttachments ?? []).flatMap((a) => a.subnets ?? []),
+      )
+
       for (const { subnet, routeTable } of subnetsWithRouteTable(vpc)) {
         if (routeTable.gatewayAssociation) continue
+        if (attachmentSubnets.has(subnet.name)) continue
         if ((routeTable.routes ?? []).length === 0) continue
         if (defaultEgressRoute(routeTable)) continue
 

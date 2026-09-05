@@ -9,6 +9,7 @@
 
 import type { LzaConfigs, ViewKind } from '../parser'
 import { accountNodeId, subnetNodeId, vpcNodeId } from '../parser/nodeIds'
+import { routeTableNames } from '../parser/routeTableRefs'
 import type { SCP } from '../parser/types'
 import { ROOT_OU, type AccountIndex } from './accountResolver'
 import type { Finding } from './types'
@@ -168,8 +169,8 @@ export function buildAccountProfile(
         attachments: (vpc.transitGatewayAttachments ?? []).map((att) => ({
           name: att.name,
           tgw: typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name,
-          associations: (att.routeTableAssociations ?? []).map((r) => r.routeTableName),
-          propagations: (att.routeTablePropagations ?? []).map((r) => r.routeTableName),
+          associations: routeTableNames(att.routeTableAssociations),
+          propagations: routeTableNames(att.routeTablePropagations),
         })),
         link: { view: 'network', nodeIds: [vpcNodeId(vpc.name, vpc.account)] },
       })

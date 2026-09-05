@@ -1,10 +1,14 @@
 import { vpcNodeId, vpnNodeId } from '../../parser/nodeIds'
+import { routeTableNames } from '../../parser/routeTableRefs'
+import { allTgwRouteTables, staticallyRoutedAttachments } from '../../parser/tgwRouteTables'
 import type { AnalysisContext, Rule, RuleFinding } from '../types'
 
 /** Every attachment in the config, VPC and VPN alike, since both associate and
  *  propagate against the same Transit Gateway route tables. */
 interface Attachment {
   label: string
+  /** Key matching a Transit Gateway route table's static-route attachment. */
+  routeKey: string
   tgw?: string
   associations: string[]
   propagations: string[]
@@ -19,9 +23,10 @@ function attachments(ctx: AnalysisContext): Attachment[] {
       const tgw = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
       list.push({
         label: `VPC ${vpc.name} attachment "${att.name}"`,
+        routeKey: `${vpc.name}::${vpc.account}`,
         tgw,
-        associations: (att.routeTableAssociations ?? []).map((r) => r.routeTableName),
-        propagations: (att.routeTablePropagations ?? []).map((r) => r.routeTableName),
+        associations: routeTableNames(att.routeTableAssociations),
+        propagations: routeTableNames(att.routeTablePropagations),
         nodeIds: [vpcNodeId(vpc.name, vpc.account)],
       })
     }
@@ -31,9 +36,10 @@ function attachments(ctx: AnalysisContext): Attachment[] {
     for (const vpn of cgw.vpnConnections ?? []) {
       list.push({
         label: `VPN "${vpn.name}"`,
+        routeKey: `vpn:${vpn.name}`,
         tgw: vpn.transitGateway,
-        associations: (vpn.routeTableAssociations ?? []).map((r) => r.routeTableName),
-        propagations: (vpn.routeTablePropagations ?? []).map((r) => r.routeTableName),
+        associations: routeTableNames(vpn.routeTableAssociations),
+        propagations: routeTableNames(vpn.routeTablePropagations),
         nodeIds: [vpnNodeId(vpn.name)],
       })
     }
@@ -53,6 +59,11 @@ export const tgwAttachmentNoPropagation: Rule = {
     const tgwDefaults = new Map(
       (ctx.configs.network?.transitGateways ?? []).map((t) => [t.name, t.defaultRouteTablePropagation]),
     )
+    // Propagation is not the only way an attachment becomes reachable: a
+    // static route on a Transit Gateway route table steers traffic to it by
+    // name, which is exactly how centralized egress and inspection VPCs are
+    // wired. Saying "nothing learns how to reach it" about those is wrong.
+    const staticallyRouted = staticallyRoutedAttachments(ctx.configs.network)
 
     const findings: RuleFinding[] = []
     for (const att of attachments(ctx)) {
@@ -61,6 +72,7 @@ export const tgwAttachmentNoPropagation: Rule = {
       // route table on its own, so an empty list is deliberate, not a gap.
       if (att.tgw && tgwDefaults.get(att.tgw) === 'enable') continue
       if (att.associations.length === 0) continue
+      if (staticallyRouted.has(att.routeKey)) continue
 
       findings.push({
         ruleId: 'tgw-attachment-no-propagation',
@@ -83,11 +95,11 @@ export const unknownTgwRouteTable: Rule = {
   id: 'unknown-tgw-route-table',
   title: 'Unknown Transit Gateway route table',
   run(ctx): RuleFinding[] {
-    const declared = ctx.configs.network?.transitGatewayRouteTables
+    const declared = allTgwRouteTables(ctx.configs.network)
     // No route tables declared at all means the file simply doesn't use them —
     // reporting every reference would be noise.
-    if (!declared || declared.length === 0) return []
-    const known = new Set(declared.map((rt) => rt.name))
+    if (declared.length === 0) return []
+    const known = new Set(declared.map(({ routeTable }) => routeTable.name))
 
     const findings: RuleFinding[] = []
     for (const att of attachments(ctx)) {

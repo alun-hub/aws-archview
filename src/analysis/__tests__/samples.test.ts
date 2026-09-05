@@ -9,12 +9,13 @@ import { runValidation } from '..'
  * rule which has started crying wolf. A new rule firing here is a false
  * positive until proven otherwise.
  *
- * The one expected finding is real and deliberate: the inspection VPC's
- * attachment associates a route table without propagating into one, which is
- * how a hub-and-spoke inspection pattern is normally wired. It is exactly the
- * kind of thing a warning is for — worth a second look, not a defect.
+ * It is expected to be completely clean. The inspection VPC's attachment
+ * associates a route table without propagating into one, which used to be
+ * reported — until checking the LZA schema showed that a static route on the
+ * Transit Gateway route table is how such an attachment is reached. The sample
+ * now carries that route, and the rule correctly says nothing.
  */
-const EXPECTED_RULE_IDS = ['tgw-attachment-no-propagation']
+const EXPECTED_RULE_IDS: string[] = []
 
 function loadSamples() {
   // The same bundled contents the "Try a sample config" button loads, rather
@@ -44,7 +45,7 @@ describe('sample configs', () => {
     expect(parseErrors).toEqual({})
   })
 
-  it('produces no findings beyond the deliberate one', () => {
+  it('produces no findings', () => {
     // Printed in full on failure: a new rule's false positives are far easier
     // to judge from the message than from a count.
     const unexpected = findings
@@ -53,9 +54,7 @@ describe('sample configs', () => {
     expect(unexpected).toEqual([])
   })
 
-  it('still reports the inspection VPC attachment', () => {
-    // Guards the other direction: if this stops firing, the rule or the sample
-    // changed and one of them is wrong.
-    expect(findings.map((f) => f.ruleId)).toEqual(['tgw-attachment-no-propagation'])
+  it('is clean', () => {
+    expect(findings).toEqual([])
   })
 })

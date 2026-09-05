@@ -8,6 +8,9 @@ import type { AnalysisContext, Rule, RuleFinding } from '../types'
  *  would search for in the YAML. */
 interface TargetSite {
   where: string
+  /** The object's own `name`, where it has one — used to match config that
+   *  refers to a policy by name from elsewhere in the file. */
+  name?: string
   configFile: string
   view: ViewKind
   targets?: ExpandableTargets
@@ -28,6 +31,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
     for (const p of policies ?? []) {
       sites.push({
         where: `${key}: ${p.name}`,
+        name: p.name,
         configFile: 'organization-config.yaml',
         view: 'organization',
         targets: p.deploymentTargets,
@@ -173,6 +177,8 @@ export const emptyDeploymentTarget: Rule = {
   run(ctx): RuleFinding[] {
     if (!ctx.configs.organization || !ctx.configs.accounts) return []
 
+    const quarantinePolicy = ctx.configs.organization?.quarantineNewAccounts?.scpPolicyName
+
     const findings: RuleFinding[] = []
     for (const site of collectSites(ctx)) {
       const expansion = ctx.accounts.expand(site.targets)
@@ -180,6 +186,13 @@ export const emptyDeploymentTarget: Rule = {
       // A broken reference already reported by the rule above is the cause
       // here, not a separate problem — don't say it twice.
       if (expansion.unknownOus.length > 0 || expansion.unknownAccounts.length > 0) continue
+      // Naming an OU that exists but holds no accounts *yet* is how a landing
+      // zone is built: the guardrails go in before the workloads do. Only
+      // targeting that names nothing at all is dead config.
+      if ((site.targets?.organizationalUnits?.length ?? 0) > 0) continue
+      // LZA attaches the quarantine SCP to new accounts as they are created,
+      // via `quarantineNewAccounts`, so its empty deploymentTargets is correct.
+      if (site.name && site.name === quarantinePolicy) continue
 
       const named = [
         ...(site.targets?.organizationalUnits ?? []).map((o) => `OU ${o}`),

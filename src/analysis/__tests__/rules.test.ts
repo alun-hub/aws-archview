@@ -173,7 +173,9 @@ describe('unknown-deployment-target', () => {
 })
 
 describe('empty-deployment-target', () => {
-  it('flags a policy targeting an OU that holds no accounts', () => {
+  it('accepts a policy on an OU that holds no accounts yet', () => {
+    // A landing zone puts guardrails on an OU before any workload lands in
+    // it. Calling that "deploys nowhere" would flag every new environment.
     const findings = of({
       organization: {
         enable: true,
@@ -182,8 +184,20 @@ describe('empty-deployment-target', () => {
       },
       accounts,
     }, 'empty-deployment-target')
-    expect(findings).toHaveLength(1)
-    expect(findings[0].severity).toBe('warning')
+    expect(findings).toHaveLength(0)
+  })
+
+  it('exempts the quarantine SCP, which LZA attaches to new accounts itself', () => {
+    const findings = of({
+      organization: {
+        enable: true,
+        organizationalUnits: [{ name: 'Sandbox' }],
+        quarantineNewAccounts: { enable: true, scpPolicyName: 'Quarantine-New-Object' },
+        serviceControlPolicies: [{ name: 'Quarantine-New-Object', deploymentTargets: {} }],
+      },
+      accounts,
+    }, 'empty-deployment-target')
+    expect(findings).toHaveLength(0)
   })
 
   it('does not double-report a target that is already a broken reference', () => {

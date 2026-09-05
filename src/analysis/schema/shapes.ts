@@ -85,6 +85,20 @@ const vpc: Shape = {
   },
 }
 
+/** A VPC template is deployed into every account a `deploymentTargets` block
+ *  resolves to, so it has no `account` of its own — reusing the VPC shape here
+ *  reported every template in a real config as missing a required field. */
+const vpcTemplate: Shape = {
+  ...vpc,
+  label: 'VPC template',
+  keys: [...vpc.keys.filter((k) => k !== 'account'), 'deploymentTargets'],
+  required: ['name', 'region'],
+  children: {
+    ...vpc.children,
+    deploymentTargets: { shape: { label: 'deploymentTargets', keys: DEPLOYMENT_TARGET_KEYS } },
+  },
+}
+
 const transitGateway: Shape = {
   label: 'Transit Gateway',
   nameKey: 'name',
@@ -132,7 +146,7 @@ export const NETWORK_SHAPE: Shape = {
   ],
   children: {
     vpcs: { list: true, shape: vpc },
-    vpcTemplates: { list: true, shape: vpc },
+    vpcTemplates: { list: true, shape: vpcTemplate },
     transitGateways: { list: true, shape: transitGateway },
     customerGateways: { list: true, shape: customerGateway },
     transitGatewayRouteTables: {

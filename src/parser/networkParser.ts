@@ -4,6 +4,8 @@ import {
   accountNodeId, cgwNodeId, dxNodeId, regionNodeId, subnetNodeId,
   tgwNodeId, tgwRouteTableNodeId, vpcNodeId, vpnNodeId,
 } from './nodeIds'
+import { routeTableNames } from './routeTableRefs'
+import { allTgwRouteTables } from './tgwRouteTables'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
 // A guess from the subnet's name, used only to pick a diagram icon. LZA has no
@@ -123,7 +125,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       const tgwName = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
       const key = `${tgwName}::${vpc.account}`
       const set = rtByTgwAccount.get(key) ?? new Set()
-      for (const rt of att.routeTableAssociations ?? []) set.add(rt.routeTableName)
+      for (const name of routeTableNames(att.routeTableAssociations)) set.add(name)
       rtByTgwAccount.set(key, set)
     }
   }
@@ -132,7 +134,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   for (const cgw of networkConfig.customerGateways ?? []) {
     for (const vpn of cgw.vpnConnections ?? []) {
       const set = new Set<string>()
-      for (const rt of vpn.routeTableAssociations ?? []) set.add(rt.routeTableName)
+      for (const name of routeTableNames(vpn.routeTableAssociations)) set.add(name)
       rtByVpn.set(vpn.name, set)
     }
   }
@@ -153,41 +155,39 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   const rtPropagations   = new Map<string, string[]>()  // rtName → [vpcName]
   for (const vpc of networkConfig.vpcs ?? []) {
     for (const att of vpc.transitGatewayAttachments ?? []) {
-      for (const r of att.routeTableAssociations ?? []) {
-        const arr = rtAssociations.get(r.routeTableName) ?? []
+      for (const name of routeTableNames(att.routeTableAssociations)) {
+        const arr = rtAssociations.get(name) ?? []
         arr.push(vpc.name)
-        rtAssociations.set(r.routeTableName, arr)
+        rtAssociations.set(name, arr)
       }
-      for (const r of att.routeTablePropagations ?? []) {
-        const arr = rtPropagations.get(r.routeTableName) ?? []
+      for (const name of routeTableNames(att.routeTablePropagations)) {
+        const arr = rtPropagations.get(name) ?? []
         arr.push(vpc.name)
-        rtPropagations.set(r.routeTableName, arr)
+        rtPropagations.set(name, arr)
       }
     }
   }
   // VPN associations
   for (const cgw of networkConfig.customerGateways ?? []) {
     for (const vpn of cgw.vpnConnections ?? []) {
-      for (const r of vpn.routeTableAssociations ?? []) {
-        const arr = rtAssociations.get(r.routeTableName) ?? []
+      for (const name of routeTableNames(vpn.routeTableAssociations)) {
+        const arr = rtAssociations.get(name) ?? []
         arr.push(vpn.name)
-        rtAssociations.set(r.routeTableName, arr)
+        rtAssociations.set(name, arr)
       }
-      for (const r of vpn.routeTablePropagations ?? []) {
-        const arr = rtPropagations.get(r.routeTableName) ?? []
+      for (const name of routeTableNames(vpn.routeTablePropagations)) {
+        const arr = rtPropagations.get(name) ?? []
         arr.push(vpn.name)
-        rtPropagations.set(r.routeTableName, arr)
+        rtPropagations.set(name, arr)
       }
     }
   }
 
   // ── TGW Route Tables (grouped in a container, placed in Zone B left of TGW) ─
   const rtGroupsByTgw = new Map<string, string[]>()
-  for (const rt of networkConfig.transitGatewayRouteTables ?? []) {
-    const tgwName = typeof rt.transitGateway === 'string' ? rt.transitGateway : rt.transitGateway?.name
-    if (!tgwName) continue
+  for (const { tgwName, routeTable } of allTgwRouteTables(networkConfig)) {
     const arr = rtGroupsByTgw.get(tgwName) ?? []
-    arr.push(rt.name)
+    arr.push(routeTable.name)
     rtGroupsByTgw.set(tgwName, arr)
   }
   for (const [tgwName, rtNames] of rtGroupsByTgw) {
@@ -255,11 +255,11 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
         edges.push({ id: `${cgwId}->${vpnId}`, source: cgwId, target: vpnId, kind: 'vpn' })
 
         // VPN Route Table Propagations to TGW Route Tables
-        for (const prop of vpn.routeTablePropagations ?? []) {
+        for (const rtName of routeTableNames(vpn.routeTablePropagations)) {
           edges.push({
-            id: `prop:vpn:${vpn.name}->tgw-rt:${prop.routeTableName}`,
+            id: `prop:vpn:${vpn.name}->tgw-rt:${rtName}`,
             source: vpnId,
-            target: tgwRouteTableNodeId(prop.routeTableName),
+            target: tgwRouteTableNodeId(rtName),
             kind: 'propagation',
             label: 'Propagates',
           })
@@ -555,11 +555,11 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
       }
 
       // VPC Route Table Propagations to TGW Route Tables
-      for (const prop of att.routeTablePropagations ?? []) {
+      for (const rtName of routeTableNames(att.routeTablePropagations)) {
         edges.push({
-          id: `prop:${vpcId}->tgw-rt:${prop.routeTableName}`,
+          id: `prop:${vpcId}->tgw-rt:${rtName}`,
           source: vpcId,
-          target: tgwRouteTableNodeId(prop.routeTableName),
+          target: tgwRouteTableNodeId(rtName),
           kind: 'propagation',
           label: 'Propagates',
         })
