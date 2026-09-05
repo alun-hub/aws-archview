@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -19,12 +19,15 @@ import { GroupNode } from '../nodes/GroupNode'
 import { ServiceNode } from '../nodes/ServiceNode'
 import { ExportMenu } from './ExportMenu'
 import { useConfig, useDispatch } from '../../store/configStore'
-import type { GraphModel } from '../../parser'
+import type { GraphModel, GraphNode } from '../../parser'
 import { applyElkLayout } from './elkLayout'
 import { EdgeRoutingContext, getAbsolutePosition, getHandlePosition, getEdgeSegments, type Point, type Segment } from './edgeRouting'
 import { LoopEdge } from './LoopEdge'
 import { HighlightContext } from './HighlightContext'
 import { KIND_LABEL } from './kindLabels'
+import { ancestorChain, isNodeVisible } from './visibility'
+import { useFileDrop } from '../../hooks/useFileDrop'
+import { SAMPLE_CONFIGS } from '../../parser/sampleConfigs'
 
 
 function sortParentsFirst(nodes: Node[]): Node[] {
@@ -163,14 +166,18 @@ function toFlowNodes(model: GraphModel, collapsedNodes: Set<string>): Node[] {
   })
 }
 
+// Each family gets its own hue, not just its own dash pattern — at the zoom
+// levels a real diagram gets viewed at (or for anyone color-weak), a dash
+// difference alone doesn't read; tgw/dx/propagation used to all share the
+// same purple.
 const EDGE_STYLES: Record<string, { color: string; dash?: string }> = {
   'tgw':         { color: '#6B3FA0', dash: '6 3' },
   'tgw-hub':     { color: '#6B3FA0', dash: '6 3' },
   'vpn':         { color: '#CC7700', dash: '4 4' },
-  'dx':          { color: '#6B3FA0', dash: '8 2 2 2' },
+  'dx':          { color: '#146EB4', dash: '8 2 2 2' },
   'peering':     { color: '#1A6CAE', dash: '5 3' },
   'flow':        { color: '#248814' },
-  'propagation': { color: '#6B3FA0', dash: '2 3' },
+  'propagation': { color: '#008296', dash: '2 3' },
 }
 
 function toFlowEdges(model: GraphModel): Edge[] {
@@ -253,11 +260,23 @@ function toFlowEdges(model: GraphModel): Edge[] {
 
 // ── SearchBar ────────────────────────────────────────────────────────────────
 
-function SearchBar() {
-  const { fitView, getNodes } = useReactFlow()
+interface SearchBarProps {
+  /** Full, unfiltered model — search must find a result even when it's
+   *  tucked behind a collapsed container or a "Node types" filter. */
+  model: GraphModel | null
+  /** Currently rendered nodes, so a just-revealed result can be framed as
+   *  soon as it actually exists on the canvas (relayout is async). */
+  nodes: Node[]
+}
+
+function SearchBar({ model, nodes }: SearchBarProps) {
+  const { fitView } = useReactFlow()
+  const dispatch = useDispatch()
+  const config   = useConfig()
   const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<Node[]>([])
+  const [results, setResults] = useState<GraphNode[]>([])
   const [focused, setFocused] = useState(false)
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -273,21 +292,40 @@ function SearchBar() {
 
   const handleInput = (q: string) => {
     setQuery(q)
-    if (q.length < 1) { setResults([]); return }
+    if (!model || q.length < 1) { setResults([]); return }
     const lq = q.toLowerCase()
-    setResults(
-      getNodes()
-        .filter(n => String(n.data?.label ?? '').toLowerCase().includes(lq))
-        .slice(0, 8)
-    )
+    setResults(model.nodes.filter(n => n.label.toLowerCase().includes(lq)).slice(0, 8))
   }
 
-  const handleSelect = (node: Node) => {
-    fitView({ nodes: [{ id: node.id }], duration: 700, padding: 0.5, maxZoom: 2 })
+  const handleSelect = (result: GraphNode) => {
+    if (!model) return
+    // A result buried under a collapsed container or a hidden node-type
+    // would otherwise look like search "found" it but nothing happens.
+    if (!isNodeVisible(model, result.id, config.collapsedNodes, config.hiddenNodeIds)) {
+      dispatch({ type: 'REVEAL_NODES', ids: [result.id, ...ancestorChain(model, result.id)] })
+    }
+    dispatch({ type: 'SELECT_NODE', id: result.id })
+    setPendingFocusId(result.id)
     setQuery('')
     setResults([])
     inputRef.current?.blur()
   }
+
+  // Frame the selected result once it's actually on the canvas — a reveal
+  // triggers an async ELK relayout, so the node may not exist in `nodes` yet
+  // on the render where it was requested. Give up after a few seconds so a
+  // result that never renders (e.g. its parent kind stays hidden) doesn't
+  // leave this watching forever.
+  useEffect(() => {
+    if (!pendingFocusId) return
+    if (nodes.some(n => n.id === pendingFocusId)) {
+      fitView({ nodes: [{ id: pendingFocusId }], duration: 700, padding: 0.5, maxZoom: 2 })
+      const clear = setTimeout(() => setPendingFocusId(null), 0)
+      return () => clearTimeout(clear)
+    }
+    const timer = setTimeout(() => setPendingFocusId(null), 4000)
+    return () => clearTimeout(timer)
+  }, [pendingFocusId, nodes, fitView])
 
   return (
     <Panel position="top-left" style={{ margin: 10 }}>
@@ -339,8 +377,7 @@ function SearchBar() {
             zIndex: 10000,
           }}>
             {results.map(n => {
-              const kind  = String(n.data?.kind ?? '')
-              const label = String(n.data?.label ?? n.id)
+              const hidden = model != null && !isNodeVisible(model, n.id, config.collapsedNodes, config.hiddenNodeIds)
               return (
                 <button
                   key={n.id}
@@ -360,8 +397,18 @@ function SearchBar() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#f5f7ff')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>{label}</span>
-                  <span style={{ fontSize: 10, color: '#888', marginTop: 1 }}>{KIND_LABEL[kind] ?? kind}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#232F3E' }}>{n.label}</span>
+                    {hidden && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, color: '#7c5c00', background: '#fffbe6',
+                        border: '1px solid #ffe58f', borderRadius: 8, padding: '0 5px', lineHeight: '14px',
+                      }}>
+                        hidden
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#888', marginTop: 1 }}>{KIND_LABEL[n.kind] ?? n.kind}</span>
                 </button>
               )
             })}
@@ -374,12 +421,13 @@ function SearchBar() {
 
 // ── Legend ───────────────────────────────────────────────────────────────────
 
-const LEGEND_EDGES = [
-  { label: 'TGW Attachment', color: '#6B3FA0', dash: '6 3' },
-  { label: 'VPN',            color: '#CC7700', dash: '4 4' },
-  { label: 'Peering',        color: '#1A6CAE', dash: '5 3' },
-  { label: 'Propagation',    color: '#6B3FA0', dash: '2 3' },
-  { label: 'Internet Flow',  color: '#248814', dash: undefined },
+const LEGEND_EDGES: { label: string; color: string; dash?: string; kinds: string[] }[] = [
+  { label: 'TGW Attachment',  color: '#6B3FA0', dash: '6 3',        kinds: ['tgw', 'tgw-hub'] },
+  { label: 'VPN',              color: '#CC7700', dash: '4 4',        kinds: ['vpn'] },
+  { label: 'Direct Connect',   color: '#146EB4', dash: '8 2 2 2',    kinds: ['dx'] },
+  { label: 'Peering',          color: '#1A6CAE', dash: '5 3',        kinds: ['peering'] },
+  { label: 'Propagation',      color: '#008296', dash: '2 3',        kinds: ['propagation'] },
+  { label: 'Internet Flow',    color: '#248814', dash: undefined,    kinds: ['flow'] },
 ]
 
 const KBD: React.CSSProperties = {
@@ -387,11 +435,14 @@ const KBD: React.CSSProperties = {
   fontSize: 9, fontFamily: 'monospace', border: '1px solid #ccc',
 }
 
-function Legend() {
+function Legend({ presentEdgeKinds }: { presentEdgeKinds: Set<string> }) {
   const [open, setOpen] = useState(false)
+  // Only show color rows for connection types this view actually draws —
+  // the legend is shared across all views now, and most only use a subset.
+  const edgeItems = LEGEND_EDGES.filter(item => item.kinds.some(k => presentEdgeKinds.has(k)))
 
   return (
-    <Panel position="bottom-left" style={{ margin: '0 10px 146px' }}>
+    <Panel position="bottom-left" style={{ margin: '0 10px 10px' }}>
       <div style={{
         background: 'rgba(255,255,255,0.96)',
         border: '1.5px solid #ddd',
@@ -425,7 +476,7 @@ function Legend() {
         </button>
         {open && (
           <div style={{ padding: '8px 10px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {LEGEND_EDGES.map(item => (
+            {edgeItems.map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <svg width="34" height="10" style={{ flexShrink: 0 }}>
                   <line x1="1" y1="5" x2="33" y2="5" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} />
@@ -434,7 +485,7 @@ function Legend() {
                 <span style={{ fontSize: 11, color: '#444' }}>{item.label}</span>
               </div>
             ))}
-            <div style={{ borderTop: '1px solid #eee', marginTop: 4, paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ borderTop: edgeItems.length > 0 ? '1px solid #eee' : 'none', marginTop: edgeItems.length > 0 ? 4 : 0, paddingTop: edgeItems.length > 0 ? 6 : 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#999', marginBottom: 1 }}>Shortcuts</div>
               <div style={{ fontSize: 10, color: '#888', display: 'flex', gap: 6, alignItems: 'center' }}>
                 <kbd style={KBD}>F</kbd> Fit view
@@ -453,26 +504,87 @@ function Legend() {
   )
 }
 
+// ── Hidden node-type filter badge ─────────────────────────────────────────────
+
+// Node-type filtering (the "Node types" section in the left panel) leaves no
+// trace on the canvas otherwise — a diagram that's missing half its accounts
+// looks like a bug, not a filter someone set five minutes ago.
+function HiddenFilterBadge() {
+  const config   = useConfig()
+  const dispatch = useDispatch()
+  const count = config.hiddenNodeIds.size
+  if (count === 0) return null
+
+  return (
+    <Panel position="top-right" style={{ margin: '54px 10px 0 0' }}>
+      <button
+        onClick={() => dispatch({ type: 'SHOW_ALL_NODES' })}
+        title="Some nodes are hidden by the Node types filter — click to show all"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: '#fffbe6',
+          border: '1.5px solid #ffe58f',
+          borderRadius: 20,
+          padding: '5px 10px',
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#7c5c00',
+          cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+          fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+        }}
+      >
+        {count} node{count === 1 ? '' : 's'} hidden
+        <span style={{ opacity: 0.6 }}>✕</span>
+      </button>
+    </Panel>
+  )
+}
+
 // ── Zoom indicator ───────────────────────────────────────────────────────────
 
 function ZoomIndicator() {
-  const { zoom } = useViewport()
+  const { zoom, x, y } = useViewport()
+  const { setViewport, fitView } = useReactFlow()
+
+  // Click resets to 100% around the viewport center; alt-click fits the
+  // whole diagram — the number was purely informational before, with no way
+  // to act on it short of the scroll wheel or the separate Controls widget.
+  const reset = (e: React.MouseEvent) => {
+    if (e.altKey) { fitView({ duration: 400, padding: 0.15 }); return }
+    const el = document.querySelector('.react-flow') as HTMLElement | null
+    const cx = (el?.clientWidth ?? 0) / 2
+    const cy = (el?.clientHeight ?? 0) / 2
+    const ratio = 1 / zoom
+    setViewport({ x: cx - (cx - x) * ratio, y: cy - (cy - y) * ratio, zoom: 1 }, { duration: 250 })
+  }
+
   return (
-    <Panel position="bottom-right" style={{ margin: '0 10px 52px' }}>
-      <div style={{
-        background: 'rgba(255, 255, 255, 0.95)',
-        border: '1.5px solid #e0e0e0',
-        borderRadius: 6,
-        padding: '3px 8px',
-        fontSize: 11,
-        fontWeight: 700,
-        color: '#444',
-        fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-        userSelect: 'none',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      }}>
+    // The MiniMap anchors to the same corner at its default 200x150 and isn't
+    // part of this flex-stacked Panel group, so it silently covers anything
+    // placed too close to the bottom edge here — clear its footprint.
+    <Panel position="bottom-right" style={{ margin: '0 10px 175px' }}>
+      <button
+        onClick={reset}
+        title="Click: reset to 100%  ·  Alt-click: fit whole diagram"
+        style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          border: '1.5px solid #e0e0e0',
+          borderRadius: 6,
+          padding: '3px 8px',
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#444',
+          fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          userSelect: 'none',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          cursor: 'pointer',
+        }}
+      >
         {Math.round(zoom * 100)}%
-      </div>
+      </button>
     </Panel>
   )
 }
@@ -542,24 +654,28 @@ function BreadcrumbNav() {
 // ── Combined flow controller: keyboard + zoom + auto-fitView ─────────────────
 
 function FlowController({ fitViewTrigger }: { fitViewTrigger: number }) {
-  const { fitView, getViewport, setViewport, getNodes } = useReactFlow()
+  const { fitView, getViewport, setViewport } = useReactFlow()
   const dispatch    = useDispatch()
-  const config      = useConfig()
-  const routingCtx  = useContext(EdgeRoutingContext)
   const prevTrigger = useRef(0)
 
-  // Refs so the wheel handler always reads current values without re-registering
-  const selectedNodeIdRef = useRef(config.selectedNodeId)
-  const routingCtxRef     = useRef(routingCtx)
-  useEffect(() => { selectedNodeIdRef.current = config.selectedNodeId })
-  useEffect(() => { routingCtxRef.current = routingCtx })
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts, plus Enter/Space to select a Tab-focused node.
+  // elementsSelectable is off (selection is driven through the store, not
+  // React Flow's own selection model), so React Flow's built-in keyboard
+  // activation of a focused node doesn't fire a click for us — do it by hand.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'f' || e.key === 'F') fitView({ duration: 600, padding: 0.15 })
       if (e.key === 'Escape') dispatch({ type: 'SELECT_NODE', id: null })
+      if (e.key === 'Enter' || e.key === ' ') {
+        const el = e.target as HTMLElement
+        const nodeEl = el.closest('.react-flow__node')
+        const nodeId = nodeEl?.getAttribute('data-id')
+        if (nodeId) {
+          e.preventDefault()
+          dispatch({ type: 'SELECT_NODE', id: nodeId })
+        }
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -573,7 +689,8 @@ function FlowController({ fitViewTrigger }: { fitViewTrigger: number }) {
     return () => clearTimeout(timer)
   }, [fitViewTrigger, fitView])
 
-  // Custom wheel zoom registered once via refs.
+  // Custom wheel handling registered once — always relative to the current
+  // getViewport()/setViewport(), so no dependency on selection or routing state.
   // capture:true fires before ReactFlow's d3-zoom handler; stopPropagation keeps it that way.
   useEffect(() => {
     const canvas = document.querySelector('.react-flow') as HTMLElement | null
@@ -584,45 +701,38 @@ function FlowController({ fitViewTrigger }: { fitViewTrigger: number }) {
       e.stopPropagation()
 
       const { x: vx, y: vy, zoom } = getViewport()
-      const zoomFactor = e.deltaY < 0 ? 1.12 : 1 / 1.12
-      const newZoom    = Math.min(Math.max(zoom * zoomFactor, 0.08), 4)
 
-      let pivotX: number
-      let pivotY: number
-
-      const selectedId = selectedNodeIdRef.current
-      const ctx        = routingCtxRef.current
-
-      if (selectedId && ctx) {
-        const absPos = ctx.absPosMap.get(selectedId)
-        const node   = getNodes().find(n => n.id === selectedId)
-        if (absPos && node) {
-          // Flow-space center of the selected node → screen-space pivot
-          pivotX = (absPos.x + (node.width  ?? 100) / 2) * zoom + vx
-          pivotY = (absPos.y + (node.height ?? 100) / 2) * zoom + vy
-        } else {
-          const rect = canvas.getBoundingClientRect()
-          pivotX = e.clientX - rect.left
-          pivotY = e.clientY - rect.top
-        }
-      } else {
-        // No selection — zoom toward cursor
+      // Pinch-to-zoom on a trackpad reports as a wheel event with ctrlKey set
+      // (same for a physical mouse's ctrl+wheel) — treat that, and only that,
+      // as a zoom gesture, always pivoting on the cursor position so the
+      // point under the pointer stays put. Matches minZoom/maxZoom on <ReactFlow>.
+      if (e.ctrlKey) {
         const rect = canvas.getBoundingClientRect()
-        pivotX = e.clientX - rect.left
-        pivotY = e.clientY - rect.top
+        const cursorX = e.clientX - rect.left
+        const cursorY = e.clientY - rect.top
+
+        const zoomFactor = e.deltaY < 0 ? 1.12 : 1 / 1.12
+        const newZoom    = Math.min(Math.max(zoom * zoomFactor, 0.1), 3)
+        const ratio       = newZoom / zoom
+
+        setViewport({
+          x: cursorX - (cursorX - vx) * ratio,
+          y: cursorY - (cursorY - vy) * ratio,
+          zoom: newZoom,
+        })
+        return
       }
 
-      const ratio = newZoom / zoom
-      setViewport({
-        x: pivotX - (pivotX - vx) * ratio,
-        y: pivotY - (pivotY - vy) * ratio,
-        zoom: newZoom,
-      })
+      // Plain wheel / two-finger trackpad scroll → pan. Shift+scroll (mouse
+      // wheels that don't report deltaX) pans horizontally instead.
+      const dx = e.shiftKey && e.deltaX === 0 ? e.deltaY : e.deltaX
+      const dy = e.shiftKey && e.deltaX === 0 ? 0 : e.deltaY
+      setViewport({ x: vx - dx, y: vy - dy, zoom })
     }
 
     canvas.addEventListener('wheel', onWheel, { passive: false, capture: true })
     return () => canvas.removeEventListener('wheel', onWheel, { capture: true })
-  }, [getViewport, getNodes, setViewport])
+  }, [getViewport, setViewport])
 
   return null
 }
@@ -662,6 +772,12 @@ export function DiagramCanvas({ model }: Props) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const { collapsedNodes, hiddenNodeIds } = config
+  const { onDrop } = useFileDrop(dispatch)
+  const loadSample = () => {
+    for (const [filename, content] of Object.entries(SAMPLE_CONFIGS)) {
+      dispatch({ type: 'SET_FILE', filename, content })
+    }
+  }
 
 
 
@@ -673,22 +789,20 @@ export function DiagramCanvas({ model }: Props) {
     return new Set(model.nodes.filter(n => n.parentId).map(n => n.parentId!))
   }, [model])
 
+  // Connection kinds this graph actually draws — the Legend is shared across
+  // every view, but each only uses a subset of edge kinds.
+  const presentEdgeKinds = useMemo(() => {
+    if (!model) return new Set<string>()
+    return new Set(model.edges.map(e => e.kind ?? 'tgw'))
+  }, [model])
+
   // Filter out descendants of collapsed nodes and nodes hidden (individually,
   // or via an ancestor) through the "Node types" filter
   const filteredModel = useMemo(() => {
     if (!model) return null
-    const nodeMap = new Map(model.nodes.map(n => [n.id, n]))
-    const visibleIds = new Set<string>()
-    for (const n of model.nodes) {
-      if (hiddenNodeIds.has(n.id)) continue
-      let visible = true
-      let pid = n.parentId
-      while (pid) {
-        if (collapsedNodes.has(pid) || hiddenNodeIds.has(pid)) { visible = false; break }
-        pid = nodeMap.get(pid)?.parentId
-      }
-      if (visible) visibleIds.add(n.id)
-    }
+    const visibleIds = new Set(
+      model.nodes.filter(n => isNodeVisible(model, n.id, collapsedNodes, hiddenNodeIds)).map(n => n.id),
+    )
     return {
       nodes: model.nodes.filter(n => visibleIds.has(n.id)),
       edges: model.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target)),
@@ -765,20 +879,46 @@ export function DiagramCanvas({ model }: Props) {
     return { nodeMap, absPosMap, otherVerticals, elkSegments: elkEdgeSegments }
   }, [nodes, edges, elkEdgeSegments])
 
-  // 1. Re-calculate layout when model or collapse state changes
+  // Ref so the layout effect always reads the current selection without
+  // taking it as a dependency — selecting a node must not re-trigger a full
+  // ELK relayout (expensive, and would also re-fit the viewport).
+  const selectedNodeIdRef = useRef(config.selectedNodeId)
+  useEffect(() => { selectedNodeIdRef.current = config.selectedNodeId })
+
+  // 1. Re-calculate layout when model or collapse state changes.
+  // Only re-fit the viewport when `model` itself changed identity (a new view
+  // or newly-loaded config) — expanding/collapsing a container or toggling a
+  // node-type filter re-lays-out the diagram but must not yank the camera
+  // away from what the user was just looking at.
+  const prevModelRef = useRef<GraphModel | null>(null)
   useEffect(() => {
     if (!filteredModel) return
     const rawNodes = toFlowNodes(filteredModel, collapsedNodes).map(n => ({
       ...n,
       data: { ...n.data, hasChildren: nodeParentIds.has(n.id) },
+      selected: n.id === selectedNodeIdRef.current,
     }))
     const rawEdges = toFlowEdges(filteredModel)
     applyElkLayout(rawNodes, rawEdges).then(({ nodes: laidNodes, edgeSegments }) => {
       setNodes(sortParentsFirst(laidNodes))
       setElkEdgeSegments(edgeSegments)
-      setFitViewTrigger(k => k + 1)
+      if (prevModelRef.current !== model) {
+        setFitViewTrigger(k => k + 1)
+      }
+      prevModelRef.current = model
     })
-  }, [filteredModel, nodeParentIds, setNodes, collapsedNodes])
+  }, [filteredModel, nodeParentIds, setNodes, collapsedNodes, model])
+
+  // Keep node `selected` in sync with the store outside of full relayouts too
+  // (e.g. selecting via search or the breadcrumb) so the clicked node always
+  // gets its highlight ring — this is a cheap array map, not an ELK relayout.
+  useEffect(() => {
+    setNodes(nds => nds.map(n =>
+      n.selected === (n.id === config.selectedNodeId)
+        ? n
+        : { ...n, selected: n.id === config.selectedNodeId }
+    ))
+  }, [config.selectedNodeId, setNodes])
 
   // 2. Filter edges by toggle state + dim based on selection
   useEffect(() => {
@@ -835,6 +975,8 @@ export function DiagramCanvas({ model }: Props) {
   if (!model || model.nodes.length === 0) {
     return (
       <div
+        onDrop={onDrop}
+        onDragOver={(e) => e.preventDefault()}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -856,7 +998,7 @@ export function DiagramCanvas({ model }: Props) {
           <rect x="48" y="26" width="18" height="18" rx="3" fill="#8C4FFF" opacity="0.3"/>
         </svg>
         <div style={{ fontWeight: 700, fontSize: 15, color: '#232F3E' }}>
-          Load LZA configuration files
+          Drop LZA configuration files here
         </div>
         <div style={{ fontSize: 12, color: '#aaa', textAlign: 'center', lineHeight: 1.6 }}>
           {config.activeView === 'organization'   && <><b>organization-config.yaml</b><br/>accounts-config.yaml</>}
@@ -866,6 +1008,23 @@ export function DiagramCanvas({ model }: Props) {
           {config.activeView === 'security'       && <><b>security-config.yaml</b></>}
           {config.activeView === 'iam'            && <><b>iam-config.yaml</b></>}
         </div>
+        <div style={{ fontSize: 12, color: '#bbb' }}>or</div>
+        <button
+          onClick={loadSample}
+          style={{
+            background: '#fff',
+            border: '1.5px solid #0073bb',
+            color: '#0073bb',
+            fontWeight: 700,
+            fontSize: 12,
+            padding: '7px 16px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+          }}
+        >
+          Try a sample configuration
+        </button>
       </div>
     )
   }
@@ -897,11 +1056,14 @@ export function DiagramCanvas({ model }: Props) {
           >
             <SemanticZoomController enableSemanticZoom={config.enableSemanticZoom} />
             <Background color="#d0d0d0" gap={20} size={1} />
-            <Controls style={{ borderRadius: 6 }} />
-            <SearchBar />
+            {/* Lifted clear of the Legend, which now sits at the very bottom
+                of this corner instead of floating over the diagram. */}
+            <Controls style={{ borderRadius: 6, marginBottom: 44 }} />
+            <SearchBar model={model} nodes={nodes} />
             <BreadcrumbNav />
             <ZoomIndicator />
-            {config.activeView === 'network' && <Legend />}
+            <Legend presentEdgeKinds={presentEdgeKinds} />
+            <HiddenFilterBadge />
             <ExportMenu />
             <FlowController fitViewTrigger={fitViewTrigger} />
             <MiniMap

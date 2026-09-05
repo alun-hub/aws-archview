@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import AppLayout from '@cloudscape-design/components/app-layout'
 import Container from '@cloudscape-design/components/container'
 import Header from '@cloudscape-design/components/header'
@@ -15,6 +15,7 @@ import {
   buildSecurityGraph,
   buildIamGraph,
   buildPolicyMatrix,
+  resolveConfigKey,
   type ViewKind,
 } from './parser'
 import { ConfigLoader, ConfigFileList } from './components/panels/ConfigLoader'
@@ -43,46 +44,90 @@ const VIEWS: { id: ViewKind; label: string; requiredConfig: string }[] = [
 
 /** Segmented control stepping through the hierarchy: each button expands the
  *  diagram down to one more tier. The endpoints are the old Collapse All /
- *  Expand All, so they stay one click away. */
+ *  Expand All, so they stay one click away. A +/- stepper sits alongside so
+ *  the same action doesn't require knowing which named tier comes next. */
 function DetailLevelControl({ levels }: { levels: DetailLevel[] }) {
   const config   = useConfig()
   const dispatch = useDispatch()
+
+  const goTo = (level: number) => {
+    const target = levels.find((l) => l.level === level)
+    if (target) dispatch({ type: 'SET_DETAIL_LEVEL', level, ids: target.collapsedIds })
+  }
+
+  // A hand-picked collapse state (detailLevel === null via TOGGLE_COLLAPSE)
+  // has no single matching tier — treat the stepper as sitting at the most
+  // detailed tier so "-" still does something sensible from there.
+  const currentIndex = config.detailLevel !== null
+    ? levels.findIndex((l) => l.level === config.detailLevel)
+    : levels.length - 1
+  const atMin = currentIndex <= 0
+  const atMax = currentIndex >= levels.length - 1
+
+  const stepperButtonStyle = (disabled: boolean): CSSProperties => ({
+    width: 20,
+    height: 22,
+    padding: 0,
+    fontSize: 13,
+    fontWeight: 700,
+    borderRadius: 4,
+    border: '1px solid #c6c6cd',
+    background: disabled ? '#f4f4f4' : '#fff',
+    color: disabled ? '#ccc' : '#414d5c',
+    cursor: disabled ? 'default' : 'pointer',
+    fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+  })
 
   return (
     <div>
       <div style={{ fontSize: 11, color: '#5f6b7a', marginBottom: 4, fontWeight: 700 }}>
         Detail level
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-        {levels.map(({ level, label }) => {
-          const active = config.detailLevel === level
-          return (
-            <button
-              key={level}
-              aria-pressed={active}
-              onClick={() =>
-                dispatch({
-                  type: 'SET_DETAIL_LEVEL',
-                  level,
-                  ids: levels.find((l) => l.level === level)?.collapsedIds ?? [],
-                })
-              }
-              style={{
-                padding: '3px 8px',
-                fontSize: 12,
-                borderRadius: 4,
-                cursor: 'pointer',
-                border: `1px solid ${active ? '#0073bb' : '#c6c6cd'}`,
-                background: active ? 'rgba(0, 115, 187, 0.10)' : '#fff',
-                color: active ? '#0073bb' : '#414d5c',
-                fontWeight: active ? 700 : 400,
-                fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
-              }}
-            >
-              {label}
-            </button>
-          )
-        })}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          aria-label="Collapse one level"
+          title="Collapse one level"
+          disabled={atMin}
+          onClick={() => goTo(levels[Math.max(0, currentIndex - 1)].level)}
+          style={stepperButtonStyle(atMin)}
+        >
+          −
+        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, flex: 1 }}>
+          {levels.map(({ level, label, visibleCount }) => {
+            const active = config.detailLevel === level
+            return (
+              <button
+                key={level}
+                aria-pressed={active}
+                title={`Show ${visibleCount} of ${levels[levels.length - 1].visibleCount} nodes`}
+                onClick={() => goTo(level)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: 12,
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  border: `1px solid ${active ? '#0073bb' : '#c6c6cd'}`,
+                  background: active ? 'rgba(0, 115, 187, 0.10)' : '#fff',
+                  color: active ? '#0073bb' : '#414d5c',
+                  fontWeight: active ? 700 : 400,
+                  fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+                }}
+              >
+                {label} <span style={{ opacity: 0.55 }}>· {visibleCount}</span>
+              </button>
+            )
+          })}
+        </div>
+        <button
+          aria-label="Expand one level"
+          title="Expand one level"
+          disabled={atMax}
+          onClick={() => goTo(levels[Math.min(levels.length - 1, currentIndex + 1)].level)}
+          style={stepperButtonStyle(atMax)}
+        >
+          +
+        </button>
       </div>
     </div>
   )
@@ -92,6 +137,16 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
+  const [nodeFilterQuery, setNodeFilterQuery] = useState('')
+  const configSectionRef = useRef<HTMLDivElement>(null)
+
+  // A file may be loaded under a folder-prefixed key (e.g. from "Select
+  // folder") — match by what it resolves to, not the raw loadedFiles key,
+  // so a loaded config folder doesn't leave every view looking unloaded.
+  const loadedConfigKeys = useMemo(
+    () => new Set(Object.keys(config.loadedFiles).map(resolveConfigKey).filter((k) => k != null)),
+    [config.loadedFiles],
+  )
 
   // Progressive disclosure: one level per tier of the hierarchy, so a dense
   // view opens readable instead of fully expanded.
@@ -126,6 +181,21 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
     })
   }
 
+  // A checkbox per kind works fine for a handful of accounts; a config with
+  // dozens needs a way to jump straight to one instead of scanning a wall
+  // of checkboxes. Only show the search box once there's enough to search.
+  const totalNodeInstances = useMemo(
+    () => kindGroups.reduce((sum, g) => sum + g.nodes.length, 0),
+    [kindGroups],
+  )
+  const nodeFilterQuery_ = nodeFilterQuery.trim().toLowerCase()
+  const visibleKindGroups = useMemo(() => {
+    if (!nodeFilterQuery_) return kindGroups
+    return kindGroups.filter(
+      (g) => g.label.toLowerCase().includes(nodeFilterQuery_) || g.nodes.some((n) => n.label.toLowerCase().includes(nodeFilterQuery_)),
+    )
+  }, [kindGroups, nodeFilterQuery_])
+
   // No wrapper here manages its own scrolling — Cloudscape's navigation
   // panel already applies overflow-y: auto to itself. Nesting a second
   // `overflow: auto` container inside it produced two stacked scrollbars.
@@ -153,11 +223,15 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0' }}>
             {VIEWS.map(({ id, label, requiredConfig }) => {
               const active  = config.activeView === id
-              const loaded  = requiredConfig in config.loadedFiles
+              const loaded  = loadedConfigKeys.has(resolveConfigKey(requiredConfig)!)
               return (
                 <button
                   key={id}
-                  onClick={() => dispatch({ type: 'SET_VIEW', view: id })}
+                  title={loaded ? undefined : `Requires ${requiredConfig}`}
+                  onClick={() => {
+                    dispatch({ type: 'SET_VIEW', view: id })
+                    if (!loaded) configSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                  }}
                   style={{
                     width: '100%',
                     textAlign: 'left',
@@ -188,11 +262,13 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
         </ExpandableSection>
 
         {/* Configuration */}
-        <ExpandableSection header="Configuration" defaultExpanded variant="navigation">
-          <div style={{ padding: '4px 0 8px' }}>
-            <ConfigLoader loadedFiles={config.loadedFiles} />
-          </div>
-        </ExpandableSection>
+        <div ref={configSectionRef}>
+          <ExpandableSection header="Configuration" defaultExpanded variant="navigation">
+            <div style={{ padding: '4px 0 8px' }}>
+              <ConfigLoader loadedFiles={config.loadedFiles} />
+            </div>
+          </ExpandableSection>
+        </div>
 
         {/* Diagram Tools */}
         {levels.length > 0 && (
@@ -210,7 +286,7 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                     checked={config.aggregateStacks}
                     onChange={() => dispatch({ type: 'TOGGLE_AGGREGATE_STACKS' })}
                   >
-                    Aggregate Redundant Stacks
+                    Merge identical stacks
                   </Checkbox>
                 </div>
               )}
@@ -219,13 +295,13 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   checked={config.enableFocusMode}
                   onChange={() => dispatch({ type: 'TOGGLE_FOCUS_MODE' })}
                 >
-                  Focus Selection (Solo Mode)
+                  Highlight selection only
                 </Checkbox>
                 <Checkbox
                   checked={config.enableSemanticZoom}
                   onChange={() => dispatch({ type: 'TOGGLE_SEMANTIC_ZOOM' })}
                 >
-                  Semantic Zoom (LOD)
+                  Simplify when zoomed out
                 </Checkbox>
               </div>
             </div>
@@ -238,6 +314,23 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
         {kindGroups.length > 0 && (
           <ExpandableSection header="Node types" variant="navigation">
             <div style={{ padding: '4px 12px 8px' }}>
+              {totalNodeInstances > 12 && (
+                <input
+                  value={nodeFilterQuery}
+                  onChange={(e) => setNodeFilterQuery(e.target.value)}
+                  placeholder="Filter node types…"
+                  style={{
+                    width: '100%',
+                    padding: '5px 8px',
+                    marginBottom: 8,
+                    fontSize: 12,
+                    border: '1px solid #d5dbdb',
+                    borderRadius: 4,
+                    boxSizing: 'border-box',
+                    fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+                  }}
+                />
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <button
                   onClick={() => dispatch({ type: 'SHOW_ALL_NODES' })}
@@ -252,13 +345,21 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                   Show all
                 </button>
               </div>
+              {visibleKindGroups.length === 0 && (
+                <div style={{ fontSize: 12, color: '#aaa', padding: '4px 0' }}>No matches for "{nodeFilterQuery}"</div>
+              )}
               <SpaceBetween size="xs">
-                {kindGroups.map(({ kind, label, nodes }) => {
-                  const hiddenCount = nodes.filter((n) => config.hiddenNodeIds.has(n.id)).length
-                  const allHidden   = hiddenCount === nodes.length
-                  const someHidden  = hiddenCount > 0 && !allHidden
-                  const expanded    = expandedKinds.has(kind)
-                  const canExpand   = nodes.length > 1
+                {visibleKindGroups.map(({ kind, label, nodes }) => {
+                  const hiddenCount   = nodes.filter((n) => config.hiddenNodeIds.has(n.id)).length
+                  const allHidden     = hiddenCount === nodes.length
+                  const someHidden    = hiddenCount > 0 && !allHidden
+                  const kindMatches   = !nodeFilterQuery_ || label.toLowerCase().includes(nodeFilterQuery_)
+                  // While filtering by an individual node's name, force that
+                  // kind open showing only the matches — no point making
+                  // someone expand a group search already narrowed down for them.
+                  const filteredNodes = kindMatches ? nodes : nodes.filter((n) => n.label.toLowerCase().includes(nodeFilterQuery_))
+                  const expanded      = nodeFilterQuery_ ? true : expandedKinds.has(kind)
+                  const canExpand     = !nodeFilterQuery_ && nodes.length > 1
                   return (
                     <div key={kind}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -294,7 +395,7 @@ function LeftPanel({ activeGraph }: { activeGraph: GraphModel | null }) {
                       </div>
                       {expanded && (
                         <div style={{ marginLeft: 21, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {nodes.map((n) => (
+                          {filteredNodes.map((n) => (
                             <Checkbox
                               key={n.id}
                               checked={!config.hiddenNodeIds.has(n.id)}

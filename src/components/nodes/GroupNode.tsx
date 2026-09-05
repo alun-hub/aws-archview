@@ -50,6 +50,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   if (isCollapsed) {
     return (
       <div
+        onDoubleClick={(e) => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', id }) }}
         style={{
           width: '100%',
           height: '100%',
@@ -68,6 +69,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
           transition: 'box-shadow 0.15s, opacity 0.2s',
           position: 'relative',
+          cursor: 'pointer',
         }}
       >
         <AwsIcon kind={d.kind as IconKind} size={18} style={{ flexShrink: 0 }} />
@@ -91,19 +93,23 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             e.stopPropagation()
             dispatch({ type: 'TOGGLE_COLLAPSE', id })
           }}
-          title="Expand"
+          title="Expand (or double-click the container)"
+          aria-label="Expand"
           style={{
             background: '#fff',
             border: '1px solid #ccc',
-            borderRadius: 3,
+            borderRadius: 4,
             cursor: 'pointer',
-            padding: '0 4px',
-            fontSize: 9,
+            padding: '0 6px',
+            margin: '-3px 0',
+            fontSize: 10,
             color: '#555',
-            lineHeight: '14px',
-            height: 16,
+            lineHeight: '22px',
+            height: 22,
+            minWidth: 24,
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           ▶
@@ -122,6 +128,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
+      onDoubleClick={d.hasChildren ? (e) => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', id }) } : undefined}
       style={{
         width: '100%',
         height: '100%',
@@ -137,6 +144,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           ? `0 0 0 3px ${border}44`
           : '0 1px 4px rgba(0,0,0,0.06)',
         transition: 'box-shadow 0.15s, opacity 0.2s',
+        cursor: d.hasChildren ? 'pointer' : 'default',
       }}
     >
       {isSubnet ? (
@@ -218,19 +226,23 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                   e.stopPropagation()
                   dispatch({ type: 'TOGGLE_COLLAPSE', id })
                 }}
-                title={isCollapsed ? 'Expand' : 'Collapse'}
+                title={`${isCollapsed ? 'Expand' : 'Collapse'} (or double-click the container)`}
+                aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                 style={{
                   background: '#fff',
                   border: '1px solid #ccc',
-                  borderRadius: 3,
+                  borderRadius: 4,
                   cursor: 'pointer',
-                  padding: '0 4px',
-                  fontSize: 9,
+                  padding: '0 6px',
+                  margin: '-3px 0',
+                  fontSize: 10,
                   color: '#555',
-                  lineHeight: '14px',
-                  height: 16,
+                  lineHeight: '22px',
+                  height: 22,
+                  minWidth: 24,
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 {isCollapsed ? '▶' : '▼'}

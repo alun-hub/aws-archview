@@ -24,7 +24,7 @@ interface State {
   highlightedScp: string | null
 }
 
-type Action =
+export type Action =
   | { type: 'SET_FILE'; filename: string; content: string }
   | { type: 'SET_VIEW'; view: ViewKind }
   | { type: 'SELECT_NODE'; id: string | null }
@@ -39,6 +39,7 @@ type Action =
   | { type: 'TOGGLE_NODE_VISIBILITY'; id: string }
   | { type: 'SET_NODES_HIDDEN'; ids: string[]; hidden: boolean }
   | { type: 'SHOW_ALL_NODES' }
+  | { type: 'REVEAL_NODES'; ids: string[] }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -182,6 +183,19 @@ function reducer(state: State, action: Action): State {
     }
     case 'SHOW_ALL_NODES':
       return { ...state, hiddenNodeIds: new Set<string>() }
+    case 'REVEAL_NODES': {
+      // Used by search to jump to a result hidden behind a collapsed
+      // container or a node-type filter: un-collapse and un-hide every id
+      // in its ancestor chain (plus itself) so it actually renders.
+      if (action.ids.length === 0) return state
+      const nextCollapsed = new Set(state.collapsedNodes)
+      const nextHidden = new Set(state.hiddenNodeIds)
+      for (const id of action.ids) {
+        nextCollapsed.delete(id)
+        nextHidden.delete(id)
+      }
+      return { ...state, collapsedNodes: nextCollapsed, hiddenNodeIds: nextHidden, detailLevel: null }
+    }
     default:
       return state
   }

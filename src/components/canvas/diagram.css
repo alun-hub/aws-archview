@@ -4,6 +4,18 @@
   height: 100%;
 }
 
+/* React Flow makes every node focusable (tabIndex) by default even though
+   nodesDraggable/elementsSelectable are off here — give Tab-users a visible
+   ring instead of a silent, invisible focus move, and a hover affordance so
+   pointer users can tell nodes are clickable before they click. */
+.react-flow__node {
+  cursor: pointer;
+}
+.react-flow__node:focus-visible {
+  outline: 2px solid #0073bb;
+  outline-offset: 2px;
+}
+
 .diagram-canvas-wrapper.rf-zoom-out .react-flow__node:not(.react-flow__node-root):not(.react-flow__node-ou):not(.react-flow__node-account):not(.react-flow__node-management-account):not(.react-flow__node-region):not(.react-flow__node-vpc):not(.react-flow__node-on-premises):not(.react-flow__node-cloud) {
   opacity: 0 !important;
   pointer-events: none !important;
