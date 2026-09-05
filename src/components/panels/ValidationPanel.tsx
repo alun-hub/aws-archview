@@ -1,17 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { Finding, Severity } from '../../analysis'
-import { SEVERITY_COLOR } from '../canvas/severityStyle'
+import { SEVERITY_COLOR, SEVERITY_GLYPH } from '../canvas/severityStyle'
 
 const SEVERITY_LABEL: Record<Severity, string> = {
   error:   'Errors',
   warning: 'Warnings',
   info:    'Info',
-}
-
-const SEVERITY_GLYPH: Record<Severity, string> = {
-  error:   '✕',
-  warning: '!',
-  info:    'i',
 }
 
 const SEVERITIES: Severity[] = ['error', 'warning', 'info']

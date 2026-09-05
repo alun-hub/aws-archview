@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { AwsIcon, type IconKind } from '../../icons/AwsIcon'
 import { kindBackground, kindBorderColor } from '../../icons/awsIconStyles'
 import { useHighlight } from '../canvas/HighlightContext'
-import { severityOutline } from '../canvas/severityStyle'
+import { SEVERITY_COLOR, SEVERITY_GLYPH, SEVERITY_WORD } from '../canvas/severityStyle'
 import { useConfig, useDispatch } from '../../store/configStore'
 
 export interface GroupNodeData {
@@ -23,7 +23,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const bg = kindBackground(d.kind)
   const { dimmedNodeIds, severityByNodeId } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
-  const severity = severityByNodeId.get(id)
+  const findings = severityByNodeId.get(id)
   const dispatch = useDispatch()
   const { collapsedNodes } = useConfig()
   const isCollapsed = collapsedNodes.has(id)
@@ -72,10 +72,18 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           transition: 'box-shadow 0.15s, opacity 0.2s',
           position: 'relative',
           cursor: 'pointer',
-          ...severityOutline(severity),
         }}
       >
         <AwsIcon kind={d.kind as IconKind} size={18} style={{ flexShrink: 0 }} />
+        {findings && (
+          <span
+            title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'}`}
+            style={{
+              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+              background: SEVERITY_COLOR[findings.severity],
+            }}
+          />
+        )}
         <div
           style={{
             fontSize: 10,
@@ -148,7 +156,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
           : '0 1px 4px rgba(0,0,0,0.06)',
         transition: 'box-shadow 0.15s, opacity 0.2s',
         cursor: d.hasChildren ? 'pointer' : 'default',
-        ...severityOutline(severity),
       }}
     >
       {isSubnet ? (
@@ -269,6 +276,27 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             >
               {getHeaderText()}
             </div>
+            {findings && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  background: SEVERITY_COLOR[findings.severity],
+                  color: '#fff',
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  fontSize: 9,
+                  fontWeight: 800,
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                }}
+                title={`${findings.count} validation finding${findings.count === 1 ? '' : 's'} — see the Validation panel`}
+              >
+                <span>{SEVERITY_GLYPH[findings.severity]}</span>
+                <span>{findings.count > 1 ? `${findings.count} ` : ''}{SEVERITY_WORD[findings.severity]}</span>
+              </div>
+            )}
             {Array.isArray(d.scps) && d.scps.length > 0 && (
               <div
                 style={{

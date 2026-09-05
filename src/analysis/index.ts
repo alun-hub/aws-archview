@@ -96,14 +96,27 @@ export function countBySeverity(findings: Finding[]): Record<Severity, number> {
   return counts
 }
 
-/** Highest severity flagged against each node, for the diagram's outline. A
- *  node can collect findings from several rules; the worst one wins. */
-export function severityByNode(findings: Finding[]): Map<string, Severity> {
-  const map = new Map<string, Severity>()
+/** What the diagram needs to annotate one node: the worst severity flagged
+ *  against it, and how many findings it collected. */
+export interface NodeFindingSummary {
+  severity: Severity
+  count: number
+}
+
+/** Findings grouped by the nodes they point at. A node can collect findings
+ *  from several rules; the worst severity wins, and the count says how many
+ *  there are so the badge can show it. */
+export function severityByNode(findings: Finding[]): Map<string, NodeFindingSummary> {
+  const map = new Map<string, NodeFindingSummary>()
   for (const f of findings) {
     for (const id of f.nodeIds) {
       const current = map.get(id)
-      if (!current || SEVERITY_ORDER[f.severity] < SEVERITY_ORDER[current]) map.set(id, f.severity)
+      if (!current) {
+        map.set(id, { severity: f.severity, count: 1 })
+        continue
+      }
+      current.count++
+      if (SEVERITY_ORDER[f.severity] < SEVERITY_ORDER[current.severity]) current.severity = f.severity
     }
   }
   return map

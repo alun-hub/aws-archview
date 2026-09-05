@@ -15,7 +15,7 @@ export function ServiceNode({ id, data, selected }: NodeProps) {
   const d = data as ServiceNodeData
   const { dimmedNodeIds, severityByNodeId } = useHighlight()
   const dimmed = dimmedNodeIds.has(id)
-  const severity = severityByNodeId.get(id)
+  const severity = severityByNodeId.get(id)?.severity
 
   return (
     <div

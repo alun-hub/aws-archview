@@ -1,12 +1,11 @@
 import { createContext, useContext } from 'react'
-import type { Severity } from '../../analysis'
+import type { NodeFindingSummary } from '../../analysis'
 
 interface HighlightState {
   dimmedNodeIds: Set<string>
-  /** Worst validation severity flagged against each node, so a node the
-   *  validation panel is complaining about is findable on the canvas without
-   *  reading the panel first. */
-  severityByNodeId: Map<string, Severity>
+  /** Validation findings per node, so a node the panel is complaining about is
+   *  findable on the canvas without reading the panel first. */
+  severityByNodeId: Map<string, NodeFindingSummary>
 }
 
 export const HighlightContext = createContext<HighlightState>({

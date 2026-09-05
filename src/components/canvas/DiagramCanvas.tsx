@@ -24,7 +24,7 @@ import { applyElkLayout } from './elkLayout'
 import { EdgeRoutingContext, getAbsolutePosition, getHandlePosition, getEdgeSegments, type Point, type Segment } from './edgeRouting'
 import { LoopEdge } from './LoopEdge'
 import { HighlightContext } from './HighlightContext'
-import type { Severity } from '../../analysis'
+import type { NodeFindingSummary } from '../../analysis'
 import { KIND_LABEL } from './kindLabels'
 import { ancestorChain, isNodeVisible } from './visibility'
 import { useFileDrop } from '../../hooks/useFileDrop'
@@ -766,7 +766,7 @@ interface Props {
   /** Worst validation severity per node id, for the flagged-node outline.
    *  Findings are computed once in the app shell and shared with the panel,
    *  so the canvas only renders what it is handed. */
-  severityByNodeId?: Map<string, Severity>
+  severityByNodeId?: Map<string, NodeFindingSummary>
 }
 
 export function DiagramCanvas({ model, severityByNodeId }: Props) {

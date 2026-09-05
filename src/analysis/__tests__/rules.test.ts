@@ -350,12 +350,12 @@ describe('runValidation', () => {
 })
 
 describe('severityByNode', () => {
-  it('keeps the worst severity when a node collects findings from several rules', () => {
+  it('keeps the worst severity, and counts every finding on the node', () => {
     const map = severityByNode([
       { id: 'a', ruleId: 'r1', severity: 'warning', title: 'w', detail: 'w', view: 'network', nodeIds: ['vpc:X:Y'] },
       { id: 'b', ruleId: 'r2', severity: 'error', title: 'e', detail: 'e', view: 'network', nodeIds: ['vpc:X:Y'] },
       { id: 'c', ruleId: 'r3', severity: 'info', title: 'i', detail: 'i', view: 'network', nodeIds: ['vpc:X:Y'] },
     ])
-    expect(map.get('vpc:X:Y')).toBe('error')
+    expect(map.get('vpc:X:Y')).toEqual({ severity: 'error', count: 3 })
   })
 })
