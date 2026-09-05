@@ -10,8 +10,9 @@
 import type { LzaConfigs, ViewKind } from '../parser'
 import { accountNodeId, subnetNodeId, vpcNodeId } from '../parser/nodeIds'
 import { routeTableNames } from '../parser/routeTableRefs'
+import { allVpcs } from '../parser/vpcTemplates'
 import type { SCP } from '../parser/types'
-import { ROOT_OU, type AccountIndex } from './accountResolver'
+import { ROOT_OU, type AccountIndex } from '../parser/accountResolver'
 import type { Finding } from './types'
 
 /** A link back to where the fact lives on a diagram. */
@@ -151,7 +152,11 @@ export function buildAccountProfile(
   const vpcs: ProfileVpc[] = []
   const sharedSubnets: SharedSubnet[] = []
 
-  for (const vpc of configs.network?.vpcs ?? []) {
+  // Templated VPCs belong to the accounts they deploy into, so a profile that
+  // read only `vpcs` would show none of a workload account's networking.
+  const networkVpcs = allVpcs(configs.network, accounts)
+
+  for (const vpc of networkVpcs) {
     if (vpc.account === accountName) {
       // LZA allows an AZ letter ("a") or a physical id (1), so normalise to
       // strings before de-duplicating and sorting.
@@ -245,7 +250,7 @@ export function buildAccountProfile(
   // Findings with no node (a misspelled OU in a policy, say) are not attributed
   // here — they belong to the config file, not to one account.
   const ownedNodeIds = new Set<string>([accountNodeId(accountName)])
-  for (const vpc of configs.network?.vpcs ?? []) {
+  for (const vpc of networkVpcs) {
     if (vpc.account !== accountName) continue
     ownedNodeIds.add(vpcNodeId(vpc.name, vpc.account))
     for (const s of vpc.subnets ?? []) ownedNodeIds.add(subnetNodeId(vpc.name, vpc.account, s.name))

@@ -1,6 +1,6 @@
 import { tgwNodeId } from '../../parser/nodeIds'
 import type { ViewKind } from '../../parser'
-import type { ExpandableTargets } from '../accountResolver'
+import type { ExpandableTargets } from '../../parser/accountResolver'
 import type { AnalysisContext, Rule, RuleFinding } from '../types'
 
 /** One targeting block somewhere in the config set, flattened so a single

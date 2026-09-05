@@ -1,5 +1,5 @@
 import { ouNodeId } from '../../parser/nodeIds'
-import { ROOT_OU } from '../accountResolver'
+import { ROOT_OU } from '../../parser/accountResolver'
 import type { Rule, RuleFinding } from '../types'
 
 /** OU paths a policy reaches: the OU itself and every OU beneath it, since an

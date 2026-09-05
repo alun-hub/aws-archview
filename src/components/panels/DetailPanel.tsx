@@ -98,6 +98,8 @@ const FIELD_LABEL: Record<string, string> = {
   region:           'Region',
   asn:              'ASN',
   cidrs:            'CIDRs',
+  fromVpcTemplate:        'Deployed from VPC template',
+  templateTargetNote:     'Target accounts',
   internetGateway:  'Internet Gateway',
   subnets:          'Subnets',
   azs:              'Availability Zones',

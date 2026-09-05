@@ -21,7 +21,7 @@ export const vpcWithoutFlowLogs: Rule = {
     if (network.vpcFlowLogs) return []
 
     const findings: RuleFinding[] = []
-    for (const vpc of network.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       if (vpc.vpcFlowLogs) continue
       findings.push({
         ruleId: 'vpc-without-flow-logs',

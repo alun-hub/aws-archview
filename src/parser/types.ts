@@ -114,7 +114,10 @@ export interface VpcConfig {
   name: string
   account: string
   region: string
-  cidrs: string[]
+  /** Optional in LZA: a VPC carved from IPAM has `ipamAllocations` instead. */
+  cidrs?: string[]
+  ipv6Cidrs?: unknown[]
+  egressOnlyIgw?: boolean
   internetGateway?: boolean
   enableDnsHostnames?: boolean
   enableDnsSupport?: boolean
@@ -133,6 +136,18 @@ export interface VpcConfig {
     networkLoadBalancers?: { name: string; subnets: string[] }[]
   }
   tags?: Record<string, string>[]
+}
+
+/**
+ * A VPC deployed into every account a `deploymentTargets` block resolves to.
+ *
+ * Identical to a VPC except that it names no `account` of its own — LZA builds
+ * one VPC per target account from the same definition. The Universal
+ * Configuration declares all of its workload VPCs this way, so a reader that
+ * only looks at `vpcs` sees the hub and none of the spokes.
+ */
+export interface VpcTemplateConfig extends Omit<VpcConfig, 'account'> {
+  deploymentTargets?: DeploymentTargets
 }
 
 export interface TgwConfig {
@@ -351,6 +366,7 @@ export interface NetworkConfig {
   /** Applies to every VPC that doesn't set its own `vpcFlowLogs`. */
   vpcFlowLogs?: VpcFlowLogsConfig
   vpcs?: VpcConfig[]
+  vpcTemplates?: VpcTemplateConfig[]
   vpcPeering?: VpcPeeringConfig[]
   transitGateways?: TgwConfig[]
   transitGatewayRouteTables?: TgwRouteTableConfig[]

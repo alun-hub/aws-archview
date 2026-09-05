@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
-import { parsedForKey, resolveConfigKey, type LzaConfigs } from '../../parser'
+import { buildNetworkGraph, parsedForKey, resolveConfigKey, type LzaConfigs } from '../../parser'
 import { runValidation } from '..'
 
 /**
@@ -66,6 +66,21 @@ describe.skipIf(!UC)('LZA Universal Configuration', () => {
         expect(parseErrors).toEqual({})
         expect(configs.network?.vpcs?.length ?? 0).toBeGreaterThan(0)
         expect(configs.organization?.organizationalUnits?.length ?? 0).toBeGreaterThan(0)
+      })
+
+      it('renders every VPC, including the templated ones', () => {
+        // UC's hub-and-spoke declares its dev/test/prod workload VPCs as
+        // `vpcTemplates`. Reading only `vpcs` drew the hub and none of the
+        // spokes, which is the bug this asserts against.
+        const templates = configs.network?.vpcTemplates ?? []
+        const graph = buildNetworkGraph(configs)!
+        const vpcNodes = graph.nodes.filter((n) => n.kind === 'vpc')
+
+        expect(vpcNodes.length).toBeGreaterThanOrEqual(configs.network?.vpcs?.length ?? 0)
+        for (const template of templates) {
+          const rendered = vpcNodes.filter((n) => n.data.fromVpcTemplate === template.name)
+          expect(rendered.length).toBeGreaterThan(0)
+        }
       })
 
       it('produces no findings', () => {

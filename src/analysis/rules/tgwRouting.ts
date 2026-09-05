@@ -18,7 +18,7 @@ interface Attachment {
 function attachments(ctx: AnalysisContext): Attachment[] {
   const list: Attachment[] = []
 
-  for (const vpc of ctx.configs.network?.vpcs ?? []) {
+  for (const vpc of ctx.vpcs) {
     for (const att of vpc.transitGatewayAttachments ?? []) {
       const tgw = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
       list.push({

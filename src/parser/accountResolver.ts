@@ -5,13 +5,18 @@
 // to answer "which accounts does that mean?" on its own. This module is the one
 // answer, so validation, the diagram, and the policy matrix cannot disagree
 // about who a policy applies to.
+//
+// It lives in `parser/` rather than `analysis/` because expanding a deployment
+// target is what the configuration *means*, not a judgement about it: the
+// diagram needs it to place VPC templates, and analysis imports parser, so the
+// other direction would be a cycle.
 
 import type {
   AccountsConfig,
   DeploymentTargets,
   OUConfig,
   OrganizationConfig,
-} from '../parser/types'
+} from './types'
 
 /** AWS Organizations (and LZA) always name the top-level OU "Root"; it is
  *  implicit rather than declared in `organizationalUnits`, and targeting it

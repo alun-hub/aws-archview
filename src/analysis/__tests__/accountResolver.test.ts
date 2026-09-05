@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { AccountsConfig, OrganizationConfig } from '../../parser/types'
-import { buildAccountIndex } from '../accountResolver'
+import { buildAccountIndex } from '../../parser/accountResolver'
 
 const organization: OrganizationConfig = {
   enable: true,

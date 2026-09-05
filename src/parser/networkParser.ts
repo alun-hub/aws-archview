@@ -6,6 +6,8 @@ import {
 } from './nodeIds'
 import { routeTableNames } from './routeTableRefs'
 import { allTgwRouteTables } from './tgwRouteTables'
+import { resolveVpcs } from './vpcTemplates'
+import type { AccountIndex } from './accountResolver'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
 // A guess from the subnet's name, used only to pick a diagram icon. LZA has no
@@ -96,7 +98,20 @@ function parseSuricataRules(fileContent: string): StatefulRule[] {
   return rules
 }
 
-export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<string, string>): GraphModel {
+export function parseNetwork(
+  networkConfig: NetworkConfig,
+  loadedFiles?: Record<string, string>,
+  /** Resolves `vpcTemplates` deployment targets to real accounts. Without it
+   *  templates still render, labelled by their target instead. */
+  accounts?: AccountIndex,
+): GraphModel {
+  // `vpcTemplates` deploy a VPC into every target account, so everything below
+  // works from the resolved list rather than `networkConfig.vpcs`.
+  const resolvedVpcs = resolveVpcs(networkConfig, accounts)
+  const vpcList = resolvedVpcs.map((r) => r.vpc)
+  const templateNameByVpc = new Map(
+    resolvedVpcs.filter((r) => r.templateName).map((r) => [`${r.vpc.name}:${r.vpc.account}`, r]),
+  )
   const nodes: GraphNode[] = []
   const edges: GraphEdge[]  = []
   const accountsSeen = new Set<string>()
@@ -120,7 +135,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
 
   // ── Pre-compute RT associations: (tgwName, accountName) → Set<rtName> ──────
   const rtByTgwAccount = new Map<string, Set<string>>()
-  for (const vpc of networkConfig.vpcs ?? []) {
+  for (const vpc of vpcList) {
     for (const att of vpc.transitGatewayAttachments ?? []) {
       const tgwName = typeof att.transitGateway === 'string' ? att.transitGateway : att.transitGateway?.name
       const key = `${tgwName}::${vpc.account}`
@@ -153,7 +168,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   // ── Pre-compute RT → associations & propagations from VPC attachments ────
   const rtAssociations   = new Map<string, string[]>()  // rtName → [vpcName]
   const rtPropagations   = new Map<string, string[]>()  // rtName → [vpcName]
-  for (const vpc of networkConfig.vpcs ?? []) {
+  for (const vpc of vpcList) {
     for (const att of vpc.transitGatewayAttachments ?? []) {
       for (const name of routeTableNames(att.routeTableAssociations)) {
         const arr = rtAssociations.get(name) ?? []
@@ -215,7 +230,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   }
 
   // Create an Internet node if any VPC has an IGW
-  const hasIgw = (networkConfig.vpcs ?? []).some(vpc => vpc.internetGateway)
+  const hasIgw = vpcList.some(vpc => vpc.internetGateway)
   if (hasIgw) {
     nodes.push({
       id: 'internet',
@@ -309,7 +324,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   const vpcNameToId = new Map<string, string>()
 
   // ── VPCs + IGW + subnets + TGW attachments ────────────────────────────────
-  for (const vpc of networkConfig.vpcs ?? []) {
+  for (const vpc of vpcList) {
     ensureAccount(vpc.account)
     
     const regionId = regionNodeId(vpc.account, vpc.region)
@@ -356,7 +371,21 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
         cidrs: vpc.cidrs,
         internetGateway: vpc.internetGateway,
         resolverRules: vpc.resolverRules,
-        dnsFirewallRuleGroups: vpc.dnsFirewallRuleGroups
+        dnsFirewallRuleGroups: vpc.dnsFirewallRuleGroups,
+        // Three accounts showing the same VPC name is confusing without
+        // saying why — this is one template deployed into each of them.
+        ...(() => {
+          const from = templateNameByVpc.get(`${vpc.name}:${vpc.account}`)
+          if (!from) return {}
+          return {
+            fromVpcTemplate: from.templateName,
+            ...(from.unresolvedTarget === 'no-account-config'
+              ? { templateTargetNote: 'Load accounts-config.yaml and organization-config.yaml to resolve the target accounts' }
+              : from.unresolvedTarget === 'no-matching-accounts'
+                ? { templateTargetNote: 'No accounts are in this target yet — one VPC is created per account added to it' }
+                : {}),
+          }
+        })(),
       },
       parentId: regionId,
     })
@@ -572,7 +601,7 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   if (r53Resolver && r53Resolver.endpoints) {
     for (const endpoint of r53Resolver.endpoints) {
       // Find endpoint host VPC
-      const targetVpc = networkConfig.vpcs?.find(v => v.name === endpoint.vpc)
+      const targetVpc = vpcList.find(v => v.name === endpoint.vpc)
       if (targetVpc) {
         const combinedRules = [
           ...(endpoint.rules ?? []),
@@ -602,10 +631,10 @@ export function parseNetwork(networkConfig: NetworkConfig, loadedFiles?: Record<
   }
 
   // Central VPCE logical edges
-  const centralVpc = networkConfig.vpcs?.find(v => v.interfaceEndpoints?.central)
+  const centralVpc = vpcList.find(v => v.interfaceEndpoints?.central)
   if (centralVpc) {
     const centralVpcId = vpcNodeId(centralVpc.name, centralVpc.account)
-    for (const otherVpc of networkConfig.vpcs ?? []) {
+    for (const otherVpc of vpcList) {
       if (otherVpc.useCentralEndpoints && otherVpc.name !== centralVpc.name) {
         const spokeVpcId = vpcNodeId(otherVpc.name, otherVpc.account)
         edges.push({

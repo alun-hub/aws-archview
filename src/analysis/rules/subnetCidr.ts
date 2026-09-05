@@ -30,7 +30,7 @@ export const subnetCidrOutsideVpc: Rule = {
   title: 'Subnet outside its VPC range',
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       const vpcRanges = (vpc.cidrs ?? []).map(parseCidr).filter((c): c is CidrRange => c != null)
       if (vpcRanges.length === 0) continue
 
@@ -58,7 +58,7 @@ export const subnetCidrOverlap: Rule = {
   title: 'Overlapping subnets in a VPC',
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       const subnets = parsedSubnets(vpc.subnets)
       for (let i = 0; i < subnets.length; i++) {
         for (let j = i + 1; j < subnets.length; j++) {

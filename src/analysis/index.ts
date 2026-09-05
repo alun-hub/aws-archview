@@ -1,5 +1,6 @@
 import type { ViewKind } from '../parser'
-import { buildAccountIndex } from './accountResolver'
+import { buildAccountIndex } from '../parser/accountResolver'
+import { allVpcs } from '../parser/vpcTemplates'
 import { vpcCidrOverlap } from './rules/cidrOverlap'
 import { emptyDeploymentTarget, unknownDeploymentTarget } from './rules/deploymentTargets'
 import { unresolvedReplacement } from './rules/replacements'
@@ -23,8 +24,8 @@ import {
 } from './types'
 
 export type { Finding, Severity, Rule, ValidationInput } from './types'
-export type { AccountIndex, ResolvedAccount, TargetExpansion } from './accountResolver'
-export { buildAccountIndex, ROOT_OU } from './accountResolver'
+export type { AccountIndex, ResolvedAccount, TargetExpansion } from '../parser/accountResolver'
+export { buildAccountIndex, ROOT_OU } from '../parser/accountResolver'
 export { buildAccountProfile } from './accountProfile'
 export type {
   AccountProfile, PolicyAttachment, ProfileVpc, SharedSubnet, ProfileDeployable, ProfileLink,
@@ -61,11 +62,13 @@ export const RULES: Rule[] = [
 
 export function runValidation(input: ValidationInput, rules: Rule[] = RULES): Finding[] {
   const { configs, loadedFiles = {}, parseErrors = {} } = input
+  const accounts = buildAccountIndex(configs.organization, configs.accounts)
   const ctx: AnalysisContext = {
     configs,
     loadedFiles,
     parseErrors,
-    accounts: buildAccountIndex(configs.organization, configs.accounts),
+    accounts,
+    vpcs: allVpcs(configs.network, accounts),
   }
 
   const findings: Finding[] = []

@@ -18,7 +18,7 @@ export const unknownSubnetRouteTable: Rule = {
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
 
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       const declared = vpc.routeTables
       if (!declared || declared.length === 0) continue
       const known = new Set(declared.map((rt) => rt.name))
@@ -48,7 +48,7 @@ export const unusedVpcRouteTable: Rule = {
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
 
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       const declared = vpc.routeTables ?? []
       if (declared.length === 0) continue
       const used = new Set((vpc.subnets ?? []).map((s) => s.routeTable).filter(Boolean))

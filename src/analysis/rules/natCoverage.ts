@@ -65,7 +65,7 @@ export const subnetWithoutDefaultRoute: Rule = {
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
 
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       // Without route tables carrying routes there is no evidence either way.
       // Guessing from subnet names is what this rule exists to avoid.
       const hasRoutes = (vpc.routeTables ?? []).some((rt) => (rt.routes ?? []).length > 0)
@@ -115,7 +115,7 @@ export const natGatewayCrossesAz: Rule = {
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
 
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       const natAzs = natAvailabilityZones(vpc)
       if (natAzs.size === 0) continue
 
@@ -157,7 +157,7 @@ export const publicSubnetAutoAssignsIps: Rule = {
   run(ctx): RuleFinding[] {
     const findings: RuleFinding[] = []
 
-    for (const vpc of ctx.configs.network?.vpcs ?? []) {
+    for (const vpc of ctx.vpcs) {
       for (const { subnet, routeTable } of subnetsWithRouteTable(vpc)) {
         if (!subnet.mapPublicIpOnLaunch) continue
         if (!isPublic(routeTable)) continue

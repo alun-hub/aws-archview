@@ -7,6 +7,7 @@ import { parseCustomizations } from './customizationsParser'
 import { parseSecurity } from './securityParser'
 import { parseIam } from './iamParser'
 import { buildPolicyMatrix as buildPolicyMatrixImpl } from './policyMatrix'
+import { buildAccountIndex } from './accountResolver'
 
 export type { GraphEdge, GraphModel, GraphNode } from './types'
 export type { GlobalConfig, CustomizationsConfig } from './types'
@@ -217,7 +218,11 @@ export function buildOrganizationGraph(configs: LzaConfigs, loadedFiles?: Record
 
 export function buildNetworkGraph(configs: LzaConfigs, loadedFiles?: Record<string, string>) {
   if (!configs.network) return null
-  return parseNetwork(configs.network, loadedFiles)
+  // The index resolves `vpcTemplates` deployment targets to real accounts.
+  // Without organization/accounts configs it resolves nothing, and the parser
+  // falls back to labelling each template by its target.
+  const accounts = buildAccountIndex(configs.organization, configs.accounts)
+  return parseNetwork(configs.network, loadedFiles, accounts)
 }
 
 export function buildGlobalGraph(configs: LzaConfigs) {

@@ -1,5 +1,6 @@
 import type { GraphModel, LzaConfigs, ViewKind } from '../parser'
-import type { AccountIndex } from './accountResolver'
+import type { AccountIndex } from '../parser/accountResolver'
+import type { VpcConfig } from '../parser/types'
 
 export type Severity = 'error' | 'warning' | 'info'
 
@@ -40,6 +41,11 @@ export interface AnalysisContext {
   loadedFiles: Record<string, string>
   parseErrors: Record<string, string>
   accounts: AccountIndex
+  /** Every VPC that will actually be deployed, including one per target
+   *  account for each `vpcTemplates` entry. Rules must use this rather than
+   *  `configs.network.vpcs`, or they silently skip every templated VPC — which
+   *  in the Universal Configuration is every workload VPC there is. */
+  vpcs: VpcConfig[]
 }
 
 export interface Rule {
