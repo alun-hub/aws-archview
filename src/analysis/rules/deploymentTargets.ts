@@ -108,7 +108,10 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
     })
   }
 
-  return sites.filter((s) => s.targets != null)
+  // Sites with no targeting block at all are kept: an object that names no
+  // destination is deployed nowhere, which `empty-deployment-target` reports.
+  // Rules that only make sense for a declared block filter them out themselves.
+  return sites
 }
 
 /** A deployment target naming an OU or account that accounts-config and
@@ -124,6 +127,7 @@ export const unknownDeploymentTarget: Rule = {
 
     const findings: RuleFinding[] = []
     for (const site of collectSites(ctx)) {
+      if (site.targets == null) continue
       const { unknownOus, unknownAccounts } = ctx.accounts.expand(site.targets)
       for (const ou of unknownOus) {
         findings.push({
@@ -154,8 +158,15 @@ export const unknownDeploymentTarget: Rule = {
   },
 }
 
-/** A policy or stack that resolves to no account at all is dead config: it
- *  looks deployed in review, and silently does nothing. */
+/**
+ * A policy or stack that resolves to no account at all is dead config: it looks
+ * deployed in review and silently does nothing.
+ *
+ * Three shapes of the same problem — no `deploymentTargets` block, an empty
+ * one, or one naming OUs that hold no accounts — reported together, because
+ * the fix is the same and an architect reading the list wants "this deploys
+ * nowhere", not three separate vocabularies for it.
+ */
 export const emptyDeploymentTarget: Rule = {
   id: 'empty-deployment-target',
   title: 'Deployment target matches no account',
@@ -174,13 +185,17 @@ export const emptyDeploymentTarget: Rule = {
         ...(site.targets?.organizationalUnits ?? []).map((o) => `OU ${o}`),
         ...(site.targets?.accounts ?? []).map((a) => `account ${a}`),
       ]
+      const detail =
+        site.targets == null
+          ? `${site.where} declares no deploymentTargets at all, so it is defined but never deployed.`
+          : named.length === 0
+            ? `${site.where} has an empty deploymentTargets block, so it is never deployed anywhere.`
+            : `${site.where} targets ${named.join(', ')}, which currently contain no accounts — it deploys nowhere.`
       findings.push({
         ruleId: 'empty-deployment-target',
         severity: 'warning',
         title: 'Deployment target matches no account',
-        detail: named.length === 0
-          ? `${site.where} has an empty deploymentTargets block, so it is never deployed anywhere.`
-          : `${site.where} targets ${named.join(', ')}, which currently contain no accounts — it deploys nowhere.`,
+        detail,
         view: site.view,
         nodeIds: site.nodeIds ?? [],
         configFile: site.configFile,

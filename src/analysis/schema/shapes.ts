@@ -125,7 +125,7 @@ const customerGateway: Shape = {
 export const NETWORK_SHAPE: Shape = {
   label: 'network-config.yaml',
   keys: [
-    'homeRegion', 'defaultVpc', 'endpointPolicies', 'vpcs', 'vpcTemplates', 'vpcPeering',
+    'homeRegion', 'defaultVpc', 'endpointPolicies', 'vpcFlowLogs', 'vpcs', 'vpcTemplates', 'vpcPeering',
     'transitGateways', 'transitGatewayRouteTables', 'transitGatewayConnects',
     'customerGateways', 'directConnectGateways', 'dhcpOptions', 'prefixLists',
     'centralNetworkServices', 'firewallManagerService', 'certificates', 'elbAccountIds',

@@ -50,6 +50,32 @@ export interface SubnetConfig {
   tags?: Record<string, string>[]
 }
 
+/** Route table a subnet points at by name, and the routes it carries. LZA
+ *  defines these per VPC; `subnet.routeTable` is a reference into this list. */
+export interface RouteTableConfig {
+  name: string
+  gatewayAssociation?: string
+  routes?: {
+    name: string
+    destination?: string
+    type?: string
+    target?: string
+    targetAvailabilityZone?: string
+  }[]
+  tags?: Record<string, string>[]
+}
+
+/** Flow logs can be set once for every VPC at the top of network-config, or
+ *  per VPC; a VPC-level block overrides the default. */
+export interface VpcFlowLogsConfig {
+  trafficType?: string
+  maxAggregationInterval?: number
+  destinations?: string[]
+  destinationsConfig?: Record<string, unknown>
+  defaultFormat?: boolean
+  customFields?: string[]
+}
+
 export interface TgwAttachmentConfig {
   name: string
   transitGateway: { name: string; account: string }
@@ -72,6 +98,8 @@ export interface VpcConfig {
   resolverRules?: string[]
   dnsFirewallRuleGroups?: string[]
   subnets?: SubnetConfig[]
+  routeTables?: RouteTableConfig[]
+  vpcFlowLogs?: VpcFlowLogsConfig
   transitGatewayAttachments?: TgwAttachmentConfig[]
   natGateways?: { name: string; subnet: string }[]
   loadBalancers?: {
@@ -271,6 +299,8 @@ export interface DnsFirewallRuleGroupConfig {
 
 export interface NetworkConfig {
   defaultVpc?: { delete: boolean }
+  /** Applies to every VPC that doesn't set its own `vpcFlowLogs`. */
+  vpcFlowLogs?: VpcFlowLogsConfig
   vpcs?: VpcConfig[]
   vpcPeering?: VpcPeeringConfig[]
   transitGateways?: TgwConfig[]
@@ -293,26 +323,33 @@ export interface NetworkConfig {
 
 // ── Security config ────────────────────────────────────────────────────────────
 
+/** LZA enables a security service org-wide and opts individual regions out,
+ *  rather than listing the regions it should run in. */
+export interface SecurityService {
+  enable?: boolean
+  excludeRegions?: string[]
+}
+
 export interface SecurityConfig {
   enableDlpChecks?: boolean
   centralSecurityServices?: {
     delegatedAdminAccount?: string
-    macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
-    guardDuty?: { enable: boolean; s3Protection?: { enable: boolean } }
-    securityHub?: { enable: boolean; standards?: (string | { name: string })[] }
-    config?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
-    inspector?: { enable: boolean; enableScanTypes?: string[] }
-    detective?: { enable: boolean }
-    auditManager?: { enable: boolean }
-    accessAnalyzer?: { enable: boolean }
-    cloudtrail?: { enable: boolean; organizationTrail?: boolean; s3BucketName?: string }
+    macie?: SecurityService & { policyFindingsPublishingFrequency?: string }
+    guardDuty?: SecurityService & { s3Protection?: { enable: boolean } }
+    securityHub?: SecurityService & { standards?: (string | { name: string })[] }
+    config?: SecurityService & { enableConfigurationRecorder?: boolean; enableDeliveryChannel?: boolean }
+    inspector?: SecurityService & { enableScanTypes?: string[] }
+    detective?: SecurityService
+    auditManager?: SecurityService
+    accessAnalyzer?: SecurityService
+    cloudtrail?: SecurityService & { organizationTrail?: boolean; s3BucketName?: string }
   }
-  macie?: { enable: boolean; policyFindingsPublishingFrequency?: string }
-  guardduty?: { enable: boolean; s3Protection?: { enable: boolean } }
-  securityHub?: { enable: boolean; standards?: (string | { name: string })[] }
-  awsConfig?: { enableConfigurationRecorder: boolean; enableDeliveryChannel?: boolean }
-  cloudwatch?: { enable?: boolean }
-  cloudtrail?: { enable: boolean; organizationTrail?: boolean; s3BucketName?: string }
+  macie?: SecurityService & { policyFindingsPublishingFrequency?: string }
+  guardduty?: SecurityService & { s3Protection?: { enable: boolean } }
+  securityHub?: SecurityService & { standards?: (string | { name: string })[] }
+  awsConfig?: SecurityService & { enableConfigurationRecorder?: boolean; enableDeliveryChannel?: boolean }
+  cloudwatch?: SecurityService
+  cloudtrail?: SecurityService & { organizationTrail?: boolean; s3BucketName?: string }
 }
 
 // ── IAM config ────────────────────────────────────────────────────────────────

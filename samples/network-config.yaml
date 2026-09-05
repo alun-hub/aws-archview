@@ -10,6 +10,29 @@
 defaultVpc:
   delete: true
 
+# ─── VPC Flow Logs ────────────────────────────────────────────────────────────
+# Applies to every VPC below; a VPC may override it with its own block.
+vpcFlowLogs:
+  trafficType: ALL
+  maxAggregationInterval: 600
+  destinations:
+    - s3
+    - cloud-watch-logs
+  defaultFormat: false
+  customFields:
+    - version
+    - account-id
+    - interface-id
+    - srcaddr
+    - dstaddr
+    - srcport
+    - dstport
+    - protocol
+    - action
+    - log-status
+    - vpc-id
+    - subnet-id
+
 # ─── Transit Gateway ──────────────────────────────────────────────────────────
 transitGateways:
   - name: Main-TGW
@@ -81,6 +104,10 @@ vpcs:
     enableDnsSupport: true
     dnsFirewallRuleGroups:
       - Block-Malicious-Domains
+    routeTables:
+      - name: Public-RT
+      - name: NLB-RT
+      - name: TGW-RT
     subnets:
       - name: Public-Subnet-A
         availabilityZone: a
@@ -132,6 +159,10 @@ vpcs:
     internetGateway: true
     enableDnsHostnames: true
     enableDnsSupport: true
+    routeTables:
+      - name: Firewall-RT
+      - name: NAT-RT
+      - name: TGW-RT
     subnets:
       - name: Firewall-Subnet-A
         availabilityZone: a
@@ -181,6 +212,10 @@ vpcs:
       - 10.1.0.0/22
     enableDnsHostnames: true
     enableDnsSupport: true
+    routeTables:
+      - name: App-RT
+      - name: Endpoint-RT
+      - name: TGW-RT
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -227,6 +262,10 @@ vpcs:
       - 10.10.0.0/21
     enableDnsHostnames: true
     enableDnsSupport: true
+    routeTables:
+      - name: App-RT
+      - name: Data-RT
+      - name: TGW-RT
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -271,6 +310,10 @@ vpcs:
     region: eu-west-1
     cidrs:
       - 10.11.0.0/21
+    routeTables:
+      - name: App-RT
+      - name: Data-RT
+      - name: TGW-RT
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a
@@ -317,6 +360,10 @@ vpcs:
       - 10.20.0.0/21
     enableDnsHostnames: true
     enableDnsSupport: true
+    routeTables:
+      - name: App-RT
+      - name: Data-RT
+      - name: TGW-RT
     subnets:
       - name: App-Private-Subnet-A
         availabilityZone: a

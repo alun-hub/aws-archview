@@ -6,7 +6,9 @@ import {
 } from './nodeIds'
 
 // ── Subnet type classification ─────────────────────────────────────────────────
-function subnetKind(name: string): NodeKind {
+// Exported so the analysis rules classify subnets exactly as the diagram does;
+// a rule that disagreed with the picture would be worse than no rule.
+export function subnetKind(name: string): NodeKind {
   const n = name.toLowerCase()
   if (n.includes('firewall') || n.includes('anfw'))                       return 'subnet-firewall'
   if (n.includes('tgw') || n.includes('transit'))                         return 'subnet-tgw'

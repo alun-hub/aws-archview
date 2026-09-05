@@ -112,7 +112,7 @@ describe('subnet CIDR rules', () => {
       { name: 'A', availabilityZone: 'a', routeTable: 'RT', ipv4CidrBlock: '10.0.0.0/24' },
       { name: 'B', availabilityZone: 'b', routeTable: 'RT', ipv4CidrBlock: '10.0.1.0/24' },
     ])
-    expect(ids(configs)).toEqual([])
+    expect(ids(configs).filter((r) => r.startsWith('subnet-cidr'))).toEqual([])
   })
 })
 
@@ -194,7 +194,22 @@ describe('empty-deployment-target', () => {
       },
       accounts,
     } })
-    expect(findings.map((f) => f.ruleId)).toEqual(['unknown-deployment-target'])
+    // The broken reference is reported once, by the rule that owns it —
+    // `empty-deployment-target` must not also claim it resolved to nothing.
+    expect(findings.map((f) => f.ruleId)).toContain('unknown-deployment-target')
+    expect(findings.map((f) => f.ruleId)).not.toContain('empty-deployment-target')
+  })
+
+  it('reports an object with no deploymentTargets block at all', () => {
+    const findings = of({
+      organization: {
+        ...org!,
+        serviceControlPolicies: [{ name: 'Orphan' }],
+      },
+      accounts,
+    }, 'empty-deployment-target')
+    expect(findings).toHaveLength(1)
+    expect(findings[0].detail).toContain('declares no deploymentTargets at all')
   })
 })
 
@@ -298,8 +313,13 @@ describe('runValidation', () => {
         ],
       },
     } })
-    expect(findings.map((f) => f.severity)).toEqual(['error', 'warning'])
-    expect(findings.map((f) => f.id)).toEqual(['unknown-deployment-target#0', 'vpc-cidr-overlap#0'])
+    // Severity ordering holds across the whole set, whichever rules fire.
+    const severities = findings.map((f) => f.severity)
+    expect(severities).toEqual([...severities].sort((a, b) =>
+      ({ error: 0, warning: 1, info: 2 })[a] - ({ error: 0, warning: 1, info: 2 })[b]))
+    expect(findings.filter((f) => f.severity === 'error').map((f) => f.ruleId))
+      .toEqual(['unknown-deployment-target'])
+    expect(findings.map((f) => f.ruleId)).toContain('vpc-cidr-overlap')
   })
 
   it('finds nothing in an empty config set', () => {

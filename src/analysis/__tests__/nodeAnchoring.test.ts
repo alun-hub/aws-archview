@@ -72,14 +72,17 @@ describe('finding node anchoring', () => {
   const graphIds = new Set(graph.nodes.map((n) => n.id))
 
   it('produces findings across the rules under test', () => {
-    expect(new Set(findings.map((f) => f.ruleId))).toEqual(new Set([
+    const produced = new Set(findings.map((f) => f.ruleId))
+    for (const rule of [
       'vpc-cidr-overlap',
       'subnet-cidr-outside-vpc',
       'subnet-cidr-overlap',
       'unknown-deployment-target',
       'unknown-tgw-route-table',
       'tgw-attachment-no-propagation',
-    ]))
+    ]) {
+      expect(produced).toContain(rule)
+    }
   })
 
   it('names only nodes the network graph actually contains', () => {

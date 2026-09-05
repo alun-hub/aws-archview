@@ -13,7 +13,9 @@ organizationalUnits:
       - name: Test
       - name: Prod
   - name: Sandbox
+  # Holds closed and quarantined accounts, which LZA must not manage.
   - name: Suspended
+    ignore: true
 
 serviceControlPolicies:
   - name: DenyRootUser
@@ -23,3 +25,4 @@ serviceControlPolicies:
         - Security
         - Infrastructure
         - Workloads
+        - Sandbox

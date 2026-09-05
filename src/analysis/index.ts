@@ -6,6 +6,11 @@ import { unresolvedReplacement } from './rules/replacements'
 import { subnetCidrOutsideVpc, subnetCidrOverlap } from './rules/subnetCidr'
 import { tgwAttachmentNoPropagation, unknownTgwRouteTable } from './rules/tgwRouting'
 import { missingInclude, yamlParseFailure } from './rules/fileIntegrity'
+import { vpcWithoutFlowLogs } from './rules/flowLogs'
+import { privateSubnetWithoutNat } from './rules/natCoverage'
+import { ouWithoutScp } from './rules/ouCoverage'
+import { securityServiceExcludedRegion, staleRegionExclusion } from './rules/securityRegions'
+import { unknownSubnetRouteTable, unusedVpcRouteTable } from './rules/subnetRouteTable'
 import { unknownKey } from './rules/unknownKey'
 import { missingRequiredField } from './rules/requiredFields'
 import {
@@ -42,6 +47,13 @@ export const RULES: Rule[] = [
   emptyDeploymentTarget,
   unknownTgwRouteTable,
   tgwAttachmentNoPropagation,
+  unknownSubnetRouteTable,
+  unusedVpcRouteTable,
+  privateSubnetWithoutNat,
+  vpcWithoutFlowLogs,
+  securityServiceExcludedRegion,
+  staleRegionExclusion,
+  ouWithoutScp,
   unresolvedReplacement,
 ]
 

@@ -203,9 +203,13 @@ describe('findings attribution', () => {
     }
     const findings = runValidation({ configs: broken })
     const p = buildAccountProfile('Aurora-Prod', broken, buildAccountIndex(broken.organization, broken.accounts), findings)!
-    expect(p.findings.map((f) => f.ruleId)).toEqual(['subnet-cidr-overlap'])
+    expect(p.findings.map((f) => f.ruleId)).toContain('subnet-cidr-overlap')
+
+    // Every finding attached to this profile must name a node it owns.
+    const otherAccountsNodes = p.findings.flatMap((f) => f.nodeIds).filter((id) => id.includes(':Network'))
+    expect(otherAccountsNodes).toEqual([])
 
     const other = buildAccountProfile('Network', broken, buildAccountIndex(broken.organization, broken.accounts), findings)!
-    expect(other.findings).toEqual([])
+    expect(other.findings.every((f) => f.nodeIds.some((id) => id.includes('Network')))).toBe(true)
   })
 })
