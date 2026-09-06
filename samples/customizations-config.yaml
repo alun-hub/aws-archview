@@ -59,22 +59,30 @@ customizations:
           - Infrastructure/Network
           - Infrastructure/SharedServices
       template: cfn-templates/ssm-session-manager.yaml
-      runOrder: 1
 
   serviceCatalogPortfolios:
+    # A portfolio lives in one account and is shared out, rather than being
+    # deployed per target the way a stack is.
     - name: Platform-Products
-      description: Approved cloud platform products for workload teams
+      account: SharedServices
       provider: Platform Engineering
       regions:
         - eu-west-1
-      deploymentTargets:
+      shareTargets:
         organizationalUnits:
           - Workloads/Dev
           - Workloads/Test
           - Workloads/Prod
       products:
         - name: Standard-VPC
-          version: v1.2.0
+          owner: Platform Engineering
           description: Three-tier VPC with flow logs
+          versions:
+            - name: v1.2.0
+              template: cfn-templates/product-standard-vpc.yaml
         - name: Encrypted-S3-Bucket
-          version: v2.0.1
+          owner: Platform Engineering
+          description: S3 bucket with KMS encryption and access logging
+          versions:
+            - name: v2.0.1
+              template: cfn-templates/product-encrypted-s3.yaml

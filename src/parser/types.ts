@@ -576,13 +576,22 @@ export interface CfnStackConfig {
   tags?: { key: string; value: string }[]
 }
 
+/** A portfolio is created in one account and shared out, rather than deployed
+ *  per target the way a stack is — so it carries `account` and `shareTargets`,
+ *  not `deploymentTargets`. */
 export interface ServiceCatalogPortfolioConfig {
   name: string
-  description?: string
+  account?: string
   provider?: string
   regions?: string[]
-  deploymentTargets?: CfnDeploymentTargets
-  products?: { name: string; version: string; description?: string }[]
+  shareTargets?: CfnDeploymentTargets
+  portfolioAssociations?: { type?: string; name?: string; propagateAssignment?: boolean }[]
+  products?: {
+    name: string
+    owner?: string
+    description?: string
+    versions?: { name: string; template: string; description?: string }[]
+  }[]
 }
 
 export interface CustomizationConfigBlock {

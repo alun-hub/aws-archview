@@ -10,6 +10,11 @@
 defaultVpc:
   delete: true
 
+# Required by the schema; referenced by interface and gateway endpoints.
+endpointPolicies:
+  - name: Default
+    document: vpc-endpoint-policies/default.json
+
 # ─── VPC Flow Logs ────────────────────────────────────────────────────────────
 # Applies to every VPC below; a VPC may override it with its own block.
 vpcFlowLogs:
@@ -39,6 +44,8 @@ transitGateways:
     account: Network
     region: eu-west-1
     asn: 65521
+    dnsSupport: enable
+    vpnEcmpSupport: enable
     defaultRouteTableAssociation: disable
     defaultRouteTablePropagation: disable
     autoAcceptSharingAttachments: enable
@@ -94,18 +101,21 @@ customerGateways:
 # ─── Direct Connect Gateways ───────────────────────────────────────────────────
 directConnectGateways:
   - name: Accelerator-DXGW
+    account: Network
+    gatewayName: Accelerator-DXGW
     asn: 64512
     virtualInterfaces:
       - name: Accelerator-VIF
         connectionId: dx-12345678
         customerAsn: 64513
+        interfaceName: Accelerator-VIF
+        ownerAccount: Network
         type: transit
         region: eu-west-1
         vlan: 100
     transitGatewayAssociations:
       - name: Main-TGW
         account: Network
-        region: eu-west-1
         routeTableAssociations:
           - VPN-RT
         allowedPrefixes:
@@ -125,7 +135,9 @@ vpcs:
     enableDnsHostnames: true
     enableDnsSupport: true
     dnsFirewallRuleGroups:
-      - Block-Malicious-Domains
+      - name: Block-Malicious-Domains
+        priority: 101
+        mutationProtection: ENABLED
     routeTables:
       - name: Public-RT
         routes:
@@ -537,16 +549,35 @@ vpcs:
 
 # ─── Central Network Services ──────────────────────────────────────────────────
 centralNetworkServices:
+  delegatedAdminAccount: Network
   networkFirewall:
     firewalls:
       - name: Core-Firewall
+        firewallPolicy: Core-Firewall-Policy
         vpc: Inspection-VPC
         subnets:
           - Firewall-Subnet-A
           - Firewall-Subnet-B
+    policies:
+      - name: Core-Firewall-Policy
+        regions:
+          - eu-west-1
+        firewallPolicy:
+          statelessDefaultActions:
+            - aws:forward_to_sfe
+          statelessFragmentDefaultActions:
+            - aws:forward_to_sfe
+          statelessRuleGroups:
+            - name: LZA-Stateless-Rules
+              priority: 100
+          statefulRuleGroups:
+            - name: LZA-Stateful-Rules
+              priority: 100
     rules:
       - name: LZA-Stateless-Rules
         type: STATELESS
+        regions:
+          - eu-west-1
         capacity: 100
         ruleGroup:
           rulesSource:
@@ -558,11 +589,13 @@ centralNetworkServices:
                       - aws:forward_to_sfe
                     matchAttributes:
                       sources:
-                        - addressDefinition: 0.0.0.0/0
+                        - 0.0.0.0/0
                       destinations:
-                        - addressDefinition: 0.0.0.0/0
+                        - 0.0.0.0/0
       - name: LZA-Stateful-Rules
         type: STATEFUL
+        regions:
+          - eu-west-1
         capacity: 200
         ruleGroup:
           rulesSource:

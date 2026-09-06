@@ -329,7 +329,6 @@ export function buildAccountProfile(
   const deployableLists = [
     ['CloudFormation stack', custom?.cloudFormationStacks],
     ['CloudFormation stack set', custom?.cloudFormationStackSets],
-    ['Service Catalog portfolio', custom?.serviceCatalogPortfolios],
   ] as const
   for (const [kind, list] of deployableLists) {
     for (const item of list ?? []) {
@@ -350,6 +349,22 @@ export function buildAccountProfile(
         } : {}),
       })
     }
+  }
+
+  // A portfolio reaches an account by being shared with it, and it lives in
+  // the account named by `account`.
+  for (const portfolio of custom?.serviceCatalogPortfolios ?? []) {
+    const via = portfolio.account === accountName
+      ? 'direct'
+      : deployedVia(portfolio.shareTargets, accountName, account.ouPath)
+    if (via == null) continue
+    deployables.push({
+      name: portfolio.name,
+      kind: 'Service Catalog portfolio',
+      regions: portfolio.regions,
+      via,
+      description: portfolio.account === accountName ? 'Created in this account' : 'Shared with this account',
+    })
   }
 
   // ── Global ────────────────────────────────────────────────────────────────

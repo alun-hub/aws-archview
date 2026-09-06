@@ -1,0 +1,104 @@
+# Deliberately flawed variant of network-config.yaml.
+#
+# A small hub-and-spoke, compact enough to read whole, carrying the network
+# mistakes the rules exist to catch.
+
+homeRegion: eu-west-1
+
+defaultVpc:
+  delete: true
+
+endpointPolicies:
+  - name: Default
+    document: vpc-endpoint-policies/default.json
+
+# ISSUE: no vpcFlowLogs here and none on the VPCs below, so nothing records
+# their traffic. Reported as info — it may be handled outside LZA.
+
+transitGateways:
+  - name: Main-TGW
+    account: Network
+    region: eu-west-1
+    asn: 65521
+    dnsSupport: enable
+    vpnEcmpSupport: enable
+    defaultRouteTableAssociation: disable
+    defaultRouteTablePropagation: disable
+    autoAcceptSharingAttachments: enable
+    routeTables:
+      - name: Spoke-RT
+        routes: []
+    shareTargets:
+      organizationalUnits:
+        - Workloads/Dev
+        - Workloads/Prod
+
+vpcs:
+  - name: Dev-VPC
+    account: Dev-Application
+    region: eu-west-1
+    cidrs:
+      - 10.20.0.0/16
+    routeTables:
+      - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
+    subnets:
+      - name: App-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.0.0/24
+      # ISSUE: overlaps App-Subnet-A. Both cannot exist.
+      - name: App-Subnet-B
+        availabilityZone: b
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.0.128/25
+    transitGatewayAttachments:
+      - name: Dev-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - Spoke-RT
+        routeTablePropagations:
+          - Spoke-RT
+        subnets:
+          - App-Subnet-A
+          - App-Subnet-B
+
+  # ISSUE: overlaps Dev-VPC, and both attach to Main-TGW. Its route tables
+  # cannot carry two identical prefixes, so this is an error rather than a
+  # warning.
+  - name: Prod-VPC
+    account: Prod-Application
+    region: eu-west-1
+    cidrs:
+      - 10.20.0.0/16
+    routeTables:
+      - name: App-RT
+        routes:
+          - name: Tgw-Default
+            destination: 0.0.0.0/0
+            type: transitGateway
+            target: Main-TGW
+    subnets:
+      - name: App-Subnet-A
+        availabilityZone: a
+        routeTable: App-RT
+        ipv4CidrBlock: 10.20.0.0/24
+    transitGatewayAttachments:
+      - name: Prod-Attachment
+        transitGateway:
+          name: Main-TGW
+          account: Network
+        routeTableAssociations:
+          - Spoke-RT
+        # ISSUE: associates a route table but propagates into none, and no
+        # static route on the Transit Gateway points here either — so nothing
+        # on Main-TGW learns how to reach this VPC.
+        routeTablePropagations: []
+        subnets:
+          - App-Subnet-A

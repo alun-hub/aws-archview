@@ -1,8 +1,10 @@
+# Deliberately flawed variant of organization-config.yaml.
+#
+# Everything here is a mistake a real team makes. Loaded from
+# "Try a config with issues" so the Validation panel has something to show.
+
 enable: true
 
-# LZA declares OUs as a flat list whose `name` carries the full path, and every
-# OU in a path must be listed. A nested `organizationalUnits` array is not part
-# of the schema.
 organizationalUnits:
   - name: Security
   - name: Infrastructure
@@ -13,7 +15,6 @@ organizationalUnits:
   - name: Workloads/Test
   - name: Workloads/Prod
   - name: Sandbox
-  # Holds closed and quarantined accounts, which LZA must not manage.
   - name: Suspended
     ignore: true
 
@@ -29,6 +30,15 @@ serviceControlPolicies:
         - Workloads
         - Sandbox
 
-# Required by the schema even when unused.
+  # ISSUE: targets an OU that does not exist. The OU is called "Workloads/Prod";
+  # "Production" is what people call it in conversation. LZA fails the pipeline.
+  - name: DenyProdChanges
+    description: Restrict destructive actions in production
+    type: customerManaged
+    policy: service-control-policies/deny-root-user.json
+    deploymentTargets:
+      organizationalUnits:
+        - Production
+
 taggingPolicies: []
 backupPolicies: []

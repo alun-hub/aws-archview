@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useConfig, useDispatch } from '../../store/configStore'
 import { FILE_MAP, findIncludes, findUnresolvedReplacements, resolveConfigKey } from '../../parser'
-import { SAMPLE_CONFIGS } from '../../parser/sampleConfigs'
+import { SAMPLE_CONFIGS, SAMPLE_CONFIGS_WITH_FINDINGS } from '../../parser/sampleConfigs'
 import { useFileDrop } from '../../hooks/useFileDrop'
 
 // Callout pointing at the Validation panel, where loading problems are now
@@ -17,8 +17,8 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { processFiles, handleFolderSelect, onDrop, fromFileList } = useFileDrop(dispatch)
 
-  const loadSample = () => {
-    for (const [filename, content] of Object.entries(SAMPLE_CONFIGS)) {
+  const loadSample = (files: Record<string, string>) => {
+    for (const [filename, content] of Object.entries(files)) {
       dispatch({ type: 'SET_FILE', filename, content })
     }
   }
@@ -83,11 +83,18 @@ export function ConfigLoader({ loadedFiles }: { loadedFiles: Record<string, stri
             Select folder
           </span>
           <span
-            onClick={(e) => { e.stopPropagation(); loadSample() }}
+            onClick={(e) => { e.stopPropagation(); loadSample(SAMPLE_CONFIGS) }}
             title="Load a small built-in LZA config so you can try every view without your own files"
             style={{ textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Try a sample config
+          </span>
+          <span
+            onClick={(e) => { e.stopPropagation(); loadSample(SAMPLE_CONFIGS_WITH_FINDINGS) }}
+            title="The same config with a handful of deliberate mistakes, so the Validation panel has something to show"
+            style={{ textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            …with issues
           </span>
         </div>
         <input

@@ -129,11 +129,15 @@ export function parseCustomizations(cfg: CustomizationsConfig, aggregateStacks: 
       label: portfolio.name,
       data: {
         kind: 'service-catalog',
-        description: portfolio.description,
+        account: portfolio.account,
         provider: portfolio.provider,
         regions: portfolio.regions,
         sublabel: portfolio.provider ?? '',
-        products: portfolio.products?.map((p) => `${p.name} [Version: ${p.version}]${p.description ? ` - ${p.description}` : ''}`),
+        // A product carries a list of versions, each with its own template.
+        products: portfolio.products?.map((p) => {
+          const versions = (p.versions ?? []).map((v) => v.name).join(', ')
+          return `${p.name}${versions ? ` [${versions}]` : ''}${p.description ? ` - ${p.description}` : ''}`
+        }),
       },
     })
   }

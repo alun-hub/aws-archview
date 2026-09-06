@@ -88,7 +88,6 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
   const customLists: [string, { name: string; deploymentTargets?: ExpandableTargets }[] | undefined][] = [
     ['cloudFormationStacks', custom?.cloudFormationStacks],
     ['cloudFormationStackSets', custom?.cloudFormationStackSets],
-    ['serviceCatalogPortfolios', custom?.serviceCatalogPortfolios],
   ]
   for (const [key, list] of customLists) {
     for (const item of list ?? []) {
@@ -100,6 +99,17 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
         targets: item.deploymentTargets,
       })
     }
+  }
+  // A portfolio is created in one account and shared out; it has no
+  // deploymentTargets to check, only shareTargets.
+  for (const portfolio of custom?.serviceCatalogPortfolios ?? []) {
+    sites.push({
+      where: `serviceCatalogPortfolios: ${portfolio.name} (shareTargets)`,
+      kind: 'deployment',
+      configFile: 'customizations-config.yaml',
+      view: 'customizations',
+      targets: portfolio.shareTargets,
+    })
   }
 
   // shareTargets follow the same shape and fail the same way — a TGW shared

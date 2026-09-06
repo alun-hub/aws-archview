@@ -1,0 +1,29 @@
+# Deliberately flawed variant of customizations-config.yaml.
+
+customizations:
+  cloudFormationStacks:
+    # ISSUE: targets the parent OU. A deploymentTargets block matches an OU
+    # exactly — unlike an attached policy it does not reach nested OUs — so the
+    # accounts in Workloads/Dev, /Test and /Prod never get this stack.
+    - name: Workload-Baseline
+      description: Baseline guardrails for workload accounts
+      regions:
+        - eu-west-1
+      deploymentTargets:
+        organizationalUnits:
+          - Workloads
+      template: cfn-templates/workload-baseline.yaml
+      runOrder: 1
+      terminationProtection: true
+
+    # ISSUE: names an account that does not exist in accounts-config.yaml.
+    - name: Sandbox-Guardrails
+      description: Spend and region limits for the sandbox
+      regions:
+        - eu-west-1
+      deploymentTargets:
+        accounts:
+          - Sandbox-Account
+      template: cfn-templates/sandbox-guardrails.yaml
+      runOrder: 2
+      terminationProtection: false

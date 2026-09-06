@@ -11,7 +11,6 @@ logging:
   cloudtrail:
     enable: true
     organizationTrail: true
-    s3BucketName: aws-accelerator-cloudtrail
   cloudwatchLogs:
     enable: true
   sessionManager:
@@ -22,10 +21,12 @@ reports:
     - name: Monthly-Total
       amount: 5000
       type: COST
+      timeUnit: MONTHLY
       unit: USD
     - name: Sandbox-Budget
       amount: 500
       type: COST
+      timeUnit: MONTHLY
       unit: USD
 backup:
   vaults:
