@@ -29,7 +29,10 @@ import {
   runValidation, severityByNode, buildAccountIndex, buildAccountProfile,
   type Finding, type Severity, type ProfileLink,
 } from './analysis'
+import { tracePath, type TraceResult } from './analysis/pathTrace'
+import { allVpcs } from './parser/vpcTemplates'
 import { AccountProfileView } from './components/panels/AccountProfileView'
+import { PathTracePanel } from './components/panels/PathTracePanel'
 import { ancestorChain } from './components/canvas/visibility'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { GraphNode, GraphModel } from './parser'
@@ -164,9 +167,11 @@ interface LeftPanelProps {
   /** Label of the node the panel is narrowed to, for the clearable chip. */
   focusNodeLabel: string | null
   onSelectFinding(finding: Finding): void
+  pathTraceResult: TraceResult | null
+  onSelectTraceHop(nodeIds: string[]): void
 }
 
-function LeftPanel({ activeGraph, findings, focusNodeLabel, onSelectFinding }: LeftPanelProps) {
+function LeftPanel({ activeGraph, findings, focusNodeLabel, onSelectFinding, pathTraceResult, onSelectTraceHop }: LeftPanelProps) {
   const config   = useConfig()
   const dispatch = useDispatch()
   const [expandedKinds, setExpandedKinds] = useState<Set<NodeKind>>(new Set())
@@ -504,6 +509,24 @@ function LeftPanel({ activeGraph, findings, focusNodeLabel, onSelectFinding }: L
           </ExpandableSection>
         )}
 
+        {/* Path trace — only in network view */}
+        {config.activeView === 'network' && (
+          <ExpandableSection header="Path trace" defaultExpanded variant="navigation">
+            <div style={{ padding: `4px ${GUTTER}px 8px` }}>
+              <PathTracePanel
+                source={config.traceSource}
+                destination={config.traceDestination}
+                picking={config.tracePicking}
+                result={pathTraceResult}
+                onPick={(role) => dispatch({ type: 'SET_TRACE_PICKING', role })}
+                onClearEndpoint={(role) => dispatch({ type: 'CLEAR_TRACE_ENDPOINT', role })}
+                onClearAll={() => dispatch({ type: 'CLEAR_TRACE' })}
+                onSelectHop={onSelectTraceHop}
+              />
+            </div>
+          </ExpandableSection>
+        )}
+
         {/* Show / Hide connections — only in network view */}
         {config.activeView === 'network' && (
           <ExpandableSection header="Show / Hide connections" defaultExpanded variant="navigation">
@@ -598,6 +621,24 @@ function AppContent() {
   )
   const severityByNodeId = useMemo(() => severityByNode(findings), [findings])
 
+  // Path trace: computed here (rather than inside the panel) so both the left
+  // panel's hop list and the canvas's dimming share one result.
+  const accountIndex = useMemo(
+    () => buildAccountIndex(config.configs.organization, config.configs.accounts),
+    [config.configs.organization, config.configs.accounts],
+  )
+  const pathTraceResult = useMemo<TraceResult | null>(() => {
+    if (!config.traceSource || !config.traceDestination) return null
+    const vpcs = allVpcs(config.configs.network, accountIndex)
+    return tracePath(config.configs.network, vpcs, config.traceSource, config.traceDestination)
+  }, [config.traceSource, config.traceDestination, config.configs.network, accountIndex])
+  const traceHighlightIds = useMemo(() => {
+    if (!pathTraceResult) return null
+    const ids = new Set<string>()
+    for (const hop of pathTraceResult.hops) for (const id of hop.nodeIds) ids.add(id)
+    return ids
+  }, [pathTraceResult])
+
   // Jumping to a node — from a finding, or from a row on an account profile —
   // switches views first; the reveal and selection then run from an effect,
   // because SET_VIEW resets the collapse state and the default-detail-level
@@ -610,15 +651,15 @@ function AppContent() {
   }
   const handleSelectFinding = (finding: Finding) =>
     focusNode({ view: finding.view, nodeIds: finding.nodeIds })
+  const handleSelectTraceHop = (nodeIds: string[]) => focusNode({ view: 'network', nodeIds })
 
   // Account profiles: the whole config set re-indexed by account, which is the
   // axis the views themselves don't offer.
   const accountProfiles = useMemo(() => {
-    const index = buildAccountIndex(config.configs.organization, config.configs.accounts)
-    return index.accounts
-      .map((a) => buildAccountProfile(a.name, config.configs, index, findings, config.loadedFiles))
+    return accountIndex.accounts
+      .map((a) => buildAccountProfile(a.name, config.configs, accountIndex, findings, config.loadedFiles))
       .filter((p) => p != null)
-  }, [config.configs, config.loadedFiles, findings])
+  }, [accountIndex, config.configs, config.loadedFiles, findings])
 
   const openAccountProfile = (name: string | null) => {
     dispatch({ type: 'SELECT_ACCOUNT', name })
@@ -700,6 +741,8 @@ function AppContent() {
           findings={findings}
           focusNodeLabel={validationFocusLabel}
           onSelectFinding={handleSelectFinding}
+          pathTraceResult={pathTraceResult}
+          onSelectTraceHop={handleSelectTraceHop}
         />
       }
       tools={
@@ -740,7 +783,11 @@ function AppContent() {
               </div>
             ) : (
               <ErrorBoundary>
-                <DiagramCanvas model={activeGraph} severityByNodeId={severityByNodeId} />
+                <DiagramCanvas
+                  model={activeGraph}
+                  severityByNodeId={severityByNodeId}
+                  traceHighlightIds={config.activeView === 'network' ? traceHighlightIds : null}
+                />
               </ErrorBoundary>
             )}
           </div>

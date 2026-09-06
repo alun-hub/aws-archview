@@ -29,6 +29,7 @@ import { KIND_LABEL } from './kindLabels'
 import { ancestorChain, isNodeVisible } from './visibility'
 import { useFileDrop } from '../../hooks/useFileDrop'
 import { SAMPLE_CONFIGS } from '../../parser/sampleConfigs'
+import { traceEndpointFromNode } from './traceEndpoint'
 
 
 function sortParentsFirst(nodes: Node[]): Node[] {
@@ -544,6 +545,41 @@ function HiddenFilterBadge() {
   )
 }
 
+// ── Path trace picking banner ─────────────────────────────────────────────────
+
+function TracePickingBanner() {
+  const config   = useConfig()
+  const dispatch = useDispatch()
+  if (!config.tracePicking) return null
+
+  return (
+    <Panel position="top-center" style={{ margin: '8px 0 0' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        background: '#eef6ff',
+        border: '1.5px solid #0073bb',
+        borderRadius: 20,
+        padding: '6px 14px',
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#0073bb',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+        fontFamily: '"Amazon Ember", "Helvetica Neue", Arial, sans-serif',
+      }}>
+        Click a VPC or subnet to set the trace {config.tracePicking}
+        <button
+          onClick={() => dispatch({ type: 'SET_TRACE_PICKING', role: null })}
+          style={{ background: 'none', border: 'none', color: '#0073bb', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+        >
+          ✕
+        </button>
+      </div>
+    </Panel>
+  )
+}
+
 // ── Zoom indicator ───────────────────────────────────────────────────────────
 
 function ZoomIndicator() {
@@ -767,9 +803,13 @@ interface Props {
    *  Findings are computed once in the app shell and shared with the panel,
    *  so the canvas only renders what it is handed. */
   severityByNodeId?: Map<string, NodeFindingSummary>
+  /** Nodes a path trace touched, computed in the app shell from the current
+   *  trace result. When set, everything else on the canvas is dimmed —
+   *  same mechanism as the SCP highlight, one caller at a time. */
+  traceHighlightIds?: Set<string> | null
 }
 
-export function DiagramCanvas({ model, severityByNodeId }: Props) {
+export function DiagramCanvas({ model, severityByNodeId, traceHighlightIds }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [fitViewTrigger, setFitViewTrigger] = useState(0)
@@ -832,6 +872,10 @@ export function DiagramCanvas({ model, severityByNodeId }: Props) {
       return withAncestors
     }
 
+    if (traceHighlightIds) {
+      return new Set(nodes.map(n => n.id).filter(id => !withAncestorsOf(traceHighlightIds).has(id)))
+    }
+
     if (config.highlightedScp) {
       const visible = new Set<string>()
       for (const n of nodes) {
@@ -849,7 +893,7 @@ export function DiagramCanvas({ model, severityByNodeId }: Props) {
       if (e.target === config.selectedNodeId) visible.add(e.source)
     }
     return new Set(nodes.map(n => n.id).filter(id => !withAncestorsOf(visible).has(id)))
-  }, [config.selectedNodeId, config.highlightedScp, edges, nodes, config.enableFocusMode])
+  }, [config.selectedNodeId, config.highlightedScp, edges, nodes, config.enableFocusMode, traceHighlightIds])
 
   const highlightValue = useMemo(
     () => ({ dimmedNodeIds, severityByNodeId: severityByNodeId ?? new Map() }),
@@ -973,9 +1017,16 @@ export function DiagramCanvas({ model, severityByNodeId }: Props) {
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (config.tracePicking && model) {
+        const endpoint = traceEndpointFromNode(model, node.id)
+        if (endpoint) {
+          dispatch({ type: 'SET_TRACE_ENDPOINT', role: config.tracePicking, endpoint })
+          return
+        }
+      }
       dispatch({ type: 'SELECT_NODE', id: node.id })
     },
-    [dispatch],
+    [dispatch, config.tracePicking, model],
   )
 
   const onPaneClick = useCallback(() => {
@@ -1071,6 +1122,7 @@ export function DiagramCanvas({ model, severityByNodeId }: Props) {
             <Controls style={{ borderRadius: 6, marginBottom: 44 }} />
             <SearchBar model={model} nodes={nodes} />
             <BreadcrumbNav />
+            <TracePickingBanner />
             <ZoomIndicator />
             <Legend presentEdgeKinds={presentEdgeKinds} />
             <HiddenFilterBadge />

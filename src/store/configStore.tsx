@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react'
 import { resolveConfigKey, parsedForKey, type LzaConfigs, type ViewKind } from '../parser'
+import type { TraceEndpoint } from '../analysis/pathTrace'
 
 interface State {
   configs: LzaConfigs
@@ -27,6 +28,11 @@ interface State {
   /** Node whose findings the Validation panel is narrowed to, set by clicking
    *  that node's badge on the diagram. */
   validationFocusNodeId: string | null
+  /** Which trace endpoint the next VPC/subnet click on the canvas should
+   *  fill. Null when the path trace tool isn't waiting for a click. */
+  tracePicking: 'source' | 'destination' | null
+  traceSource: TraceEndpoint | null
+  traceDestination: TraceEndpoint | null
 }
 
 export type Action =
@@ -47,6 +53,10 @@ export type Action =
   | { type: 'REVEAL_NODES'; ids: string[] }
   | { type: 'SELECT_ACCOUNT'; name: string | null }
   | { type: 'SET_VALIDATION_FOCUS'; id: string | null }
+  | { type: 'SET_TRACE_PICKING'; role: 'source' | 'destination' | null }
+  | { type: 'SET_TRACE_ENDPOINT'; role: 'source' | 'destination'; endpoint: TraceEndpoint }
+  | { type: 'CLEAR_TRACE_ENDPOINT'; role: 'source' | 'destination' }
+  | { type: 'CLEAR_TRACE' }
 
 // Parse every recognized file; a failure in one file must not take down the
 // others (or the whole app) — collect errors per file instead.
@@ -123,6 +133,9 @@ const getInitialState = (): State => {
     highlightedScp: null,
     selectedAccount: null,
     validationFocusNodeId: null,
+    tracePicking: null,
+    traceSource: null,
+    traceDestination: null,
   }
 }
 
@@ -142,13 +155,30 @@ function reducer(state: State, action: Action): State {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aws-archview:activeView', action.view)
       }
-      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null, validationFocusNodeId: null }
+      return { ...state, activeView: action.view, selectedNodeId: null, collapsedNodes: new Set<string>(), detailLevel: null, hiddenNodeIds: new Set<string>(), highlightedScp: null, validationFocusNodeId: null, tracePicking: null, traceSource: null, traceDestination: null }
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.id }
     case 'SELECT_ACCOUNT':
       return { ...state, selectedAccount: action.name }
     case 'SET_VALIDATION_FOCUS':
       return { ...state, validationFocusNodeId: action.id }
+    case 'SET_TRACE_PICKING':
+      return { ...state, tracePicking: action.role }
+    case 'SET_TRACE_ENDPOINT':
+      return {
+        ...state,
+        tracePicking: null,
+        traceSource: action.role === 'source' ? action.endpoint : state.traceSource,
+        traceDestination: action.role === 'destination' ? action.endpoint : state.traceDestination,
+      }
+    case 'CLEAR_TRACE_ENDPOINT':
+      return {
+        ...state,
+        traceSource: action.role === 'source' ? null : state.traceSource,
+        traceDestination: action.role === 'destination' ? null : state.traceDestination,
+      }
+    case 'CLEAR_TRACE':
+      return { ...state, tracePicking: null, traceSource: null, traceDestination: null }
     case 'TOGGLE_LAYER':
       return {
         ...state,
