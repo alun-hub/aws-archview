@@ -253,7 +253,9 @@ export interface VpcPeeringConfig {
 export interface PermissionSetConfig {
   name: string
   description?: string
-  sessionDuration?: string
+  /** Minutes. LZA takes a number here, not an ISO 8601 duration. */
+  sessionDuration?: number | string
+  policies?: IamPolicyAttachments & { inlinePolicy?: string; acceleratorManaged?: string[] }
   awsManagedPolicies?: string[]
   customerManagedPolicies?: { name: string }[]
 }
@@ -304,8 +306,11 @@ export interface FirewallRuleGroupConfig {
 export interface IdentityCenterAssignmentConfig {
   name: string
   permissionSetName: string
-  principalType: 'GROUP' | 'USER'
-  principalId: string
+  /** Current LZA shape. */
+  principals?: { type?: string; name?: string }[]
+  /** Older shape, still accepted by LZA. */
+  principalType?: 'GROUP' | 'USER' | string
+  principalId?: string
   deploymentTargets: {
     accounts?: string[]
     organizationalUnits?: string[]
@@ -509,10 +514,15 @@ export interface IamConfig {
     enable?: boolean
     name?: string
     delegatedAdminAccount?: string
+    /** Where LZA declares them. */
+    identityCenterPermissionSets?: PermissionSetConfig[]
+    identityCenterAssignments?: IdentityCenterAssignmentConfig[]
     [key: string]: unknown
   }
+  /** Top-level forms, accepted but not what LZA writes. */
   permissionSets?: PermissionSetConfig[]
   identityCenterAssignments?: IdentityCenterAssignmentConfig[]
+  providers?: unknown[]
   policySets?: PolicySetConfig[]
   roleSets?: RoleSetConfig[]
   groupSets?: GroupSetConfig[]

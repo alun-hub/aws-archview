@@ -11,10 +11,10 @@
 // diagram needs it to place VPC templates, and analysis imports parser, so the
 // other direction would be a cycle.
 
+import { flattenOus } from './organizationalUnits'
 import type {
   AccountsConfig,
   DeploymentTargets,
-  OUConfig,
   OrganizationConfig,
 } from './types'
 
@@ -60,30 +60,13 @@ export interface AccountIndex {
   expand(targets?: ExpandableTargets): TargetExpansion
 }
 
-function walkOus(
-  ous: OUConfig[],
-  parentPath: string,
-  paths: string[],
-  ignored: Set<string>,
-  inheritedIgnore: boolean,
-) {
-  for (const ou of ous) {
-    if (!ou?.name) continue
-    const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
-    const isIgnored = inheritedIgnore || ou.ignore === true
-    paths.push(path)
-    if (isIgnored) ignored.add(path)
-    walkOus(ou.organizationalUnits ?? [], path, paths, ignored, isIgnored)
-  }
-}
-
 export function buildAccountIndex(
   organization?: OrganizationConfig,
   accountsConfig?: AccountsConfig,
 ): AccountIndex {
-  const ouPaths: string[] = []
-  const ignoredOuPaths = new Set<string>()
-  walkOus(organization?.organizationalUnits ?? [], '', ouPaths, ignoredOuPaths, false)
+  const flat = flattenOus(organization?.organizationalUnits)
+  const ouPaths = flat.map((ou) => ou.path)
+  const ignoredOuPaths = new Set(flat.filter((ou) => ou.ignore).map((ou) => ou.path))
 
   const accounts: ResolvedAccount[] = [
     ...(accountsConfig?.mandatoryAccounts ?? []).map((a) => ({ ...a, source: 'mandatory' as const })),

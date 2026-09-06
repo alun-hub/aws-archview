@@ -1,5 +1,6 @@
 import type { AccountsConfig, OrganizationConfig, OUConfig, SCP } from './types'
 import { accountNodeId, ouNodeId } from './nodeIds'
+import { flattenOus } from './organizationalUnits'
 
 export type PolicyMatrixCellState = 'direct' | 'inherited' | 'none'
 
@@ -41,19 +42,20 @@ interface TreeNode {
   children: TreeNode[]
 }
 
-function buildOuTree(ous: OUConfig[], parentPath: string): TreeNode[] {
-  return ous
-    .filter((ou) => !ou.ignore)
-    .map((ou) => {
-      const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
-      return {
-        id: ouNodeId(path),
-        label: ou.name,
-        path,
-        kind: 'ou' as const,
-        children: buildOuTree(ou.organizationalUnits ?? [], path),
-      }
-    })
+/** OUs as a tree, built from the path in each name — see `flattenOus`. */
+function buildOuTree(ous: OUConfig[] | undefined): TreeNode[] {
+  const byPath = new Map<string, TreeNode>()
+  const roots: TreeNode[] = []
+
+  for (const ou of flattenOus(ous)) {
+    if (ou.ignore) continue
+    const node: TreeNode = { id: ouNodeId(ou.path), label: ou.label, path: ou.path, kind: 'ou', children: [] }
+    byPath.set(ou.path, node)
+    const parent = ou.parentPath ? byPath.get(ou.parentPath) : undefined
+    if (parent) parent.children.push(node)
+    else roots.push(node)
+  }
+  return roots
 }
 
 // AWS Organizations (and LZA) always name the top-level OU "Root" — match
@@ -105,7 +107,7 @@ export function buildPolicyMatrix(
     ...backup.map((p) => [`backup:${p.name}`, p] as const),
   ])
 
-  const root: TreeNode = { id: 'root', label: 'Root', path: 'Root', kind: 'ou', children: buildOuTree(orgConfig.organizationalUnits ?? [], '') }
+  const root: TreeNode = { id: 'root', label: 'Root', path: 'Root', kind: 'ou', children: buildOuTree(orgConfig.organizationalUnits) }
   const ouChildren = new Map<string, TreeNode>()
   indexOus([root], ouChildren)
   attachAccounts(root, ouChildren, accountsConfig)

@@ -1,17 +1,17 @@
 enable: true
 
+# LZA declares OUs as a flat list whose `name` carries the full path, and every
+# OU in a path must be listed. A nested `organizationalUnits` array is not part
+# of the schema.
 organizationalUnits:
   - name: Security
-    organizationalUnits: []
   - name: Infrastructure
-    organizationalUnits:
-      - name: Network
-      - name: SharedServices
+  - name: Infrastructure/Network
+  - name: Infrastructure/SharedServices
   - name: Workloads
-    organizationalUnits:
-      - name: Dev
-      - name: Test
-      - name: Prod
+  - name: Workloads/Dev
+  - name: Workloads/Test
+  - name: Workloads/Prod
   - name: Sandbox
   # Holds closed and quarantined accounts, which LZA must not manage.
   - name: Suspended

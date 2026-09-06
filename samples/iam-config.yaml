@@ -1,16 +1,65 @@
 # AWS Landing Zone Accelerator IAM Configuration
 #
+# Permission sets and assignments live under `identityCenter`, not at the top
+# level. `sessionDuration` is a number of minutes, not an ISO 8601 duration.
+
+providers: []
+
 identityCenter:
   name: AWS-Identity-Center
   delegatedAdminAccount: Audit
 
-permissionSets:
-  - name: AdministratorAccess
-    description: Full administrative access to AWS services and resources.
-    sessionDuration: PT12H
-  - name: Billing
-    description: Access to billing, cost management, and payment methods.
-    sessionDuration: PT4H
-  - name: SecurityAudit
-    description: Read-only access for security audits and log analysis.
-    sessionDuration: PT8H
+  identityCenterPermissionSets:
+    - name: AdministratorAccess
+      policies:
+        awsManaged:
+          - arn:aws:iam::aws:policy/AdministratorAccess
+      sessionDuration: 720
+
+    - name: Billing
+      policies:
+        awsManaged:
+          - arn:aws:iam::aws:policy/job-function/Billing
+      sessionDuration: 240
+
+    - name: SecurityAudit
+      policies:
+        awsManaged:
+          - arn:aws:iam::aws:policy/SecurityAudit
+          - arn:aws:iam::aws:policy/AWSSupportAccess
+      sessionDuration: 480
+
+  identityCenterAssignments:
+    - name: CloudAdmins
+      permissionSetName: AdministratorAccess
+      principals:
+        - type: GROUP
+          name: aws-cloud-admins
+      deploymentTargets:
+        organizationalUnits:
+          - Infrastructure
+          - Infrastructure/Network
+          - Infrastructure/SharedServices
+
+    - name: SecurityAuditors
+      permissionSetName: SecurityAudit
+      principals:
+        - type: GROUP
+          name: aws-security-auditors
+      deploymentTargets:
+        organizationalUnits:
+          - Security
+
+    - name: BillingViewers
+      permissionSetName: Billing
+      principals:
+        - type: GROUP
+          name: aws-finance
+      deploymentTargets:
+        accounts:
+          - Management
+
+policySets: []
+roleSets: []
+groupSets: []
+userSets: []

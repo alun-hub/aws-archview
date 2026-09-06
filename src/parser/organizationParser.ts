@@ -3,6 +3,8 @@ import { getNormalizedSecurityConfig } from './securityParser'
 import { findFileContent } from './fileResolve'
 import { parsePolicyStatements, type PolicyStatementEntry } from './policyParse'
 import { accountNodeId, ouNodeId } from './nodeIds'
+import { assignments, describePrincipals } from './identityCenter'
+import { flattenOus } from './organizationalUnits'
 
 function formatPolicyEntry(p: SCP): string {
   return `${p.name}${p.policy ? ` (${p.policy})` : ''}${p.description ? ` - ${p.description}` : ''}`
@@ -46,9 +48,8 @@ function computePolicyAttachments(
 }
 
 function collectOUs(
-  ous: OUConfig[],
-  parentId: string,
-  parentPath: string,
+  ous: OUConfig[] | undefined,
+  rootId: string,
   nodes: GraphNode[],
   scps: SCP[],
   taggingPolicies: SCP[],
@@ -56,34 +57,34 @@ function collectOUs(
   loadedFiles: Record<string, string>,
   iamConfig?: IamConfig,
 ) {
-  for (const ou of ous) {
-    if (ou.ignore) continue
-    // Full org-tree path (e.g. "Infrastructure/Network"), not just the leaf
-    // name — two OUs in different branches can share a name, and only the
-    // full path uniquely identifies an OU (matching how LZA config targets it).
-    const path = parentPath ? `${parentPath}/${ou.name}` : ou.name
-    const id = ouNodeId(path)
-    const policyAttachments = computePolicyAttachments('ou', path, scps, taggingPolicies, backupPolicies, loadedFiles)
+  // LZA declares OUs flat, with the path in the name. `flattenOus` resolves
+  // parentage from that path and also accepts the nested shape.
+  const flat = flattenOus(ous).filter((ou) => !ou.ignore)
+  const declared = new Set(flat.map((ou) => ou.path))
 
-    const ouAssignments = iamConfig?.identityCenterAssignments
-      ?.filter((a) => a.deploymentTargets?.organizationalUnits?.includes(path))
-      ?.map((a) => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${a.permissionSetName}`) ?? []
+  for (const ou of flat) {
+    const id = ouNodeId(ou.path)
+    const policyAttachments = computePolicyAttachments('ou', ou.path, scps, taggingPolicies, backupPolicies, loadedFiles)
+
+    const ouAssignments = assignments(iamConfig)
+      .filter((a) => a.deploymentTargets?.organizationalUnits?.includes(ou.path))
+      .map((a) => `${describePrincipals(a.principals)} → ${a.permissionSetName}`)
 
     nodes.push({
       id,
       kind: 'ou',
-      label: ou.name,
+      label: ou.label,
       data: {
         kind: 'ou',
+        path: ou.path,
         tags: ou.tags,
         ...policyAttachments,
         iamAssignments: ouAssignments.length > 0 ? ouAssignments : undefined,
       },
-      parentId,
+      // An ignored parent is not drawn, so its children attach to Root rather
+      // than to a node that does not exist.
+      parentId: ou.parentPath && declared.has(ou.parentPath) ? ouNodeId(ou.parentPath) : rootId,
     })
-    if (ou.organizationalUnits?.length) {
-      collectOUs(ou.organizationalUnits, id, path, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
-    }
   }
 }
 
@@ -109,7 +110,7 @@ export function parseOrganization(
   const backupPolicies = orgConfig.backupPolicies ?? []
 
   if (orgConfig.organizationalUnits?.length) {
-    collectOUs(orgConfig.organizationalUnits, rootId, '', nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
+    collectOUs(orgConfig.organizationalUnits, rootId, nodes, scps, taggingPolicies, backupPolicies, loadedFiles, iamConfig)
   }
 
   const nodeSet = new Set(nodes.map((n) => n.id))
@@ -128,9 +129,9 @@ export function parseOrganization(
 
     const policyAttachments = computePolicyAttachments('account', account.name, scps, taggingPolicies, backupPolicies, loadedFiles)
 
-    const accountAssignments = iamConfig?.identityCenterAssignments
-      ?.filter((a) => a.deploymentTargets?.accounts?.includes(account.name))
-      ?.map((a) => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${a.permissionSetName}`) ?? []
+    const accountAssignments = assignments(iamConfig)
+      .filter((a) => a.deploymentTargets?.accounts?.includes(account.name))
+      .map((a) => `${describePrincipals(a.principals)} → ${a.permissionSetName}`)
 
     nodes.push({
       id,

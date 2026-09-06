@@ -10,6 +10,7 @@
 import type { LzaConfigs, ViewKind } from '../parser'
 import { accountNodeId, subnetNodeId, vpcNodeId } from '../parser/nodeIds'
 import { findFileContent } from '../parser/fileResolve'
+import { assignments } from '../parser/identityCenter'
 import { parsePolicyStatements, type PolicyStatementEntry } from '../parser/policyParse'
 import { routeTableNames } from '../parser/routeTableRefs'
 import { allVpcs, resolveVpcs } from '../parser/vpcTemplates'
@@ -296,9 +297,13 @@ export function buildAccountProfile(
       })
     }
   }
-  const ssoAssignments = (configs.iam?.identityCenterAssignments ?? [])
+  const ssoAssignments = assignments(configs.iam)
     .filter((a) => reachedVia(a.deploymentTargets, accountName, ouChain) != null)
-    .map((a) => ({ principal: a.principalId, principalType: a.principalType, permissionSet: a.permissionSetName }))
+    .flatMap((a) => a.principals.map((p) => ({
+      principal: p.name,
+      principalType: p.type,
+      permissionSet: a.permissionSetName,
+    })))
 
   // ── Customizations ────────────────────────────────────────────────────────
   const custom = configs.customizations?.customizations ?? configs.customizations

@@ -1,6 +1,7 @@
 import type { IamConfig, AccountsConfig, GraphEdge, GraphModel, GraphNode, DeploymentTargets } from './types'
 import { findFileContent } from './fileResolve'
 import { parsePolicyStatements, type PolicyStatementEntry } from './policyParse'
+import { assignments, describePrincipals, permissionSets } from './identityCenter'
 
 function formatTargets(dt?: DeploymentTargets): string | undefined {
   if (!dt) return undefined
@@ -32,17 +33,17 @@ export function parseIam(cfg: IamConfig, _accountsConfig?: AccountsConfig, loade
 
   // Build assignment lookup: permissionSetName → list of targets
   const assignmentsByPs = new Map<string, string[]>()
-  for (const a of cfg.identityCenterAssignments ?? []) {
+  for (const a of assignments(cfg)) {
     const targets: string[] = [
-      ...(a.deploymentTargets.accounts ?? []).map(acc => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → ${acc}`),
-      ...(a.deploymentTargets.organizationalUnits ?? []).map(ou => `${a.principalType === 'GROUP' ? 'Group' : 'User'}: ${a.principalId} → OU: ${ou}`),
+      ...(a.deploymentTargets.accounts ?? []).map(acc => `${describePrincipals(a.principals)} → ${acc}`),
+      ...(a.deploymentTargets.organizationalUnits ?? []).map(ou => `${describePrincipals(a.principals)} → OU: ${ou}`),
     ]
     const existing = assignmentsByPs.get(a.permissionSetName) ?? []
     assignmentsByPs.set(a.permissionSetName, [...existing, ...targets])
   }
 
   // One node per permission set
-  for (const ps of cfg.permissionSets ?? []) {
+  for (const ps of permissionSets(cfg)) {
     const policies: string[] = []
     if (ps.awsManagedPolicies?.length) {
       policies.push(...ps.awsManagedPolicies.map(arn => arn.split('/').pop() ?? arn))
@@ -70,7 +71,7 @@ export function parseIam(cfg: IamConfig, _accountsConfig?: AccountsConfig, loade
 
   // If there are assignments for permission sets not in the permissionSets list, show them too
   for (const [psName, targets] of assignmentsByPs) {
-    if (!cfg.permissionSets?.find(p => p.name === psName)) {
+    if (!permissionSets(cfg).find(p => p.name === psName)) {
       nodes.push({
         id: `iam:ps:${psName}`,
         kind: 'iam',

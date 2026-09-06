@@ -26,9 +26,25 @@ const accounts: AccountsConfig = {
 }
 
 describe('buildAccountIndex', () => {
+  it('reads OUs declared flat, with the path in the name, as LZA does', () => {
+    const flat = buildAccountIndex({
+      enable: true,
+      organizationalUnits: [
+        { name: 'Workloads' },
+        { name: 'Workloads/Dev' },
+        { name: 'Workloads/Dev/Team-A' },
+      ],
+    }, { mandatoryAccounts: [{ name: 'A', email: 'a@example.com', organizationalUnit: 'Workloads/Dev/Team-A' }] })
+    expect([...flat.ouPaths].sort()).toEqual(['Workloads', 'Workloads/Dev', 'Workloads/Dev/Team-A'])
+    expect(flat.accountsInOu('Workloads/Dev').map((a) => a.name)).toEqual(['A'])
+  })
+
   it('flattens nested OUs to full paths', () => {
     const index = buildAccountIndex(organization, accounts)
-    expect(index.ouPaths).toEqual(['Security', 'Infrastructure', 'Infrastructure/Network', 'Suspended'])
+    // Order is parents-before-children, then alphabetical; the set is what
+    // matters here.
+    expect([...index.ouPaths].sort())
+      .toEqual(['Infrastructure', 'Infrastructure/Network', 'Security', 'Suspended'])
     expect(index.hasOu('Infrastructure/Network')).toBe(true)
     expect(index.hasOu('Network')).toBe(false)
     expect(index.hasOu('Root')).toBe(true)

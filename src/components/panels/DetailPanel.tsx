@@ -8,8 +8,9 @@ import Input from '@cloudscape-design/components/input'
 import Header from '@cloudscape-design/components/header'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import { useConfig, useDispatch } from '../../store/configStore'
-import type { PermissionSetConfig, IdentityCenterAssignmentConfig, FirewallRuleGroupConfig, CfnStackConfig, Route53ResolverRuleConfig } from '../../parser/types'
+import type { PermissionSetConfig, FirewallRuleGroupConfig, CfnStackConfig, Route53ResolverRuleConfig } from '../../parser/types'
 import type { GraphNode } from '../../parser'
+import { assignments, describePrincipals, permissionSets, type NormalisedAssignment } from '../../parser/identityCenter'
 
 interface StackEntry extends CfnStackConfig {
   isStackSet: boolean
@@ -569,7 +570,9 @@ export function DetailPanel({ node, onOpenAccount }: Props) {
   const iamConfig = config.configs.iam
 
   const matchingAssignments = useMemo(() => {
-    if (!node || !iamConfig?.identityCenterAssignments) return []
+    if (!node) return []
+    const all = assignments(iamConfig)
+    if (all.length === 0) return []
 
     const nodeKind = node.kind
     const nodeLabel = node.label
@@ -588,7 +591,7 @@ export function DetailPanel({ node, onOpenAccount }: Props) {
       }
     }
 
-    return iamConfig.identityCenterAssignments.filter(assignment => {
+    return all.filter(assignment => {
       const targets = assignment.deploymentTargets
       if (nodeKind === 'account') {
         const directMatch = targets.accounts?.includes(nodeLabel)
@@ -603,17 +606,17 @@ export function DetailPanel({ node, onOpenAccount }: Props) {
 
   const permissionSetsMap = useMemo(() => {
     const map = new Map<string, PermissionSetConfig>()
-    for (const ps of iamConfig?.permissionSets ?? []) {
+    for (const ps of permissionSets(iamConfig)) {
       map.set(ps.name, ps)
     }
     return map
   }, [iamConfig])
 
-  const columns: TableProps<IdentityCenterAssignmentConfig>['columnDefinitions'] = useMemo(() => [
+  const columns: TableProps<NormalisedAssignment>['columnDefinitions'] = useMemo(() => [
     {
       id: 'principal',
       header: 'SSO Group (Principal)',
-      cell: item => item.principalId,
+      cell: item => describePrincipals(item.principals) || '-',
       sortingField: 'principal'
     },
     {
@@ -659,7 +662,7 @@ export function DetailPanel({ node, onOpenAccount }: Props) {
     if (filteringText.trim()) {
       const query = filteringText.toLowerCase()
       result = result.filter(a =>
-        a.principalId.toLowerCase().includes(query) ||
+        describePrincipals(a.principals).toLowerCase().includes(query) ||
         a.permissionSetName.toLowerCase().includes(query)
       )
     }
@@ -669,8 +672,8 @@ export function DetailPanel({ node, onOpenAccount }: Props) {
         let valA = ''
         let valB = ''
         if (sortingColumn === 'principal') {
-          valA = a.principalId
-          valB = b.principalId
+          valA = describePrincipals(a.principals)
+          valB = describePrincipals(b.principals)
         } else if (sortingColumn === 'role') {
           valA = a.permissionSetName
           valB = b.permissionSetName

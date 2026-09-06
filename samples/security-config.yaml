@@ -1,20 +1,81 @@
 # AWS Landing Zone Accelerator Security Configuration
 #
-securityHub:
-  enable: true
-  excludeRegions: []
-  standards:
-    - aws-foundational-security-best-practices-v1.0.0
-    - cis-aws-foundational-benchmarks-v1.2.0
-guardduty:
-  enable: true
-  s3Protection:
+# Service configuration lives under `centralSecurityServices`, deployed from the
+# delegated administrator account. Only accessAnalyzer, iamPasswordPolicy,
+# cloudWatch and awsConfig sit at the top level. CloudTrail is configured in
+# global-config.yaml under `logging`, not here.
+
+centralSecurityServices:
+  delegatedAdminAccount: Audit
+
+  ebsDefaultVolumeEncryption:
     enable: true
-macie:
+    excludeRegions: []
+
+  s3PublicAccessBlock:
+    enable: true
+    excludeAccounts: []
+
+  scpRevertChangesConfig:
+    enable: true
+    snsTopicName: Security
+
+  macie:
+    enable: true
+    excludeRegions: []
+    policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+    publishSensitiveDataFindings: true
+
+  guardduty:
+    enable: true
+    excludeRegions: []
+    s3Protection:
+      enable: true
+      excludeRegions: []
+    eksProtection:
+      enable: true
+      excludeRegions: []
+    exportConfiguration:
+      enable: true
+      destinationType: S3
+      exportFrequency: FIFTEEN_MINUTES
+
+  securityHub:
+    enable: true
+    regionAggregation: true
+    snsTopicName: Security
+    notificationLevel: HIGH
+    excludeRegions: []
+    standards:
+      - name: AWS Foundational Security Best Practices v1.0.0
+        enable: true
+        controlsToDisable: []
+      - name: CIS AWS Foundations Benchmark v1.2.0
+        enable: true
+        controlsToDisable: []
+
+  ssmAutomation:
+    documentSets: []
+
+accessAnalyzer:
   enable: true
-  policyFindingsPublishingFrequency: FIFTEEN_MINUTES
+
+iamPasswordPolicy:
+  allowUsersToChangePassword: true
+  hardExpiry: false
+  requireUppercaseCharacters: true
+  requireLowercaseCharacters: true
+  requireSymbols: true
+  requireNumbers: true
+  minimumPasswordLength: 14
+  passwordReusePrevention: 24
+  maxPasswordAge: 90
+
+cloudWatch:
+  metricSets: []
+  alarmSets: []
+
 awsConfig:
   enableConfigurationRecorder: true
   enableDeliveryChannel: true
-cloudtrail:
-  enable: true
+  ruleSets: []
