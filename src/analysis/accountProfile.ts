@@ -146,6 +146,24 @@ function reachedVia(
   return null
 }
 
+/**
+ * The same question for a `deploymentTargets` block, which LZA resolves by
+ * exact OU match rather than by inheritance — see `expandDeployment`. Only
+ * `Root` and the account's own OU reach it.
+ */
+function deployedVia(
+  targets: { organizationalUnits?: string[]; accounts?: string[]; excludedAccounts?: string[] } | undefined,
+  accountName: string,
+  ouPath: string,
+): 'direct' | string | null {
+  if (!targets) return null
+  if (targets.excludedAccounts?.includes(accountName)) return null
+  if (targets.accounts?.includes(accountName)) return 'direct'
+  if (targets.organizationalUnits?.includes(ouPath)) return ouPath
+  if (targets.organizationalUnits?.includes(ROOT_OU)) return ROOT_OU
+  return null
+}
+
 function policyAttachments(
   policies: SCP[] | undefined,
   type: PolicyAttachment['type'],
@@ -172,7 +190,7 @@ function policyAttachments(
       targets: {
         organizationalUnits: p.deploymentTargets?.organizationalUnits ?? [],
         accounts: p.deploymentTargets?.accounts ?? [],
-        accountCount: accounts.expand(p.deploymentTargets).accounts.length,
+        accountCount: accounts.expandPolicy(p.deploymentTargets).accounts.length,
       },
     })
   }
@@ -252,7 +270,7 @@ export function buildAccountProfile(
 
     // Subnets another account owns but shares with this one.
     for (const subnet of vpc.subnets ?? []) {
-      const via = reachedVia(subnet.shareTargets, accountName, ouChain)
+      const via = deployedVia(subnet.shareTargets, accountName, account.ouPath)
       if (via == null) continue
       sharedSubnets.push({
         subnet: subnet.name,
@@ -268,26 +286,26 @@ export function buildAccountProfile(
   // ── IAM ───────────────────────────────────────────────────────────────────
   const roles: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.roleSets ?? []) {
-    if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
+    if (deployedVia(set.deploymentTargets, accountName, account.ouPath) == null) continue
     for (const r of set.roles ?? []) {
       roles.push({ name: r.name, boundaryPolicy: r.boundaryPolicy, ...attachedPolicies(r.policies) })
     }
   }
   const groups: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.groupSets ?? []) {
-    if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
+    if (deployedVia(set.deploymentTargets, accountName, account.ouPath) == null) continue
     for (const g of set.groups ?? []) groups.push({ name: g.name, ...attachedPolicies(g.policies) })
   }
   const users: ProfileIamPrincipal[] = []
   for (const set of configs.iam?.userSets ?? []) {
-    if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
+    if (deployedVia(set.deploymentTargets, accountName, account.ouPath) == null) continue
     for (const u of set.users ?? []) {
       users.push({ name: u.username, group: u.group, boundaryPolicy: u.boundaryPolicy })
     }
   }
   const iamPolicies: AccountProfile['iam']['policies'] = []
   for (const set of configs.iam?.policySets ?? []) {
-    if (reachedVia(set.deploymentTargets, accountName, ouChain) == null) continue
+    if (deployedVia(set.deploymentTargets, accountName, account.ouPath) == null) continue
     for (const p of set.policies ?? []) {
       const content = p.policy ? findFileContent(p.policy, loadedFiles) : undefined
       iamPolicies.push({
@@ -298,7 +316,7 @@ export function buildAccountProfile(
     }
   }
   const ssoAssignments = assignments(configs.iam)
-    .filter((a) => reachedVia(a.deploymentTargets, accountName, ouChain) != null)
+    .filter((a) => deployedVia(a.deploymentTargets, accountName, account.ouPath) != null)
     .flatMap((a) => a.principals.map((p) => ({
       principal: p.name,
       principalType: p.type,
@@ -315,7 +333,7 @@ export function buildAccountProfile(
   ] as const
   for (const [kind, list] of deployableLists) {
     for (const item of list ?? []) {
-      const via = reachedVia(item.deploymentTargets, accountName, ouChain)
+      const via = deployedVia(item.deploymentTargets, accountName, account.ouPath)
       if (via == null) continue
       deployables.push({
         name: item.name,
@@ -336,7 +354,7 @@ export function buildAccountProfile(
 
   // ── Global ────────────────────────────────────────────────────────────────
   const backupVaults = (configs.global?.backup?.vaults ?? [])
-    .filter((v) => reachedVia(v.deploymentTargets as Parameters<typeof reachedVia>[0], accountName, ouChain) != null)
+    .filter((v) => deployedVia(v.deploymentTargets as Parameters<typeof deployedVia>[0], accountName, account.ouPath) != null)
     .map((v) => v.name)
 
   // ── Findings ──────────────────────────────────────────────────────────────

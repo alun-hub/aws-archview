@@ -48,10 +48,16 @@ customizations:
       regions:
         - eu-west-1
         - eu-north-1
+      # A deploymentTargets block matches an OU exactly — it does not reach
+      # nested OUs the way an attached policy does, so every OU that holds
+      # accounts must be listed.
       deploymentTargets:
         organizationalUnits:
-          - Workloads
-          - Infrastructure
+          - Workloads/Dev
+          - Workloads/Test
+          - Workloads/Prod
+          - Infrastructure/Network
+          - Infrastructure/SharedServices
       template: cfn-templates/ssm-session-manager.yaml
       runOrder: 1
 
@@ -63,7 +69,9 @@ customizations:
         - eu-west-1
       deploymentTargets:
         organizationalUnits:
-          - Workloads
+          - Workloads/Dev
+          - Workloads/Test
+          - Workloads/Prod
       products:
         - name: Standard-VPC
           version: v1.2.0

@@ -1,6 +1,7 @@
 import { tgwNodeId } from '../../parser/nodeIds'
 import type { ViewKind } from '../../parser'
 import type { ExpandableTargets } from '../../parser/accountResolver'
+import { assignments } from '../../parser/identityCenter'
 import type { AnalysisContext, Rule, RuleFinding } from '../types'
 
 /** One targeting block somewhere in the config set, flattened so a single
@@ -8,6 +9,12 @@ import type { AnalysisContext, Rule, RuleFinding } from '../types'
  *  would search for in the YAML. */
 interface TargetSite {
   where: string
+  /**
+   * `policy` — attached to the OU in AWS Organizations, so it reaches nested
+   * OUs by inheritance. `deployment` — LZA resolves it to a list of accounts
+   * by exact OU match, so it does not.
+   */
+  kind: 'policy' | 'deployment'
   /** The object's own `name`, where it has one — used to match config that
    *  refers to a policy by name from elsewhere in the file. */
   name?: string
@@ -16,6 +23,13 @@ interface TargetSite {
   targets?: ExpandableTargets
   /** Node to select when the user clicks the finding, when one exists. */
   nodeIds?: string[]
+}
+
+/** Resolves a site's targets with the semantics that site actually follows. */
+function expandFor(ctx: AnalysisContext, site: TargetSite) {
+  return site.kind === 'policy'
+    ? ctx.accounts.expandPolicy(site.targets)
+    : ctx.accounts.expandDeployment(site.targets)
 }
 
 function collectSites(ctx: AnalysisContext): TargetSite[] {
@@ -33,6 +47,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
       sites.push({
         where: `${key}: ${p.name}`,
         name: p.name,
+        kind: 'policy',
         configFile: 'organization-config.yaml',
         view: 'organization',
         targets: p.deploymentTargets,
@@ -40,9 +55,10 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
     }
   }
 
-  for (const a of iam?.identityCenterAssignments ?? []) {
+  for (const a of assignments(iam)) {
     sites.push({
       where: `identityCenterAssignments: ${a.name}`,
+      kind: 'deployment',
       configFile: 'iam-config.yaml',
       view: 'iam',
       targets: a.deploymentTargets,
@@ -60,6 +76,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
     ;(sets ?? []).forEach((s, i) => {
       sites.push({
         where: `${key}[${i}]${s.name ? `: ${s.name}` : ''}`,
+        kind: 'deployment',
         configFile: 'iam-config.yaml',
         view: 'iam',
         targets: s.deploymentTargets,
@@ -77,6 +94,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
     for (const item of list ?? []) {
       sites.push({
         where: `${key}: ${item.name}`,
+        kind: 'deployment',
         configFile: 'customizations-config.yaml',
         view: 'customizations',
         targets: item.deploymentTargets,
@@ -89,6 +107,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
   for (const tgw of network?.transitGateways ?? []) {
     sites.push({
       where: `transitGateways: ${tgw.name} (shareTargets)`,
+      kind: 'deployment',
       configFile: 'network-config.yaml',
       view: 'network',
       targets: tgw.shareTargets,
@@ -98,6 +117,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
   for (const rule of network?.centralNetworkServices?.route53Resolver?.rules ?? []) {
     sites.push({
       where: `route53Resolver rules: ${rule.name} (shareTargets)`,
+      kind: 'deployment',
       configFile: 'network-config.yaml',
       view: 'network',
       targets: rule.shareTargets,
@@ -107,6 +127,7 @@ function collectSites(ctx: AnalysisContext): TargetSite[] {
   for (const vault of global?.backup?.vaults ?? []) {
     sites.push({
       where: `backup vaults: ${vault.name}`,
+      kind: 'deployment',
       configFile: 'global-config.yaml',
       view: 'global',
       targets: vault.deploymentTargets as ExpandableTargets | undefined,
@@ -133,7 +154,7 @@ export const unknownDeploymentTarget: Rule = {
     const findings: RuleFinding[] = []
     for (const site of collectSites(ctx)) {
       if (site.targets == null) continue
-      const { unknownOus, unknownAccounts } = ctx.accounts.expand(site.targets)
+      const { unknownOus, unknownAccounts } = expandFor(ctx, site)
       for (const ou of unknownOus) {
         findings.push({
           ruleId: 'unknown-deployment-target',
@@ -182,15 +203,23 @@ export const emptyDeploymentTarget: Rule = {
 
     const findings: RuleFinding[] = []
     for (const site of collectSites(ctx)) {
-      const expansion = ctx.accounts.expand(site.targets)
+      const expansion = expandFor(ctx, site)
       if (expansion.accounts.length > 0) continue
       // A broken reference already reported by the rule above is the cause
       // here, not a separate problem — don't say it twice.
       if (expansion.unknownOus.length > 0 || expansion.unknownAccounts.length > 0) continue
-      // Naming an OU that exists but holds no accounts *yet* is how a landing
-      // zone is built: the guardrails go in before the workloads do. Only
-      // targeting that names nothing at all is dead config.
-      if ((site.targets?.organizationalUnits?.length ?? 0) > 0) continue
+      // A deployment naming a parent OU whose accounts all live in nested OUs
+      // is the common trap: policies inherit downward, deploymentTargets do
+      // not. That is a mistake, not a future state, so it is reported.
+      const nestedInstead = site.kind === 'deployment'
+        ? (site.targets?.organizationalUnits ?? []).filter(
+            (ou) => ctx.accounts.accountsDirectlyIn(ou).length === 0 && ctx.accounts.accountsInOu(ou).length > 0,
+          )
+        : []
+
+      // Otherwise, naming an OU that exists but holds no accounts *yet* is how
+      // a landing zone is built: the guardrails go in before the workloads do.
+      if (nestedInstead.length === 0 && (site.targets?.organizationalUnits?.length ?? 0) > 0) continue
       // LZA attaches the quarantine SCP to new accounts as they are created,
       // via `quarantineNewAccounts`, so its empty deploymentTargets is correct.
       if (site.name && site.name === quarantinePolicy) continue
@@ -202,9 +231,11 @@ export const emptyDeploymentTarget: Rule = {
       const detail =
         site.targets == null
           ? `${site.where} declares no deploymentTargets at all, so it is defined but never deployed.`
-          : named.length === 0
-            ? `${site.where} has an empty deploymentTargets block, so it is never deployed anywhere.`
-            : `${site.where} targets ${named.join(', ')}, which currently contain no accounts — it deploys nowhere.`
+          : nestedInstead.length > 0
+            ? `${site.where} targets ${nestedInstead.map((o) => `OU ${o}`).join(', ')}, whose accounts all sit in nested OUs. A deploymentTargets block matches an OU exactly — unlike a policy, it does not reach nested OUs — so this deploys nowhere. List the nested OUs instead.`
+            : named.length === 0
+              ? `${site.where} has an empty deploymentTargets block, so it is never deployed anywhere.`
+              : `${site.where} targets ${named.join(', ')}, which currently contain no accounts — it deploys nowhere.`
       findings.push({
         ruleId: 'empty-deployment-target',
         severity: 'warning',

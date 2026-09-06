@@ -59,10 +59,15 @@ transitGateways:
         routes: []
       - name: VPN-RT
         routes: []
+    # shareTargets resolve like deploymentTargets: an exact OU match, so the
+    # OUs that actually hold the spoke accounts have to be named.
     shareTargets:
       organizationalUnits:
-        - Infrastructure
-        - Workloads
+        - Infrastructure/Network
+        - Infrastructure/SharedServices
+        - Workloads/Dev
+        - Workloads/Test
+        - Workloads/Prod
     tags:
       - key: Environment
         value: Hub

@@ -49,7 +49,7 @@ const configs: LzaConfigs = {
         subnets: [
           {
             name: 'Shared-App-A', availabilityZone: 'a', routeTable: 'RT', ipv4CidrBlock: '10.0.4.0/24',
-            shareTargets: { organizationalUnits: ['Workloads'] },
+            shareTargets: { organizationalUnits: ['Workloads/Production'] },
           },
           { name: 'Private-A', availabilityZone: 'a', routeTable: 'RT', ipv4CidrBlock: '10.0.5.0/24' },
         ],
@@ -70,11 +70,11 @@ const configs: LzaConfigs = {
   customizations: {
     customizations: {
       cloudFormationStacks: [
-        { name: 'ProdRemediations', regions: ['eu-west-1'], deploymentTargets: { organizationalUnits: ['Workloads'] } },
+        { name: 'ProdRemediations', regions: ['eu-west-1'], deploymentTargets: { organizationalUnits: ['Workloads/Production'] } },
         { name: 'InfraBaseline',                            deploymentTargets: { organizationalUnits: ['Infrastructure'] } },
         {
           name: 'ExcludedFromProd',
-          deploymentTargets: { organizationalUnits: ['Workloads'], excludedAccounts: ['Aurora-Prod'] },
+          deploymentTargets: { organizationalUnits: ['Workloads/Production'], excludedAccounts: ['Aurora-Prod'] },
         },
       ],
     },
@@ -150,7 +150,7 @@ describe('network', () => {
       subnet: 'Shared-App-A',
       vpc: 'Shared-VPC',
       ownerAccount: 'Network',
-      via: 'Workloads',
+      via: 'Workloads/Production',
     })
   })
 
@@ -262,6 +262,25 @@ describe('IAM and deployables', () => {
     expect(names).toContain('ProdRemediations')
     expect(names).not.toContain('ExcludedFromProd')
     expect(names).not.toContain('InfraBaseline')
+  })
+
+  it('does not treat a parent OU as reaching a nested account', () => {
+    // LZA resolves a deploymentTargets block by exact OU match, so a stack on
+    // `Workloads` never lands in `Workloads/Production`. Policies do inherit,
+    // which is exactly why the two are separated.
+    const parentTargeted = buildAccountProfile('Aurora-Prod', {
+      ...configs,
+      customizations: {
+        customizations: {
+          cloudFormationStacks: [
+            { name: 'ParentTargeted', deploymentTargets: { organizationalUnits: ['Workloads'] } },
+          ],
+        },
+      },
+    }, index)!
+    expect(parentTargeted.deployables).toEqual([])
+    // The SCP on Workloads still reaches it.
+    expect(parentTargeted.policies.map((p) => p.name)).toContain('RestrictRegions')
   })
 
   it('resolves backup vaults', () => {

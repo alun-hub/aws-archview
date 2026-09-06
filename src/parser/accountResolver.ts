@@ -54,10 +54,29 @@ export interface AccountIndex {
    *  does not manage them, so targeting one is not a broken reference. */
   ignoredOuPaths: Set<string>
   hasOu(path: string): boolean
-  /** Accounts directly in `path` plus those in OUs nested beneath it, matching
-   *  how LZA expands an OU deployment target. `ROOT_OU` returns everything. */
+  /** Accounts in `path` and in every OU beneath it. `ROOT_OU` returns
+   *  everything. This is AWS Organizations inheritance, which is what an
+   *  OU-attached policy follows. */
   accountsInOu(path: string): ResolvedAccount[]
-  expand(targets?: ExpandableTargets): TargetExpansion
+  /** Accounts whose `organizationalUnit` is exactly `path`. */
+  accountsDirectlyIn(path: string): ResolvedAccount[]
+  /**
+   * Accounts an OU-attached policy reaches: SCPs, RCPs, tagging and backup
+   * policies. LZA attaches these to the OU itself, and AWS Organizations
+   * applies them to everything beneath — so this descends.
+   */
+  expandPolicy(targets?: ExpandableTargets): TargetExpansion
+  /**
+   * Accounts a `deploymentTargets` block resolves to, exactly as LZA resolves
+   * it (`AccountsConfig.getAccountIdsFromDeploymentTarget`): `Root` means every
+   * account, and any other OU matches only accounts whose
+   * `organizationalUnit` equals it — no descent into nested OUs.
+   *
+   * Targeting `Workloads` therefore reaches nothing when the accounts live in
+   * `Workloads/Dev`. That trips people up precisely because policies *do*
+   * inherit, which is why the two are separate functions here.
+   */
+  expandDeployment(targets?: ExpandableTargets): TargetExpansion
 }
 
 export function buildAccountIndex(
@@ -91,7 +110,11 @@ export function buildAccountIndex(
     return accounts.filter((a) => a.ouPath === path || a.ouPath.startsWith(prefix))
   }
 
-  const expand = (targets?: ExpandableTargets): TargetExpansion => {
+  const accountsDirectlyIn = (path: string) =>
+    path === ROOT_OU ? accounts : accounts.filter((a) => a.ouPath === path)
+
+  const makeExpand = (inOu: (path: string) => ResolvedAccount[]) =>
+    (targets?: ExpandableTargets): TargetExpansion => {
     const resolved = new Set<string>()
     const unknownOus: string[] = []
     const unknownAccounts: string[] = []
@@ -101,7 +124,7 @@ export function buildAccountIndex(
         unknownOus.push(ou)
         continue
       }
-      for (const a of accountsInOu(ou)) resolved.add(a.name)
+      for (const a of inOu(ou)) resolved.add(a.name)
     }
     for (const name of targets?.accounts ?? []) {
       if (!byName.has(name)) {
@@ -119,5 +142,10 @@ export function buildAccountIndex(
     }
   }
 
-  return { accounts, byName, ouPaths, ignoredOuPaths, hasOu, accountsInOu, expand }
+  return {
+    accounts, byName, ouPaths, ignoredOuPaths, hasOu,
+    accountsInOu, accountsDirectlyIn,
+    expandPolicy: makeExpand(accountsInOu),
+    expandDeployment: makeExpand(accountsDirectlyIn),
+  }
 }

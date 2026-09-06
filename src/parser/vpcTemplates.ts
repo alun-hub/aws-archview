@@ -34,7 +34,7 @@ export function resolveVpcs(
 
   for (const template of network?.vpcTemplates ?? []) {
     const { deploymentTargets, ...rest } = template
-    const targetAccounts = accounts?.expand(deploymentTargets).accounts ?? []
+    const targetAccounts = accounts?.expandDeployment(deploymentTargets).accounts ?? []
 
     if (targetAccounts.length > 0) {
       for (const account of targetAccounts) {

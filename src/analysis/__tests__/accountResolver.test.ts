@@ -85,28 +85,53 @@ describe('accountsInOu', () => {
   })
 })
 
-describe('expand', () => {
+describe('expandPolicy', () => {
   const index = buildAccountIndex(organization, accounts)
 
   it('resolves OUs and accounts together, deduplicated and sorted', () => {
-    expect(index.expand({ organizationalUnits: ['Infrastructure'], accounts: ['Network', 'LogArchive'] }).accounts)
+    expect(index.expandPolicy({ organizationalUnits: ['Infrastructure'], accounts: ['Network', 'LogArchive'] }).accounts)
       .toEqual(['LogArchive', 'Network', 'Shared'])
   })
 
   it('reports references that do not exist instead of silently dropping them', () => {
-    const result = index.expand({ organizationalUnits: ['Infrastucture'], accounts: ['Netwrok'] })
+    const result = index.expandPolicy({ organizationalUnits: ['Infrastucture'], accounts: ['Netwrok'] })
     expect(result.unknownOus).toEqual(['Infrastucture'])
     expect(result.unknownAccounts).toEqual(['Netwrok'])
     expect(result.accounts).toEqual([])
   })
 
   it('applies excludedAccounts', () => {
-    expect(index.expand({ organizationalUnits: ['Root'], excludedAccounts: ['Management', 'Shared'] }).accounts)
+    expect(index.expandPolicy({ organizationalUnits: ['Root'], excludedAccounts: ['Management', 'Shared'] }).accounts)
       .toEqual(['LogArchive', 'Network'])
   })
 
   it('treats an absent target block as deploying nowhere', () => {
-    expect(index.expand(undefined).accounts).toEqual([])
-    expect(index.expand({}).accounts).toEqual([])
+    expect(index.expandPolicy(undefined).accounts).toEqual([])
+    expect(index.expandPolicy({}).accounts).toEqual([])
+  })
+})
+
+describe('expandDeployment', () => {
+  const index = buildAccountIndex(organization, accounts)
+
+  it('matches an OU exactly, as LZA resolves a deploymentTargets block', () => {
+    // `getAccountIdsFromDeploymentTarget` compares `ou === account.organizationalUnit`.
+    // Targeting a parent reaches nothing when the accounts sit below it — the
+    // trap that makes this different from a policy attachment.
+    expect(index.expandDeployment({ organizationalUnits: ['Infrastructure'] }).accounts)
+      .toEqual(['Shared'])
+    expect(index.expandPolicy({ organizationalUnits: ['Infrastructure'] }).accounts.sort())
+      .toEqual(['Network', 'Shared'])
+  })
+
+  it('still treats Root as every account', () => {
+    expect(index.expandDeployment({ organizationalUnits: ['Root'] }).accounts)
+      .toEqual(index.accounts.map((a) => a.name).sort())
+  })
+
+  it('applies excludedAccounts and reports unknown references the same way', () => {
+    const result = index.expandDeployment({ organizationalUnits: ['Root', 'Nope'], excludedAccounts: ['Management'] })
+    expect(result.accounts).not.toContain('Management')
+    expect(result.unknownOus).toEqual(['Nope'])
   })
 })

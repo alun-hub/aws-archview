@@ -349,3 +349,66 @@ describe('ou-without-scp', () => {
     }, 'ou-without-scp')).toHaveLength(0)
   })
 })
+
+// ── Deployment targets vs policy attachment ─────────────────────────────────
+
+describe('empty-deployment-target and nested OUs', () => {
+  const organization: LzaConfigs['organization'] = {
+    enable: true,
+    organizationalUnits: [{ name: 'Workloads' }, { name: 'Workloads/Prod' }],
+  }
+  const accounts: LzaConfigs['accounts'] = {
+    mandatoryAccounts: [{ name: 'Prod-1', email: 'p@example.com', organizationalUnit: 'Workloads/Prod' }],
+  }
+
+  it('flags a deployment on a parent OU whose accounts sit below it', () => {
+    // LZA matches an OU exactly here, so this deploys nowhere — the mistake
+    // people make because attached policies *do* inherit downward.
+    const findings = of({
+      organization,
+      accounts,
+      customizations: {
+        customizations: {
+          cloudFormationStacks: [{ name: 'Baseline', deploymentTargets: { organizationalUnits: ['Workloads'] } }],
+        },
+      },
+    }, 'empty-deployment-target')
+    expect(findings).toHaveLength(1)
+    expect(findings[0].detail).toContain('does not reach nested OUs')
+    expect(findings[0].detail).toContain('List the nested OUs instead')
+  })
+
+  it('accepts the same deployment once the nested OU is named', () => {
+    expect(of({
+      organization,
+      accounts,
+      customizations: {
+        customizations: {
+          cloudFormationStacks: [{ name: 'Baseline', deploymentTargets: { organizationalUnits: ['Workloads/Prod'] } }],
+        },
+      },
+    }, 'empty-deployment-target')).toHaveLength(0)
+  })
+
+  it('does not flag a policy on the same parent OU, which does inherit', () => {
+    expect(of({
+      organization: {
+        ...organization!,
+        serviceControlPolicies: [{ name: 'Guard', deploymentTargets: { organizationalUnits: ['Workloads'] } }],
+      },
+      accounts,
+    }, 'empty-deployment-target')).toHaveLength(0)
+  })
+
+  it('still says nothing about an OU that simply has no accounts yet', () => {
+    expect(of({
+      organization: { enable: true, organizationalUnits: [{ name: 'Sandbox' }] },
+      accounts,
+      customizations: {
+        customizations: {
+          cloudFormationStacks: [{ name: 'Baseline', deploymentTargets: { organizationalUnits: ['Sandbox'] } }],
+        },
+      },
+    }, 'empty-deployment-target')).toHaveLength(0)
+  })
+})
