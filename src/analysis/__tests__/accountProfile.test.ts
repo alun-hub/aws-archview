@@ -208,8 +208,42 @@ describe('IAM and deployables', () => {
     const scp = withDoc.policies.find((p) => p.name === 'DenyRoot')!
     expect(scp.policyFile).toBe('policies/deny-root.json')
     expect(scp.statements).toEqual([
-      { name: 'DenyRoot [DenyRoot]', effect: 'Deny', action: '*', resource: '*' },
+      {
+        name: 'DenyRoot [DenyRoot]', sid: 'DenyRoot', effect: 'Deny',
+        action: '*', resource: '*', condition: '', principal: '',
+      },
     ])
+  })
+
+  it('carries the condition, without which an SCP reads as far broader than it is', () => {
+    // `Deny * on *` with a condition is a targeted rule; rendering it without
+    // the condition says it denies everything for everyone.
+    const withCondition = buildAccountProfile('Aurora-Prod', {
+      ...configs,
+      organization: {
+        ...configs.organization!,
+        serviceControlPolicies: [
+          { name: 'DenyRoot', policy: 'p.json', deploymentTargets: { organizationalUnits: ['Root'] } },
+        ],
+        backupPolicies: [],
+      },
+    }, index, [], {
+      'p.json': JSON.stringify({
+        Statement: [{
+          Effect: 'Deny', Action: '*', Resource: '*',
+          Condition: { StringLike: { 'aws:PrincipalArn': 'arn:aws:iam::*:root' } },
+        }],
+      }),
+    })!
+    expect(withCondition.policies[0].statements![0].condition)
+      .toBe('StringLike aws:PrincipalArn = arn:aws:iam::*:root')
+  })
+
+  it('reports how far a policy reaches beyond this account', () => {
+    const scp = profile.policies.find((p) => p.name === 'DenyRoot')!
+    expect(scp.targets.organizationalUnits).toEqual(['Root'])
+    // Every account in the fixture, not just the one whose profile this is.
+    expect(scp.targets.accountCount).toBe(3)
   })
 
   it('leaves statements undefined when the document is not loaded', () => {

@@ -32,6 +32,9 @@ export interface PolicyAttachment {
   source: 'direct' | string
   /** Path to the policy document, as written in organization-config. */
   policyFile?: string
+  /** The OUs and accounts the policy names, and how many accounts it reaches
+   *  in total — "what else does changing this affect?" */
+  targets: { organizationalUnits: string[]; accounts: string[]; accountCount: number }
   /** The document's statements, when the file is loaded. Knowing a policy is
    *  attached is much less useful than seeing what it actually denies. */
   statements?: PolicyStatementEntry[]
@@ -148,6 +151,7 @@ function policyAttachments(
   accountName: string,
   ouChain: string[],
   loadedFiles: Record<string, string>,
+  accounts: AccountIndex,
 ): PolicyAttachment[] {
   const out: PolicyAttachment[] = []
   for (const p of policies ?? []) {
@@ -164,6 +168,11 @@ function policyAttachments(
       source,
       policyFile: p.policy,
       statements: content ? parsePolicyStatements(p.name, content) : undefined,
+      targets: {
+        organizationalUnits: p.deploymentTargets?.organizationalUnits ?? [],
+        accounts: p.deploymentTargets?.accounts ?? [],
+        accountCount: accounts.expand(p.deploymentTargets).accounts.length,
+      },
     })
   }
   return out
@@ -193,10 +202,10 @@ export function buildAccountProfile(
 
   // ── Policies ──────────────────────────────────────────────────────────────
   const policies = [
-    ...policyAttachments(org?.serviceControlPolicies, 'scp', accountName, ouChain, loadedFiles),
-    ...policyAttachments(org?.resourceControlPolicies, 'rcp', accountName, ouChain, loadedFiles),
-    ...policyAttachments(org?.taggingPolicies, 'tagging', accountName, ouChain, loadedFiles),
-    ...policyAttachments(org?.backupPolicies, 'backup', accountName, ouChain, loadedFiles),
+    ...policyAttachments(org?.serviceControlPolicies, 'scp', accountName, ouChain, loadedFiles, accounts),
+    ...policyAttachments(org?.resourceControlPolicies, 'rcp', accountName, ouChain, loadedFiles, accounts),
+    ...policyAttachments(org?.taggingPolicies, 'tagging', accountName, ouChain, loadedFiles, accounts),
+    ...policyAttachments(org?.backupPolicies, 'backup', accountName, ouChain, loadedFiles, accounts),
   ]
 
   // ── Network ───────────────────────────────────────────────────────────────

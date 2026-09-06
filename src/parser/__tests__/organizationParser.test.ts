@@ -314,8 +314,16 @@ describe('organizationParser', () => {
 
     const statements = ouNode?.data.scpStatements as { name: string; effect: string; action: string; resource: string }[]
     expect(statements).toHaveLength(2)
-    expect(statements[0]).toEqual({ name: 'DenyRootUser [DenyRoot]', effect: 'Deny', action: 'sts:AssumeRole', resource: '*' })
-    expect(statements[1]).toEqual({ name: 'DenyRootUser', effect: 'Deny', action: 'NOT iam:GetRole, iam:ListRoles', resource: '*' })
+    expect(statements[0]).toEqual({
+      name: 'DenyRootUser [DenyRoot]', sid: 'DenyRoot', effect: 'Deny',
+      action: 'sts:AssumeRole', resource: '*',
+      // This fixture always had a condition; it was simply being dropped.
+      condition: 'StringLike aws:PrincipalArn = *:root', principal: '',
+    })
+    expect(statements[1]).toEqual({
+      name: 'DenyRootUser', sid: '', effect: 'Deny',
+      action: 'NOT iam:GetRole, iam:ListRoles', resource: '*', condition: '', principal: '',
+    })
     // UnresolvedScp's file was never loaded — no statements for it, and no crash
   })
 

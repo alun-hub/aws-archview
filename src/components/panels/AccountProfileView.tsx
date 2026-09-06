@@ -176,27 +176,46 @@ const cellStyle: React.CSSProperties = {
 }
 const headStyle: React.CSSProperties = { ...cellStyle, color: '#8b95a1', fontWeight: 600 }
 
-/** The statements a policy document actually contains — the answer to "what
- *  does this SCP deny?", which the policy's name only hints at. */
+/**
+ * The statements a policy document actually contains.
+ *
+ * The Condition column is not a nicety. Most SCPs are `Deny * on *` and mean
+ * something entirely specific because of their condition — showing the first
+ * three columns alone reads as "denies everything for everyone", which is both
+ * wrong and alarming. Principal matters for resource control policies.
+ */
 function StatementTable({ statements }: { statements: PolicyStatementEntry[] }) {
+  const anyPrincipal = statements.some((st) => st.principal)
+  const anySid = statements.some((st) => st.sid)
+
   return (
     <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 340 }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
         <thead>
           <tr>
-            <th style={{ ...headStyle, width: 70 }}>Effect</th>
+            {anySid && <th style={headStyle}>Sid</th>}
+            <th style={{ ...headStyle, width: 58 }}>Effect</th>
             <th style={headStyle}>Action</th>
             <th style={headStyle}>Resource</th>
+            {anyPrincipal && <th style={headStyle}>Principal</th>}
+            <th style={headStyle}>Condition</th>
           </tr>
         </thead>
         <tbody>
           {statements.map((st, i) => (
             <tr key={`${st.name}:${i}`}>
+              {anySid && <td style={cellStyle}>{st.sid || '—'}</td>}
               <td style={{ ...cellStyle, color: st.effect === 'Deny' ? '#d13212' : '#248814', fontWeight: 700 }}>
                 {st.effect || '—'}
               </td>
               <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{st.action}</td>
               <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{st.resource}</td>
+              {anyPrincipal && <td style={{ ...cellStyle, fontFamily: 'monospace' }}>{st.principal || '—'}</td>}
+              <td style={{ ...cellStyle, fontFamily: 'monospace' }}>
+                {st.condition
+                  ? st.condition
+                  : <span style={{ color: '#aab', fontStyle: 'italic', fontFamily: FONT }}>unconditional</span>}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -339,7 +358,7 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
                   )}
                 </>
               }
-              detail={p.statements?.length || p.policyFile ? (
+              detail={
                 <>
                   {p.policyFile && (
                     <div style={{ fontSize: 10, color: '#8b95a1', fontFamily: 'monospace', marginBottom: 6 }}>
@@ -348,11 +367,23 @@ function ProfileCard({ profile, onFocus, onSelectFinding, onBack }: {
                   )}
                   {p.statements?.length ? (
                     <StatementTable statements={p.statements} />
-                  ) : (
+                  ) : p.policyFile ? (
                     <Empty>Load {p.policyFile} to see what this policy contains.</Empty>
+                  ) : (
+                    <Empty>This policy names no document, so it deploys nothing.</Empty>
                   )}
+                  {/* What else changing this policy would affect. */}
+                  <div style={{ marginTop: 8, fontSize: 11, color: '#5f6b7a' }}>
+                    Applies to {p.targets.accountCount} account{p.targets.accountCount === 1 ? '' : 's'}
+                    {(p.targets.organizationalUnits.length > 0 || p.targets.accounts.length > 0) && (
+                      <> via {[
+                        ...p.targets.organizationalUnits.map((o) => `OU ${o}`),
+                        ...p.targets.accounts,
+                      ].join(', ')}</>
+                    )}
+                  </div>
                 </>
-              ) : undefined}
+              }
             />
           ))
         )}

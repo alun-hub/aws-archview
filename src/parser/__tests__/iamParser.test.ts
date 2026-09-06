@@ -89,7 +89,11 @@ describe('iamParser', () => {
     const model = parseIam(cfg, undefined, loadedFiles)
     const policySet = model.nodes.find(n => n.label === 'Custom-Policies')!
     expect(policySet.data.policyStatements).toEqual([
-      { name: 'S3-ReadOnly [ReadOnly]', effect: 'Allow', action: 's3:GetObject', resource: 'arn:aws:s3:::bucket/*' },
+      {
+        name: 'S3-ReadOnly [ReadOnly]', sid: 'ReadOnly', effect: 'Allow',
+        action: 's3:GetObject', resource: 'arn:aws:s3:::bucket/*',
+        condition: '', principal: '',
+      },
     ])
   })
 
