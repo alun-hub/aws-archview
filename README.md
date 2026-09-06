@@ -8,13 +8,17 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ## Screenshots
 
-| Organization | Policies |
+| Organization | Accounts |
 |---|---|
-| ![Organization view](docs/screenshots/organization.png) | ![Policies view](docs/screenshots/policies.png) |
+| ![Organization view](docs/screenshots/organization.png) | ![Accounts view](docs/screenshots/accounts.png) |
 
-| Network | Security |
+| Policies | Network |
 |---|---|
-| ![Network view](docs/screenshots/network.png) | ![Security view](docs/screenshots/security.png) |
+| ![Policies view](docs/screenshots/policies.png) | ![Network view](docs/screenshots/network.png) |
+
+| Path trace | Security |
+|---|---|
+| ![Path trace](docs/screenshots/path-trace.png) | ![Security view](docs/screenshots/security.png) |
 
 | IAM | Global |
 |---|---|
