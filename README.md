@@ -52,6 +52,89 @@ Because AWS ArchView is a pure client-side web application, **no server-side pro
 
 ---
 
+## Validation
+
+Every loaded config is checked by a rule engine as soon as it's dropped in — no diagram
+required, so a check still runs even for a view whose diagram fails to render. Findings show up
+in the **Validation** panel in the left sidebar, grouped by severity, and clicking one jumps
+straight to the node on the diagram it's about.
+
+This isn't YAML linting. The types in `parser/types.ts` are compile-time only, so a config can
+be syntactically perfect YAML and still reference an account that doesn't exist, route traffic
+into a CIDR collision, or attach a policy that reaches nothing — none of that is a parse error.
+21 rules currently check for exactly that class of mistake, verified against LZA's own shipped
+JSON Schemas, the AWS-published Universal Configuration, and the LZA source itself (see
+`CLAUDE.md` for the full verification methodology).
+
+### Severity means confidence, not importance
+
+- 🔴 **Error** — the config is broken or will not deploy: a dangling reference, a CIDR
+  collision, a missing required field, a file that failed to parse.
+- 🟡 **Warning** — the config is internally inconsistent: an attachment nothing can route to, a
+  policy that deploys nowhere, a service excluded from a region the org actually runs in.
+- ⚪ **Info** — an observation, not necessarily a defect: an option not enabled, an OU with no
+  SCP, a route table nobody uses. Often deliberate, and worth a second look rather than a fix.
+
+### What gets checked
+
+**File & structural integrity**
+- File failed to parse (`yaml-parse-failure`) — invalid YAML in a loaded file.
+- Included file not loaded (`missing-include`) — an `!include` tag names a file you haven't dropped in yet.
+- Required field is missing (`missing-required-field`) — a field a view or a rule genuinely needs to function.
+- Misspelled configuration key (`unknown-key`) — an unrecognized key that's a near-miss typo of a known one (e.g. `enalbe`); flagging every key LZA supports but this app doesn't model would drown real typos in noise, so this is deliberately conservative.
+- Unresolved replacement token (`unresolved-replacement`) — a `{{ }}` placeholder with no matching `global-config.yaml` value.
+
+**Organization & accounts**
+- Deployment target does not exist (`unknown-deployment-target`) — a `deploymentTargets` block names an OU or account that isn't declared anywhere.
+- Deployment target matches no account (`empty-deployment-target`) — a target resolves to zero accounts, usually because an OU was named instead of the specific sub-OU the accounts actually live in (LZA matches a deployment target exactly, not hierarchically — see below).
+- Organizational unit has no SCP (`ou-without-scp`) — an OU with no Service Control Policy attached, direct or inherited.
+
+**Networking — CIDRs**
+- Overlapping VPC CIDRs (`vpc-cidr-overlap`) — two VPCs whose address ranges collide; an error when they share a Transit Gateway or peering (their route tables can't express two destinations with the same prefix), a warning otherwise (it still blocks ever connecting them later).
+- Subnet outside its VPC range (`subnet-cidr-outside-vpc`) — a subnet's CIDR isn't contained in its VPC's.
+- Overlapping subnets in a VPC (`subnet-cidr-overlap`) — two subnets in the same VPC with colliding ranges.
+
+**Networking — routing**
+- Subnet references an undeclared route table (`unknown-subnet-route-table`) — a value-level reference (so plain YAML parsing can't catch it) to a route table the VPC never defines.
+- Route table is never used (`unused-vpc-route-table`) — a declared route table no subnet points at; often the other half of a rename applied on only one side.
+- Subnet has no route out of the VPC (`subnet-without-default-route`) — no default route at all, so the subnet can only reach other things in the same VPC.
+- Subnet routes to a NAT Gateway in another AZ (`nat-gateway-crosses-az`) — a cross-AZ hop that adds latency and an AWS data-transfer charge with no resilience benefit.
+- Public subnet auto-assigns public IPs (`public-subnet-auto-assigns-ips`) — flagged as a heads-up, not a mistake: every instance launched here gets a public IP by default.
+
+**Networking — Transit Gateway**
+- Unknown Transit Gateway route table (`unknown-tgw-route-table`) — an association or propagation names a TGW route table that isn't declared, wherever LZA allows declaring one (nested under the TGW, or at the top level).
+- Attachment propagates to no route table (`tgw-attachment-no-propagation`) — an attachment that can't be learned from anywhere; not flagged when a static route reaches it instead, which is exactly how a hub-and-spoke inspection VPC is meant to work.
+
+**Security**
+- Security service disabled in an enabled region (`security-service-excluded-region`) — GuardDuty, Security Hub, etc. excluded from a region the org actually deploys into.
+- Region exclusion has no effect (`stale-region-exclusion`) — a region named in `excludeRegions` that the org isn't even enabled in, usually leftover after `enabledRegions` shrank.
+
+**Observability**
+- VPC has no flow logs (`vpc-without-flow-logs`) — no `vpcFlowLogs` on the VPC and no org-wide default in `network-config.yaml`; `info` rather than `warning`, since this app only sees the LZA configs and the account may well be covered by something outside them (an org-wide Config rule, an account-factory baseline).
+
+### A trap worth knowing about
+
+LZA resolves a policy attachment (SCP, tagging, backup) and a deployment target
+(`deploymentTargets`/`shareTargets`) differently. A policy attached to an OU cascades to every
+account beneath it in AWS Organizations. A deployment target does not — `Root` still means
+every account, but naming any other OU reaches only accounts whose `organizationalUnit` equals
+it exactly, with no descent into sub-OUs. Targeting `Workloads` when the actual accounts live in
+`Workloads/Dev` silently deploys nothing, and `empty-deployment-target` exists specifically to
+catch it.
+
+### Path trace
+
+The **Network** view has a "Path trace" tool in the sidebar for a question the rules above don't
+answer: can this specific VPC actually reach that one? Pick a source and a destination by
+clicking VPC or subnet nodes on the canvas, and it walks the same chain LZA itself resolves at
+deploy time — the subnet's route table, the Transit Gateway route table its attachment
+associates with, whether that table carries the destination by propagation or by a static route,
+or a VPC peering connection — and separately checks the return path, since a config can easily
+route traffic one way and not the other. The traced path highlights on the diagram; each hop in
+the result explains itself, including exactly where and why it breaks.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
