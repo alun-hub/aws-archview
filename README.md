@@ -67,8 +67,7 @@ This isn't YAML linting. The types in `parser/types.ts` are compile-time only, s
 be syntactically perfect YAML and still reference an account that doesn't exist, route traffic
 into a CIDR collision, or attach a policy that reaches nothing — none of that is a parse error.
 21 rules currently check for exactly that class of mistake, verified against LZA's own shipped
-JSON Schemas, the AWS-published Universal Configuration, and the LZA source itself (see
-`CLAUDE.md` for the full verification methodology).
+JSON Schemas, the AWS-published Universal Configuration, and the LZA source itself.
 
 ### Severity means confidence, not importance
 
